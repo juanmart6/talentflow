@@ -3,7 +3,7 @@ import { PlaceholderPattern } from '@/components/ui/placeholder-pattern';
 import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
 
-export default function Centros() {
+export default function EducationCenters() {
     return (
         <AppLayout>
             <Head title="Centros Educativos" />

@@ -10,8 +10,7 @@ Route::inertia('/', 'welcome', [
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::inertia('dashboard', 'dashboard')->name('dashboard');
-    Route::get('centros', function () { return Inertia::render('centros'); })->name('centros');
-
+    Route::get('education-centers', function () { return Inertia::render('education-centers'); })->name('educationCenters');
     
 });
 

@@ -12,7 +12,7 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
-import { dashboard, centros } from '@/routes';
+import { dashboard, educationCenters } from '@/routes';
 import type { NavItem } from '@/types';
 import logo from '@/assets/TF_logo.svg'
 
@@ -24,7 +24,7 @@ const mainNavItems: NavItem[] = [
     },
     {
         title: 'Centros Educativos',
-        href: centros(),
+        href: educationCenters(),
         icon: School,
     },
     {
