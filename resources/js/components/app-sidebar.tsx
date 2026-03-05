@@ -12,7 +12,7 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
-import { dashboard } from '@/routes';
+import { dashboard, centros } from '@/routes';
 import type { NavItem } from '@/types';
 import logo from '@/assets/TF_logo.svg'
 
@@ -23,13 +23,8 @@ const mainNavItems: NavItem[] = [
         icon: LayoutGrid,
     },
     {
-        title: 'Autenticación y Usuarios',
-        href: '/autenticacion-usuarios',
-        icon: Users,
-    },
-    {
         title: 'Centros Educativos',
-        href: '/centros',
+        href: centros(),
         icon: School,
     },
     {
@@ -51,6 +46,11 @@ const mainNavItems: NavItem[] = [
         title: 'Evaluación y Notas',
         href: '/evaluacion-notas',
         icon: Award,
+    },
+    {
+            title: 'Autenticación y Usuarios',
+        href: '/autenticacion-usuarios',
+        icon: Users,
     }
 ];
 
