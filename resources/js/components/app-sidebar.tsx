@@ -12,19 +12,20 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
-import { dashboard, educationCenters } from '@/routes';
+import { dashboard } from '@/routes';
+import educationCenters from '@/routes/education-centers';
 import type { NavItem } from '@/types';
 import logo from '@/assets/TF_logo.svg'
 
 const mainNavItems: NavItem[] = [
     {
         title: 'Dashboard',
-        href: dashboard(),
+        href: dashboard().url,
         icon: LayoutGrid,
     },
     {
         title: 'Centros Educativos',
-        href: educationCenters(),
+        href: educationCenters.index().url,
         icon: School,
     },
     {
