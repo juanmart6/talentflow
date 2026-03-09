@@ -40,7 +40,7 @@ trait EducationCenterValidationRules
     protected function educationCenterMessages(): array
     {
         return [
-            'institutional_email.unique' => 'Ya existe un centro con ese email institucional.',
+            'institutional_email.unique' => 'Ya existe un centro con ese email.',
             'agreement_expires_at.after_or_equal' => 'La fecha de vencimiento debe ser igual o posterior a la fecha de firma.',
             'agreement_agreed_slots.min' => 'Las plazas acordadas deben ser al menos 1.',
             'agreement_pdf.mimes' => 'El documento del convenio debe ser un archivo PDF.',
