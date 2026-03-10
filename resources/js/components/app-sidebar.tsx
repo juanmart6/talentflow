@@ -1,6 +1,4 @@
-import { Link } from '@inertiajs/react';
 import { Award, Clock9, GraduationCap, LayoutGrid, NotebookPen, School, Users } from 'lucide-react';
-import AppLogo from '@/components/app-logo';
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
 import {
@@ -9,14 +7,12 @@ import {
     SidebarFooter,
     SidebarHeader,
     SidebarMenu,
-    SidebarMenuButton,
-    SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
 import educationCenters from '@/routes/education-centers';
 import interns from '@/routes/interns';
 import type { NavItem } from '@/types';
-import logo from '@/assets/TF_logo.svg'
+import logo from '@/assets/TF_logo.svg';
 
 const mainNavItems: NavItem[] = [
     {
@@ -50,18 +46,29 @@ const mainNavItems: NavItem[] = [
         icon: Award,
     },
     {
-            title: 'Autenticación y Usuarios',
+        title: 'Autenticación y Usuarios',
         href: '/autenticacion-usuarios',
         icon: Users,
-    }
+    },
 ];
 
 export function AppSidebar() {
     return (
-        <Sidebar collapsible="icon" variant="inset">
+        <Sidebar
+            collapsible="icon"
+            variant="inset"
+            className="group-data-[variant=inset]:p-3"
+        >
             <SidebarHeader>
-                <div className="flex items-center justify-center py-4">
-                    <img src={logo} alt="TalentFlow Logo" className="h-30 w-auto" />
+                <div className="relative overflow-hidden rounded-2xl border border-sidebar-border/70 bg-sidebar/90 px-3 py-4 shadow-sm backdrop-blur">
+                    <div className="pointer-events-none absolute -top-10 right-0 h-24 w-24 rounded-full bg-sidebar-primary/20 blur-2xl" />
+                    <div className="flex items-center justify-center">
+                        <img
+                            src={logo}
+                            alt="TalentFlow Logo"
+                            className="relative h-28 w-auto transition-all duration-200 group-data-[collapsible=icon]:h-10"
+                        />
+                    </div>
                 </div>
             </SidebarHeader>
 

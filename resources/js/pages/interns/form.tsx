@@ -37,6 +37,12 @@ type InternFormData = {
     abandonment_reason?: string | null;
 };
 
+const STATUS_LABELS: Record<'active' | 'finished' | 'abandoned', string> = {
+    active: 'Activo',
+    finished: 'Finalizado',
+    abandoned: 'Abandonado',
+};
+
 type Props = {
     mode: 'create' | 'edit';
     intern: InternFormData | null;
@@ -107,7 +113,7 @@ export default function InternFormPage({ mode, intern, educationCenters }: Props
                     </div>
                     <div className="rounded-xl border border-sidebar-border/70 p-4 dark:border-sidebar-border">
                         <p className="text-sm text-muted-foreground">Estado actual</p>
-                        <p className="mt-2 text-2xl font-semibold">{data.status}</p>
+                        <p className="mt-2 text-2xl font-semibold">{STATUS_LABELS[data.status as 'active' | 'finished' | 'abandoned']}</p>
                     </div>
                     <div className="rounded-xl border border-sidebar-border/70 p-4 dark:border-sidebar-border">
                         <p className="text-sm text-muted-foreground">Campos obligatorios</p>
