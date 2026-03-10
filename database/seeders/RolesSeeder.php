@@ -13,10 +13,18 @@ class RolesSeeder extends Seeder
         $roles = ['admin', 'tutor', 'intern'];
 
         $permissions = [
+
+            // Centros Educativos:
             'education-centers.view',
             'education-centers.create',
             'education-centers.update',
             'education-centers.delete',
+
+            //Becarios:
+            'interns.view',
+            'interns.create',
+            'interns.update',
+            'interns.delete',
         ];
 
         foreach ($permissions as $permission) {
@@ -41,12 +49,16 @@ class RolesSeeder extends Seeder
                     'education-centers.view',
                     'education-centers.create',
                     'education-centers.update',
+                    'interns.view',
+                    'interns.create',
+                    'interns.update',
                 ]);
             }
 
             if ($role === 'intern') {
                 $roleModel->syncPermissions([
                     'education-centers.view',
+                    'interns.view',
                 ]);
             }
         }

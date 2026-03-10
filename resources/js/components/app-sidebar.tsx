@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
 import educationCenters from '@/routes/education-centers';
+import interns from '@/routes/interns';
 import type { NavItem } from '@/types';
 import logo from '@/assets/TF_logo.svg'
 
@@ -30,7 +31,7 @@ const mainNavItems: NavItem[] = [
     },
     {
         title: 'Gestión de Becarios',
-        href: '/gestion-becarios',
+        href: interns.index().url,
         icon: GraduationCap,
     },
     {
