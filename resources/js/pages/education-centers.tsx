@@ -1,6 +1,7 @@
-import { Head, Link, router } from '@inertiajs/react';
-import { FormEvent, useMemo, useState } from 'react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
 import {
     Dialog,
     DialogContent,
@@ -71,9 +72,23 @@ function normalizePaginationLabel(label: string): string {
 }
 
 export default function EducationCenters({ centers, filters }: Props) {
+    const page = usePage<{ flash?: { success?: string; error?: string } }>();
     const [search, setSearch] = useState(filters.search ?? '');
     const [centerToDelete, setCenterToDelete] = useState<CenterRow | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
+
+    useEffect(() => {
+        const successMessage = page.props.flash?.success;
+        const errorMessage = page.props.flash?.error;
+
+        if (successMessage) {
+            toast.success(successMessage);
+        }
+
+        if (errorMessage) {
+            toast.error(errorMessage);
+        }
+    }, [page.props.flash?.success, page.props.flash?.error]);
 
     const hasRows = centers.data.length > 0;
     const renewalSoonCount = centers.data.filter((center) => center.renewal_soon).length;
@@ -234,6 +249,9 @@ export default function EducationCenters({ centers, filters }: Props) {
                                             </td>
                                             <td className="px-4 py-3">
                                                 <div className="flex justify-end gap-2">
+                                                    <Button variant="secondary" size="sm" asChild>
+                                                        <Link href={educationCenters.show(center.id).url}>Ver</Link>
+                                                    </Button>
                                                     <Button variant="outline" size="sm" asChild>
                                                         <Link href={educationCenters.edit(center.id).url}>Editar</Link>
                                                     </Button>

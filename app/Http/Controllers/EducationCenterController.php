@@ -24,7 +24,7 @@ class EducationCenterController extends Controller
             ->with('latestCollaborationAgreement')
             ->withCount('collaborationAgreements')
             ->when($search !== '', function ($query) use ($search) {
-                $query->where('name', 'like', "%{$search}%");
+                $query->whereRaw('LOWER(name) LIKE ?', ['%'.mb_strtolower($search).'%']);
             })
             ->orderBy('name')
             ->paginate(10)
@@ -103,6 +103,34 @@ class EducationCenterController extends Controller
         return redirect()
             ->route('education-centers.index')
             ->with('success', 'Centro educativo creado correctamente.');
+    }
+
+    public function show(EducationCenter $educationCenter): Response
+    {
+        $latestAgreement = $educationCenter
+            ->collaborationAgreements()
+            ->latest('signed_at')
+            ->first();
+
+        return Inertia::render('education-centers/form', [
+            'mode' => 'show',
+            'center' => [
+                'id' => $educationCenter->id,
+                'name' => $educationCenter->name,
+                'address' => $educationCenter->address,
+                'phone' => $educationCenter->phone,
+                'institutional_email' => $educationCenter->institutional_email,
+                'website' => $educationCenter->website,
+                'contact_name' => $educationCenter->contact_name,
+                'contact_position' => $educationCenter->contact_position,
+                'contact_phone' => $educationCenter->contact_phone,
+                'contact_email' => $educationCenter->contact_email,
+                'agreement_signed_at' => $latestAgreement?->signed_at?->toDateString(),
+                'agreement_expires_at' => $latestAgreement?->expires_at?->toDateString(),
+                'agreement_agreed_slots' => $latestAgreement?->agreed_slots,
+                'agreement_pdf_path' => $latestAgreement?->pdf_path,
+            ],
+        ]);
     }
 
     public function edit(EducationCenter $educationCenter): Response
@@ -210,7 +238,8 @@ class EducationCenterController extends Controller
 
         return DB::table('interns')
             ->where('education_center_id', $educationCenterId)
-            ->where('status', 'active')
+            ->whereNull('deleted_at')
+            ->whereRaw("LOWER(TRIM(status)) IN ('active', 'activo', 'activa')")
             ->exists();
     }
 }

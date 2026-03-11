@@ -27,6 +27,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('education-centers', [EducationCenterController::class, 'store'])
         ->middleware('permission:education-centers.create')
         ->name('education-centers.store');
+    
+    Route::get('education-centers/{education_center}', [EducationCenterController::class, 'show'])
+        ->middleware('permission:education-centers.view')
+        ->name('education-centers.show');
 
     Route::get('education-centers/{education_center}/edit', [EducationCenterController::class, 'edit'])
         ->middleware('permission:education-centers.view')
@@ -53,6 +57,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('interns', [InternController::class, 'store'])
         ->middleware('permission:interns.create')
         ->name('interns.store');
+
+    Route::get('interns/{intern}', [InternController::class, 'show'])
+        ->middleware('permission:interns.view')
+        ->name('interns.show');
 
     Route::get('interns/{intern}/edit', [InternController::class, 'edit'])
         ->middleware('permission:interns.view')

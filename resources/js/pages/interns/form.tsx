@@ -44,7 +44,7 @@ const STATUS_LABELS: Record<'active' | 'finished' | 'abandoned', string> = {
 };
 
 type Props = {
-    mode: 'create' | 'edit';
+    mode: 'create' | 'edit' | 'show';
     intern: InternFormData | null;
     educationCenters: EducationCenterOption[];
 };
@@ -66,6 +66,7 @@ function toDateInput(value?: string | null): string {
 
 export default function InternFormPage({ mode, intern, educationCenters }: Props) {
     const isCreate = mode === 'create';
+    const isReadOnly = mode === 'show';
 
     const { data, setData, post, put, processing, errors } = useForm({
         education_center_id: intern?.education_center_id ? String(intern.education_center_id) : '',
@@ -93,6 +94,10 @@ export default function InternFormPage({ mode, intern, educationCenters }: Props
     const submit = (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
 
+        if (isReadOnly) {
+            return;
+        }
+
         if (isCreate) {
             post(interns.store().url, { preserveScroll: true });
             return;
@@ -103,13 +108,13 @@ export default function InternFormPage({ mode, intern, educationCenters }: Props
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title={isCreate ? 'Nuevo Becario' : 'Editar Becario'} />
+            <Head title={isCreate ? 'Nuevo Becario' : isReadOnly ? 'Ver Becario' : 'Editar Becario'} />
 
             <div className="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-4">
                 <div className="grid auto-rows-min gap-4 md:grid-cols-3">
                     <div className="rounded-xl border border-sidebar-border/70 p-4 dark:border-sidebar-border">
                         <p className="text-sm text-muted-foreground">Modo</p>
-                        <p className="mt-2 text-2xl font-semibold">{isCreate ? 'Alta' : 'Edicion'}</p>
+                        <p className="mt-2 text-2xl font-semibold">{isCreate ? 'Alta' : isReadOnly ? 'Consulta' : 'Edicion'}</p>
                     </div>
                     <div className="rounded-xl border border-sidebar-border/70 p-4 dark:border-sidebar-border">
                         <p className="text-sm text-muted-foreground">Estado actual</p>
@@ -125,9 +130,11 @@ export default function InternFormPage({ mode, intern, educationCenters }: Props
                     <div className="flex flex-col gap-4 p-4">
                         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                             <div>
-                                <h1 className="text-2xl font-bold">{isCreate ? 'Nuevo Becario' : 'Editar Becario'}</h1>
+                                <h1 className="text-2xl font-bold">{isCreate ? 'Nuevo Becario' : isReadOnly ? 'Ver Becario' : 'Editar Becario'}</h1>
                                 <p className="text-sm text-muted-foreground">
-                                    Completa datos personales, academicos y periodo de practicas.
+                                    {isReadOnly
+                                        ? 'Consulta datos personales, academicos y periodo de practicas.'
+                                        : 'Completa datos personales, academicos y periodo de practicas.'}
                                 </p>
                             </div>
 
@@ -137,6 +144,7 @@ export default function InternFormPage({ mode, intern, educationCenters }: Props
                         </div>
 
                         <form onSubmit={submit} className="space-y-6">
+                            <fieldset disabled={isReadOnly} className="space-y-6">
                             <section className="space-y-4 rounded-lg border border-sidebar-border/70 p-4 dark:border-sidebar-border">
                                 <h2 className="text-lg font-semibold">Datos personales</h2>
 
@@ -319,12 +327,26 @@ export default function InternFormPage({ mode, intern, educationCenters }: Props
                                     </div>
                                 </div>
                             </section>
+                            </fieldset>
 
                             <div className="flex gap-2 border-t border-sidebar-border/70 pt-2 dark:border-sidebar-border">
-                                <Button disabled={processing}>{processing ? 'Guardando...' : 'Guardar'}</Button>
-                                <Button type="button" variant="secondary" asChild>
-                                    <Link href={interns.index().url}>Cancelar</Link>
-                                </Button>
+                                {isReadOnly ? (
+                                    <>
+                                        <Button asChild>
+                                            <Link href={interns.edit(intern?.id ?? 0).url}>Editar</Link>
+                                        </Button>
+                                        <Button type="button" variant="secondary" asChild>
+                                            <Link href={interns.index().url}>Volver al listado</Link>
+                                        </Button>
+                                    </>
+                                ) : (
+                                    <>
+                                        <Button disabled={processing}>{processing ? 'Guardando...' : 'Guardar'}</Button>
+                                        <Button type="button" variant="secondary" asChild>
+                                            <Link href={interns.index().url}>Cancelar</Link>
+                                        </Button>
+                                    </>
+                                )}
                             </div>
                         </form>
                     </div>

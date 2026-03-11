@@ -25,7 +25,7 @@ type CenterFormData = {
 };
 
 type Props = {
-    mode: 'create' | 'edit';
+    mode: 'create' | 'edit' | 'show';
     center: CenterFormData | null;
 };
 
@@ -38,6 +38,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 export default function EducationCenterForm({ mode, center }: Props) {
     const isCreate = mode === 'create';
+    const isReadOnly = mode === 'show';
     const formRoute = isCreate
         ? educationCenters.store.form()
         : educationCenters.update.form(center?.id ?? 0);
@@ -46,13 +47,13 @@ export default function EducationCenterForm({ mode, center }: Props) {
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title={isCreate ? 'Nuevo Centro Educativo' : 'Editar Centro Educativo'} />
+            <Head title={isCreate ? 'Nuevo Centro Educativo' : isReadOnly ? 'Ver Centro Educativo' : 'Editar Centro Educativo'} />
 
             <div className="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-4">
                 <div className="grid auto-rows-min gap-4 md:grid-cols-3">
                     <div className="rounded-xl border border-sidebar-border/70 p-4 dark:border-sidebar-border">
                         <p className="text-sm text-muted-foreground">Modo</p>
-                        <p className="mt-2 text-2xl font-semibold">{isCreate ? 'Alta' : 'Edicion'}</p>
+                        <p className="mt-2 text-2xl font-semibold">{isCreate ? 'Alta' : isReadOnly ? 'Consulta' : 'Edicion'}</p>
                     </div>
                     <div className="rounded-xl border border-sidebar-border/70 p-4 dark:border-sidebar-border">
                         <p className="text-sm text-muted-foreground">Convenio actual</p>
@@ -69,10 +70,12 @@ export default function EducationCenterForm({ mode, center }: Props) {
                         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                             <div>
                                 <h1 className="text-2xl font-bold">
-                                    {isCreate ? 'Nuevo Centro Educativo' : 'Editar Centro Educativo'}
+                                    {isCreate ? 'Nuevo Centro Educativo' : isReadOnly ? 'Ver Centro Educativo' : 'Editar Centro Educativo'}
                                 </h1>
                                 <p className="text-sm text-muted-foreground">
-                                    Completa la informacion del centro, contacto y convenio principal.
+                                    {isReadOnly
+                                        ? 'Consulta la informacion del centro, contacto y convenio principal.'
+                                        : 'Completa la informacion del centro, contacto y convenio principal.'}
                                 </p>
                             </div>
 
@@ -89,6 +92,7 @@ export default function EducationCenterForm({ mode, center }: Props) {
                         >
                             {({ processing, errors }) => (
                                 <>
+                                    <fieldset disabled={isReadOnly} className="space-y-6">
                                     <section className="space-y-4 rounded-lg border border-sidebar-border/70 p-4 dark:border-sidebar-border">
                                         <h2 className="text-lg font-semibold">Datos del centro</h2>
 
@@ -242,14 +246,28 @@ export default function EducationCenterForm({ mode, center }: Props) {
                                             </p>
                                         )}
                                     </section>
+                                    </fieldset>
 
                                     <div className="flex gap-2 border-t border-sidebar-border/70 pt-2 dark:border-sidebar-border">
-                                        <Button disabled={processing}>
-                                            {processing ? 'Guardando...' : 'Guardar'}
-                                        </Button>
-                                        <Button type="button" variant="secondary" asChild>
-                                            <Link href={educationCenters.index().url}>Cancelar</Link>
-                                        </Button>
+                                        {isReadOnly ? (
+                                            <>
+                                                <Button asChild>
+                                                    <Link href={educationCenters.edit(center?.id ?? 0).url}>Editar</Link>
+                                                </Button>
+                                                <Button type="button" variant="secondary" asChild>
+                                                    <Link href={educationCenters.index().url}>Volver al listado</Link>
+                                                </Button>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Button disabled={processing}>
+                                                    {processing ? 'Guardando...' : 'Guardar'}
+                                                </Button>
+                                                <Button type="button" variant="secondary" asChild>
+                                                    <Link href={educationCenters.index().url}>Cancelar</Link>
+                                                </Button>
+                                            </>
+                                        )}
                                     </div>
                                 </>
                             )}

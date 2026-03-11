@@ -31,6 +31,7 @@ type InternRow = {
     id: number;
     first_name: string;
     last_name: string;
+    dni_nie: string;
     email: string;
     phone: string;
     status: 'active' | 'finished' | 'abandoned';
@@ -228,6 +229,7 @@ export default function InternsPage({ interns: internPagination, filters, educat
                                             <p className="font-medium">
                                                 {intern.first_name} {intern.last_name}
                                             </p>
+                                            <p className="text-muted-foreground">{intern.dni_nie}</p>
                                             <p className="text-muted-foreground">{intern.email}</p>
                                             <p className="text-muted-foreground">{intern.phone}</p>
                                         </td>
@@ -254,6 +256,9 @@ export default function InternsPage({ interns: internPagination, filters, educat
                                         </td>
                                         <td className="px-4 py-3">
                                             <div className="flex justify-end gap-2">
+                                                <Button variant="secondary" size="sm" asChild>
+                                                    <Link href={interns.show(intern.id).url}>Ver</Link>
+                                                </Button>
                                                 <Button variant="outline" size="sm" asChild>
                                                     <Link href={interns.edit(intern.id).url}>Editar</Link>
                                                 </Button>

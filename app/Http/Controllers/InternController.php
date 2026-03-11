@@ -23,12 +23,14 @@ class InternController extends Controller
         $interns = Intern::query()
             ->with('educationCenter')
             ->when($search !== '', function ($query) use ($search) {
-                $query->where(function ($subQuery) use ($search) {
+                $normalizedSearch = '%'.mb_strtolower($search).'%';
+
+                $query->where(function ($subQuery) use ($normalizedSearch) {
                     $subQuery
-                        ->where('first_name', 'like', "%{$search}%")
-                        ->orWhere('last_name', 'like', "%{$search}%")
-                        ->orWhere('dni_nie', 'like', "%{$search}%")
-                        ->orWhere('email', 'like', "%{$search}%");
+                        ->whereRaw('LOWER(first_name) LIKE ?', [$normalizedSearch])
+                        ->orWhereRaw('LOWER(last_name) LIKE ?', [$normalizedSearch])
+                        ->orWhereRaw('LOWER(dni_nie) LIKE ?', [$normalizedSearch])
+                        ->orWhereRaw('LOWER(email) LIKE ?', [$normalizedSearch]);
                 });
             })
             ->when($status !== '', fn ($query) => $query->where('status', $status))
@@ -124,5 +126,16 @@ class InternController extends Controller
         return redirect()
             ->route('interns.index')
             ->with('success', 'Becario eliminado correctamente.');
+    }
+
+    public function show(Intern $intern): Response
+    {
+        return Inertia::render('interns/form', [
+            'mode' => 'show',
+            'intern' => $intern,
+            'educationCenters' => EducationCenter::query()
+                ->orderBy('name')
+                ->get(['id', 'name']),
+        ]);
     }
 }
