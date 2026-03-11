@@ -112,6 +112,26 @@ class EducationCenterController extends Controller
             ->latest('signed_at')
             ->first();
 
+        $internsHistory = $educationCenter
+            ->interns()
+            ->withTrashed()
+            ->orderByDesc('internship_start_date')
+            ->orderByDesc('id')
+            ->get()
+            ->map(fn ($intern) : array => [
+                    'id' => $intern->id,
+                    'first_name' => $intern->first_name,
+                    'last_name' => $intern->last_name,
+                    'dni_nie' => $intern->dni_nie,
+                    'email' => $intern->email,
+                    'phone' => $intern->phone,
+                    'status' => $intern->status,
+                    'internship_start_date' => $intern->internship_start_date?->toDateString(),
+                    'internship_end_date' => $intern->internship_end_date?->toDateString(),
+                    'deleted_at' => $intern->deleted_at?->toDateTimeString(),
+                ])
+                ->values();
+
         return Inertia::render('education-centers/form', [
             'mode' => 'show',
             'center' => [
@@ -130,6 +150,7 @@ class EducationCenterController extends Controller
                 'agreement_agreed_slots' => $latestAgreement?->agreed_slots,
                 'agreement_pdf_path' => $latestAgreement?->pdf_path,
             ],
+            'internsHistory' => $internsHistory,
         ]);
     }
 

@@ -24,9 +24,23 @@ type CenterFormData = {
     agreement_pdf_path?: string | null;
 };
 
+    type InternHistoryItem = {
+    id: number;
+    first_name: string;
+    last_name: string;
+    dni_nie: string;
+    email: string;
+    phone: string;
+    status: 'active' | 'finished' | 'abandoned' | string;
+    internship_start_date: string | null;
+    internship_end_date: string | null;
+    deleted_at: string | null;
+    };
+
 type Props = {
     mode: 'create' | 'edit' | 'show';
     center: CenterFormData | null;
+    internsHistory?: InternHistoryItem[];
 };
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -36,7 +50,15 @@ const breadcrumbs: BreadcrumbItem[] = [
     },
 ];
 
-export default function EducationCenterForm({ mode, center }: Props) {
+function internStatusLabel(status: string): string {
+    if (status === 'active') return 'Activo';
+    if (status === 'finished') return 'Finalizado';
+    if (status === 'abandoned') return 'Abandonado';
+
+    return status;
+}
+
+export default function EducationCenterForm({ mode, center, internsHistory = [] }: Props) {
     const isCreate = mode === 'create';
     const isReadOnly = mode === 'show';
     const formRoute = isCreate
@@ -248,6 +270,60 @@ export default function EducationCenterForm({ mode, center }: Props) {
                                     </section>
                                     </fieldset>
 
+                                    {isReadOnly && (
+                                        <section className="space-y-4 rounded-lg border border-sidebar-border/70 p-4 dark:border-sidebar-border">
+                                            <div className="flex items-center justify-between gap-2">
+                                                <h2 className="text-lg font-semibold">Historico de becarios por centro</h2>
+                                                <p className="text-sm text-muted-foreground">Total: {internsHistory.length}</p>
+                                            </div>
+
+                                            {internsHistory.length === 0 ? (
+                                                <p className="text-sm text-muted-foreground">
+                                                    No hay becarios registrados para este centro.
+                                                </p>
+                                            ) : (
+                                                <div className="overflow-x-auto rounded-lg border border-sidebar-border/70 dark:border-sidebar-border">
+                                                    <table className="w-full min-w-[980px] text-sm">
+                                                        <thead className="bg-muted/50 text-left">
+                                                            <tr>
+                                                                <th className="px-4 py-3 font-medium">Becario</th>
+                                                                <th className="px-4 py-3 font-medium">Contacto</th>
+                                                                <th className="px-4 py-3 font-medium">Periodo</th>
+                                                                <th className="px-4 py-3 font-medium">Estado</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {internsHistory.map((intern) => (
+                                                                <tr key={intern.id} className="border-t align-top">
+                                                                    <td className="px-4 py-3">
+                                                                        <p className="font-medium">
+                                                                            {intern.first_name} {intern.last_name}
+                                                                        </p>
+                                                                        <p className="text-muted-foreground">{intern.dni_nie}</p>
+                                                                    </td>
+                                                                    <td className="px-4 py-3">
+                                                                        <p>{intern.email}</p>
+                                                                        <p className="text-muted-foreground">{intern.phone}</p>
+                                                                    </td>
+                                                                    <td className="px-4 py-3">
+                                                                        <p>Inicio: {intern.internship_start_date ?? '-'}</p>
+                                                                        <p>Fin: {intern.internship_end_date ?? '-'}</p>
+                                                                    </td>
+                                                                    <td className="px-4 py-3">
+                                                                        <p>{internStatusLabel(intern.status)}</p>
+                                                                        {intern.deleted_at && (
+                                                                            <p className="text-xs text-muted-foreground">Eliminado del sistema</p>
+                                                                        )}
+                                                                    </td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            )}
+                                        </section>
+                                    )}
+
                                     <div className="flex gap-2 border-t border-sidebar-border/70 pt-2 dark:border-sidebar-border">
                                         {isReadOnly ? (
                                             <>
@@ -272,6 +348,7 @@ export default function EducationCenterForm({ mode, center }: Props) {
                                 </>
                             )}
                         </Form>
+
                     </div>
                 </div>
             </div>
