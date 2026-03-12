@@ -12,7 +12,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('interns', function (Blueprint $table) {
-            //
+            $table->string('collaboration_agreement_path')->nullable()->after('abandonment_reason');
+            $table->string('insurance_policy_path')->nullable()->after('collaboration_agreement_path');
+            $table->string('dni_scan_path')->nullable()->after('insurance_policy_path');
         });
     }
 
@@ -22,7 +24,11 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('interns', function (Blueprint $table) {
-            //
+            $table->dropColumn([
+                'collaboration_agreement_path',
+                'insurance_policy_path',
+                'dni_scan_path',    
+            ]);
         });
     }
 };
