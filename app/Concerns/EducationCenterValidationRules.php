@@ -14,7 +14,7 @@ trait EducationCenterValidationRules
             'phone' => ['required', 'string', 'max:50'],
             'institutional_email' => [
                 'required',
-                'email:rfc,dns',
+                'email:rfc',
                 'max:255',
                 Rule::unique('education_centers', 'institutional_email')->ignore($ignoreCenterId),
             ],
@@ -23,7 +23,7 @@ trait EducationCenterValidationRules
             'contact_name' => ['required', 'string', 'max:255'],
             'contact_position' => ['required', 'string', 'max:255'],
             'contact_phone' => ['required', 'string', 'max:50'],
-            'contact_email' => ['required', 'email:rfc,dns', 'max:255'],
+            'contact_email' => ['required', 'email:rfc', 'max:255'],
 
             'agreement_signed_at' => ['required', 'date'],
             'agreement_expires_at' => ['required', 'date', 'after_or_equal:agreement_signed_at'],

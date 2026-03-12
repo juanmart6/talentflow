@@ -17,7 +17,7 @@ class UpdateEducationCenterRequest extends FormRequest
 
     public function rules(): array
     {
-        $educationCenter = $this->route('educationCenter');
+        $educationCenter = $this->route('education_center');
 
         return $this->educationCenterRules(
             ignoreCenterId: $educationCenter?->id,

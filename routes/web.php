@@ -70,6 +70,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->middleware('permission:interns.update')
         ->name('interns.update');
 
+    Route::get('interns/{intern}/documents/{document}/{filename}/preview', [InternController::class, 'previewDocument'])
+        ->where('filename', '^[^/]+$')
+        ->middleware('permission:interns.view')
+        ->name('interns.documents.preview');
+
+    Route::get('interns/{intern}/documents/{document}/{filename}/download', [InternController::class, 'downloadDocument'])
+        ->where('filename', '^[^/]+$')
+        ->middleware('permission:interns.view')
+        ->name('interns.documents.download');
+
     Route::delete('interns/{intern}', [InternController::class, 'destroy'])
         ->middleware('permission:interns.delete')
         ->name('interns.destroy');

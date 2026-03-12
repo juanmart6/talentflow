@@ -33,6 +33,9 @@ class Intern extends Model
         'required_hours',
         'status',
         'abandonment_reason',
+        'collaboration_agreement_path',
+        'insurance_policy_path',
+        'dni_scan_path',
     ];
 
     protected function casts(): array

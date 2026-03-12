@@ -21,7 +21,7 @@ trait InternValidationRules
             ],
             'email' => [
                 'required',
-                'email:rfc,dns',
+                'email:rfc',
                 'max:255',
                 Rule::unique('interns', 'email')->ignore($ignoreInternId),
             ],
@@ -35,7 +35,7 @@ trait InternValidationRules
             'training_cycle' => ['required', 'string', 'max:255'],
             'academic_year' => ['required', 'string', 'max:20'],
             'academic_tutor_name' => ['required', 'string', 'max:255'],
-            'academic_tutor_email' => ['nullable', 'email:rfc,dns', 'max:255'],
+            'academic_tutor_email' => ['nullable', 'email:rfc', 'max:255'],
 
             'internship_start_date' => ['required', 'date'],
             'internship_end_date' => ['required', 'date', 'after_or_equal:internship_start_date'],
@@ -43,6 +43,10 @@ trait InternValidationRules
 
             'status' => ['required', Rule::in(['active', 'finished', 'abandoned'])],
             'abandonment_reason' => ['nullable', 'string', 'max:1000'],
+
+            'collaboration_agreement_document' => ['nullable', 'file', 'mimes:pdf,jpeg,jpg,png', 'max:5120'],
+            'insurance_policy_document' => ['nullable', 'file', 'mimes:pdf,jpeg,jpg,png', 'max:5120'],
+            'dni_scan_document' => ['nullable', 'file', 'mimes:pdf,jpeg,jpg,png', 'max:5120'],
         ];
     }
     
@@ -55,6 +59,14 @@ trait InternValidationRules
             'internship_end_date.after_or_equal' => 'La fecha de finalización debe ser igual o posterior a la fecha de inicio.',
             'required_hours.min' => 'Las horas requeridas deben ser al menos 1.',
             'status.in' => 'El estado debe ser Activo, Finalizado o Abandonado.',
-        ];
+
+            'collaboration_agreement_document.mimes' => 'El convenio debe ser un archivo PDF, JPEG, JPG o PNG.',
+            'insurance_policy_document.mimes' => 'El seguro debe ser un archivo PDF, JPEG, JPG o PNG.',
+            'dni_scan_document.mimes' => 'El DNI escaneado debe ser un archivo PDF, JPEG, JPG o PNG.',
+
+            'collaboration_agreement_document.max' => 'El archivo no puede superar los 5MB.',
+            'insurance_policy_document.max' => 'El archivo no puede superar los 5MB.',
+            'dni_scan_document.max' => 'El archivo no puede superar los 5MB.',
+            ];
     }
 }

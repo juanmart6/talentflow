@@ -17,6 +17,8 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { INTERN_STATUS_META, type InternStatus } from '@/lib/intern-status';
+import { SUMMARY_CARD_CLASSES, UI_PRESETS, stripedRowClass } from '@/lib/ui-presets';
 import AppLayout from '@/layouts/app-layout';
 import interns from '@/routes/interns';
 import type { BreadcrumbItem } from '@/types';
@@ -60,6 +62,11 @@ type EducationCenterOption = {
 type Props = {
     interns: InternsPagination;
     educationCenters: EducationCenterOption[];
+    statusCounts: {
+        active: number;
+        finished: number;
+        abandoned: number;
+    };
     filters: {
         search: string;
         status: string;
@@ -83,7 +90,15 @@ function normalizePaginationLabel(label: string): string {
         .trim();
 }
 
-export default function InternsPage({ interns: internPagination, filters, educationCenters }: Props) {
+function formatDate(date: string | null): string {
+    if (!date) {
+        return '-';
+    }
+
+    return date;
+}
+
+export default function InternsPage({ interns: internPagination, filters, educationCenters, statusCounts }: Props) {
     const [search, setSearch] = useState(filters.search ?? '');
     const [status, setStatus] = useState(filters.status || 'all');
     const [educationCenterId, setEducationCenterId] = useState(
@@ -168,91 +183,112 @@ export default function InternsPage({ interns: internPagination, filters, educat
                     </Button>
                 </div>
 
-                <form onSubmit={submitFilters} className="flex flex-col gap-3 md:flex-row md:items-center">
-                    <Input
-                        value={search}
-                        onChange={(event) => setSearch(event.target.value)}
-                        placeholder="Buscar por nombre o email"
-                        className="md:max-w-sm"
-                    />
+                <section className="grid gap-3 md:grid-cols-4">
+                    <div className={SUMMARY_CARD_CLASSES.neutral}>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-200">Total filtrado</p>
+                        <p className="mt-2 text-3xl font-semibold">{internPagination.total}</p>
+                    </div>
+                    <div className={SUMMARY_CARD_CLASSES.success}>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-emerald-100">Activos</p>
+                        <p className="mt-2 text-3xl font-semibold">{statusCounts.active}</p>
+                    </div>
+                    <div className={SUMMARY_CARD_CLASSES.info}>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-sky-100">Finalizados</p>
+                        <p className="mt-2 text-3xl font-semibold">{statusCounts.finished}</p>
+                    </div>
+                    <div className={SUMMARY_CARD_CLASSES.danger}>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-rose-100">Abandonados</p>
+                        <p className="mt-2 text-3xl font-semibold">{statusCounts.abandoned}</p>
+                    </div>
+                </section>
 
-                    <Select value={status} onValueChange={setStatus}>
-                        <SelectTrigger className="md:max-w-xs">
-                            <SelectValue placeholder="Estado" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">Todos los estados</SelectItem>
-                            <SelectItem value="active">Activo</SelectItem>
-                            <SelectItem value="finished">Finalizado</SelectItem>
-                            <SelectItem value="abandoned">Abandonado</SelectItem>
-                        </SelectContent>
-                    </Select>
+                <form onSubmit={submitFilters} className={UI_PRESETS.filterBar}>
+                    <div className="grid gap-3 md:grid-cols-[1.5fr_auto_auto] md:items-center">
+                        <Input
+                            value={search}
+                            onChange={(event) => setSearch(event.target.value)}
+                            placeholder="Buscar por nombre, DNI o email"
+                            className={UI_PRESETS.filterInput}
+                        />
 
-                    <Select value={educationCenterId} onValueChange={setEducationCenterId}>
-                        <SelectTrigger className="md:max-w-xs">
-                            <SelectValue placeholder="Centro educativo" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">Todos los centros</SelectItem>
-                            {educationCenters.map((center) => (
-                                <SelectItem key={center.id} value={String(center.id)}>
-                                    {center.name}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                            <Select value={status} onValueChange={setStatus}>
+                                <SelectTrigger className={`${UI_PRESETS.selectTrigger} min-w-[180px]`}>
+                                    <SelectValue placeholder="Estado" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem className={UI_PRESETS.selectItem} value="all">Todos los estados</SelectItem>
+                                    <SelectItem className={UI_PRESETS.selectItem} value="active">Activo</SelectItem>
+                                    <SelectItem className={UI_PRESETS.selectItem} value="finished">Finalizado</SelectItem>
+                                    <SelectItem className={UI_PRESETS.selectItem} value="abandoned">Abandonado</SelectItem>
+                                </SelectContent>
+                            </Select>
 
-                    <div className="flex gap-2">
-                        <Button type="submit">Buscar</Button>
-                        <Button type="button" variant="secondary" onClick={clearFilters}>
-                            Limpiar
-                        </Button>
+                            <Select value={educationCenterId} onValueChange={setEducationCenterId}>
+                                <SelectTrigger className={`${UI_PRESETS.selectTrigger} min-w-[220px]`}>
+                                    <SelectValue placeholder="Centro educativo" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem className={UI_PRESETS.selectItem} value="all">Todos los centros</SelectItem>
+                                    {educationCenters.map((center) => (
+                                        <SelectItem className={UI_PRESETS.selectItem} key={center.id} value={String(center.id)}>
+                                            {center.name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        <div className="flex gap-2 md:justify-end">
+                            <Button type="submit">Buscar</Button>
+                            <Button type="button" variant="secondary" onClick={clearFilters}>
+                                Limpiar
+                            </Button>
+                        </div>
                     </div>
                 </form>
 
                 <div className="overflow-x-auto rounded-lg border border-sidebar-border/70 dark:border-sidebar-border">
-                    <table className="w-full min-w-[980px] text-sm">
-                        <thead className="bg-muted/50 text-left">
+                    <table className="w-full min-w-[1180px] text-sm">
+                        <thead className={UI_PRESETS.tableHead}>
                             <tr>
-                                <th className="px-4 py-3 font-medium">Becario</th>
-                                <th className="px-4 py-3 font-medium">Centro</th>
-                                <th className="px-4 py-3 font-medium">Periodo</th>
-                                <th className="px-4 py-3 font-medium">Estado</th>
-                                <th className="px-4 py-3 text-right font-medium">Acciones</th>
+                                <th className="px-4 py-3 font-semibold">Becario</th>
+                                <th className="px-4 py-3 font-semibold">DNI/NIE</th>
+                                <th className="px-4 py-3 font-semibold">Contacto</th>
+                                <th className="px-4 py-3 font-semibold">Centro</th>
+                                <th className="px-4 py-3 font-semibold">Practicas</th>
+                                <th className="px-4 py-3 font-semibold">Estado</th>
+                                <th className="px-4 py-3 text-right font-semibold">Acciones</th>
                             </tr>
                         </thead>
                         <tbody>
                             {hasRows ? (
-                                internPagination.data.map((intern) => (
-                                    <tr key={intern.id} className="border-t align-top">
+                                internPagination.data.map((intern, index) => (
+                                    <tr key={intern.id} className={`border-t align-top ${stripedRowClass(index)} hover:bg-amber-50/70 dark:hover:bg-slate-800/60`}>
                                         <td className="px-4 py-3">
-                                            <p className="font-medium">
+                                            <p className="font-semibold">
                                                 {intern.first_name} {intern.last_name}
                                             </p>
-                                            <p className="text-muted-foreground">{intern.dni_nie}</p>
-                                            <p className="text-muted-foreground">{intern.email}</p>
-                                            <p className="text-muted-foreground">{intern.phone}</p>
                                         </td>
-                                        <td className="px-4 py-3">{intern.education_center?.name ?? '-'}</td>
+                                        <td className="px-4 py-3 font-mono text-xs font-semibold md:text-sm">{intern.dni_nie}</td>
                                         <td className="px-4 py-3">
-                                            <p>Inicio: {intern.internship_start_date ?? '-'}</p>
-                                            <p>Fin: {intern.internship_end_date ?? '-'}</p>
-                                            <p>Horas: {intern.required_hours}</p>
+                                            <p className="text-sm font-medium">{intern.email}</p>
+                                            <p className="text-xs text-muted-foreground">{intern.phone}</p>
+                                        </td>
+                                        <td className="px-4 py-3 font-medium">{intern.education_center?.name ?? '-'}</td>
+                                        <td className="px-4 py-3">
+                                            <p className="text-xs font-semibold text-muted-foreground">Inicio</p>
+                                            <p className="font-medium">{formatDate(intern.internship_start_date)}</p>
+                                            <p className="mt-2 text-xs font-semibold text-muted-foreground">Fin</p>
+                                            <p className="font-medium">{formatDate(intern.internship_end_date)}</p>
+                                            <p className="mt-2 inline-flex rounded-md bg-amber-100 px-2 py-1 text-xs font-medium text-amber-800">
+                                                {intern.required_hours}h
+                                            </p>
                                         </td>
                                         <td className="px-4 py-3">
-                                            {intern.status === 'active' ? (
-                                                <span className="inline-flex rounded-full bg-emerald-100 px-2 py-1 text-xs font-medium text-emerald-700">
-                                                    Activo
-                                                </span>
-                                            ) : intern.status === 'finished' ? (
-                                                <span className="inline-flex rounded-full bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700">
-                                                    Finalizado
-                                                </span>
-                                            ) : (
-                                                <span className="inline-flex rounded-full bg-rose-100 px-2 py-1 text-xs font-medium text-rose-700">
-                                                    Abandonado
-                                                </span>
-                                            )}
+                                            <span className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${INTERN_STATUS_META[intern.status].badgeClass}`}>
+                                                {INTERN_STATUS_META[intern.status].label}
+                                            </span>
                                         </td>
                                         <td className="px-4 py-3">
                                             <div className="flex justify-end gap-2">
@@ -275,7 +311,7 @@ export default function InternsPage({ interns: internPagination, filters, educat
                                 ))
                             ) : (
                                 <tr>
-                                    <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
+                                    <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">
                                         No hay becarios para mostrar con el filtro actual.
                                     </td>
                                 </tr>

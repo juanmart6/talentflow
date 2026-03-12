@@ -20,12 +20,37 @@ class EducationCenterController extends Controller
     {
         $search = trim((string) $request->string('search')->toString());
 
-        $centers = EducationCenter::query()
-            ->with('latestCollaborationAgreement')
-            ->withCount('collaborationAgreements')
+        $baseQuery = EducationCenter::query()
             ->when($search !== '', function ($query) use ($search) {
                 $query->whereRaw('LOWER(name) LIKE ?', ['%'.mb_strtolower($search).'%']);
-            })
+            });
+
+        $today = now()->startOfDay();
+        $renewalLimit = now()->addDays(30)->startOfDay();
+
+        $summaryCenters = (clone $baseQuery)
+            ->with('latestCollaborationAgreement')
+            ->get(['id']);
+
+        $summaryCounts = [
+            'total' => $summaryCenters->count(),
+            'renewal_soon' => $summaryCenters
+                ->filter(function (EducationCenter $center) use ($today, $renewalLimit): bool {
+                    $expiresAt = $center->latestCollaborationAgreement?->expires_at;
+
+                    return $expiresAt !== null
+                        && $today->lte($expiresAt)
+                        && $renewalLimit->gte($expiresAt);
+                })
+                ->count(),
+            'without_agreement' => $summaryCenters
+                ->filter(fn (EducationCenter $center): bool => $center->latestCollaborationAgreement === null)
+                ->count(),
+        ];
+
+        $centers = (clone $baseQuery)
+            ->with('latestCollaborationAgreement')
+            ->withCount('collaborationAgreements')
             ->orderBy('name')
             ->paginate(10)
             ->through(function (EducationCenter $center): array {
@@ -57,6 +82,7 @@ class EducationCenterController extends Controller
 
         return Inertia::render('education-centers', [
             'centers' => $centers,
+            'summaryCounts' => $summaryCounts,
             'filters' => [
                 'search' => $search,
             ],

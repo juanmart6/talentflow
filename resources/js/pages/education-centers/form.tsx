@@ -1,8 +1,9 @@
 import { Form, Head, Link } from '@inertiajs/react';
+import { FieldLabel, SectionIntro } from '@/components/form-ui';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { MODE_CARD_CLASSES, UI_PRESETS, agreementCardClasses, agreementCardSubtextClasses, stripedRowClass } from '@/lib/ui-presets';
 import AppLayout from '@/layouts/app-layout';
 import educationCenters from '@/routes/education-centers';
 import type { BreadcrumbItem } from '@/types';
@@ -72,26 +73,28 @@ export default function EducationCenterForm({ mode, center, internsHistory = [] 
             <Head title={isCreate ? 'Nuevo Centro Educativo' : isReadOnly ? 'Ver Centro Educativo' : 'Editar Centro Educativo'} />
 
             <div className="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-4">
-                <div className="grid auto-rows-min gap-4 md:grid-cols-3">
-                    <div className="rounded-xl border border-sidebar-border/70 p-4 dark:border-sidebar-border">
-                        <p className="text-sm text-muted-foreground">Modo</p>
+                <div className={`grid auto-rows-min gap-4 ${isCreate ? 'md:grid-cols-3' : 'md:grid-cols-2'}`}>
+                    <div className={`rounded-xl bg-gradient-to-r p-4 ${MODE_CARD_CLASSES[mode]}`}>
+                        <p className="text-sm text-white/80">Modo</p>
                         <p className="mt-2 text-2xl font-semibold">{isCreate ? 'Alta' : isReadOnly ? 'Consulta' : 'Edicion'}</p>
                     </div>
-                    <div className="rounded-xl border border-sidebar-border/70 p-4 dark:border-sidebar-border">
-                        <p className="text-sm text-muted-foreground">Convenio actual</p>
+                    <div className={agreementCardClasses(hasAgreement)}>
+                        <p className={`text-sm ${agreementCardSubtextClasses(hasAgreement)}`}>Convenio actual</p>
                         <p className="mt-2 text-2xl font-semibold">{hasAgreement ? 'Si' : 'No'}</p>
                     </div>
-                    <div className="rounded-xl border border-sidebar-border/70 p-4 dark:border-sidebar-border">
-                        <p className="text-sm text-muted-foreground">Campos obligatorios</p>
-                        <p className="mt-2 text-2xl font-semibold">13</p>
-                    </div>
+                    {isCreate && (
+                        <div className="rounded-xl bg-gradient-to-r from-slate-800 to-slate-700 p-4 text-white">
+                            <p className="text-sm text-slate-200">Campos obligatorios</p>
+                            <p className="mt-2 text-2xl font-semibold">13</p>
+                        </div>
+                    )}
                 </div>
 
                 <div className="relative min-h-[100vh] flex-1 overflow-hidden rounded-xl border border-sidebar-border/70 md:min-h-min dark:border-sidebar-border">
                     <div className="flex flex-col gap-4 p-4">
                         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                             <div>
-                                <h1 className="text-2xl font-bold">
+                                <h1 className="text-2xl font-extrabold">
                                     {isCreate ? 'Nuevo Centro Educativo' : isReadOnly ? 'Ver Centro Educativo' : 'Editar Centro Educativo'}
                                 </h1>
                                 <p className="text-sm text-muted-foreground">
@@ -115,30 +118,33 @@ export default function EducationCenterForm({ mode, center, internsHistory = [] 
                             {({ processing, errors }) => (
                                 <>
                                     <fieldset disabled={isReadOnly} className="space-y-6">
-                                    <section className="space-y-4 rounded-lg border border-sidebar-border/70 p-4 dark:border-sidebar-border">
-                                        <h2 className="text-lg font-semibold">Datos del centro</h2>
+                                    <section className={UI_PRESETS.sectionCard}>
+                                        <SectionIntro
+                                            title="Datos del centro"
+                                            description="Informacion principal del centro educativo y sus canales de contacto."
+                                        />
 
                                         <div className="grid gap-4 md:grid-cols-2">
                                             <div className="grid gap-2 md:col-span-2">
-                                                <Label htmlFor="name">Nombre</Label>
+                                                <FieldLabel htmlFor="name">Nombre</FieldLabel>
                                                 <Input id="name" name="name" defaultValue={center?.name ?? ''} required />
                                                 <InputError message={errors.name} />
                                             </div>
 
                                     <div className="grid gap-2 md:col-span-2">
-                                        <Label htmlFor="address">Direccion</Label>
+                                        <FieldLabel htmlFor="address">Direccion</FieldLabel>
                                         <Input id="address" name="address" defaultValue={center?.address ?? ''} required />
                                         <InputError message={errors.address} />
                                     </div>
 
                                     <div className="grid gap-2">
-                                        <Label htmlFor="phone">Telefono</Label>
+                                        <FieldLabel htmlFor="phone">Telefono</FieldLabel>
                                         <Input id="phone" name="phone" defaultValue={center?.phone ?? ''} required />
                                         <InputError message={errors.phone} />
                                     </div>
 
                                     <div className="grid gap-2">
-                                        <Label htmlFor="institutional_email">Email institucional</Label>
+                                        <FieldLabel htmlFor="institutional_email">Email institucional</FieldLabel>
                                         <Input
                                             id="institutional_email"
                                             type="email"
@@ -150,19 +156,22 @@ export default function EducationCenterForm({ mode, center, internsHistory = [] 
                                     </div>
 
                                     <div className="grid gap-2 md:col-span-2">
-                                        <Label htmlFor="website">Web (opcional)</Label>
+                                        <FieldLabel htmlFor="website">Web (opcional)</FieldLabel>
                                         <Input id="website" name="website" defaultValue={center?.website ?? ''} />
                                         <InputError message={errors.website} />
                                     </div>
                                         </div>
                                     </section>
 
-                                    <section className="space-y-4 rounded-lg border border-sidebar-border/70 p-4 dark:border-sidebar-border">
-                                        <h2 className="text-lg font-semibold">Persona de contacto</h2>
+                                    <section className={UI_PRESETS.sectionCard}>
+                                        <SectionIntro
+                                            title="Persona de contacto"
+                                            description="Responsable de coordinacion entre el centro y la organizacion."
+                                        />
 
                                 <div className="grid gap-4 md:grid-cols-2">
                                     <div className="grid gap-2">
-                                        <Label htmlFor="contact_name">Nombre</Label>
+                                        <FieldLabel htmlFor="contact_name">Nombre</FieldLabel>
                                         <Input
                                             id="contact_name"
                                             name="contact_name"
@@ -173,7 +182,7 @@ export default function EducationCenterForm({ mode, center, internsHistory = [] 
                                     </div>
 
                                     <div className="grid gap-2">
-                                        <Label htmlFor="contact_position">Cargo</Label>
+                                        <FieldLabel htmlFor="contact_position">Cargo</FieldLabel>
                                         <Input
                                             id="contact_position"
                                             name="contact_position"
@@ -184,7 +193,7 @@ export default function EducationCenterForm({ mode, center, internsHistory = [] 
                                     </div>
 
                                     <div className="grid gap-2">
-                                        <Label htmlFor="contact_phone">Telefono</Label>
+                                        <FieldLabel htmlFor="contact_phone">Telefono</FieldLabel>
                                         <Input
                                             id="contact_phone"
                                             name="contact_phone"
@@ -195,7 +204,7 @@ export default function EducationCenterForm({ mode, center, internsHistory = [] 
                                     </div>
 
                                     <div className="grid gap-2">
-                                        <Label htmlFor="contact_email">Email</Label>
+                                        <FieldLabel htmlFor="contact_email">Email</FieldLabel>
                                         <Input
                                             id="contact_email"
                                             type="email"
@@ -208,12 +217,15 @@ export default function EducationCenterForm({ mode, center, internsHistory = [] 
                                         </div>
                                     </section>
 
-                                    <section className="space-y-4 rounded-lg border border-sidebar-border/70 p-4 dark:border-sidebar-border">
-                                        <h2 className="text-lg font-semibold">Convenio de colaboracion</h2>
+                                    <section className={UI_PRESETS.sectionCard}>
+                                        <SectionIntro
+                                            title="Convenio de colaboracion"
+                                            description="Fechas, plazas acordadas y documento principal del convenio."
+                                        />
 
                                 <div className="grid gap-4 md:grid-cols-2">
                                     <div className="grid gap-2">
-                                        <Label htmlFor="agreement_signed_at">Fecha de firma</Label>
+                                        <FieldLabel htmlFor="agreement_signed_at">Fecha de firma</FieldLabel>
                                         <Input
                                             id="agreement_signed_at"
                                             type="date"
@@ -225,7 +237,7 @@ export default function EducationCenterForm({ mode, center, internsHistory = [] 
                                     </div>
 
                                     <div className="grid gap-2">
-                                        <Label htmlFor="agreement_expires_at">Fecha de vencimiento</Label>
+                                        <FieldLabel htmlFor="agreement_expires_at">Fecha de vencimiento</FieldLabel>
                                         <Input
                                             id="agreement_expires_at"
                                             type="date"
@@ -237,7 +249,7 @@ export default function EducationCenterForm({ mode, center, internsHistory = [] 
                                     </div>
 
                                     <div className="grid gap-2">
-                                        <Label htmlFor="agreement_agreed_slots">Plazas acordadas</Label>
+                                        <FieldLabel htmlFor="agreement_agreed_slots">Plazas acordadas</FieldLabel>
                                         <Input
                                             id="agreement_agreed_slots"
                                             type="number"
@@ -250,7 +262,7 @@ export default function EducationCenterForm({ mode, center, internsHistory = [] 
                                     </div>
 
                                     <div className="grid gap-2">
-                                        <Label htmlFor="agreement_pdf">Documento PDF</Label>
+                                        <FieldLabel htmlFor="agreement_pdf">Documento PDF</FieldLabel>
                                         <Input
                                             id="agreement_pdf"
                                             type="file"
@@ -271,9 +283,9 @@ export default function EducationCenterForm({ mode, center, internsHistory = [] 
                                     </fieldset>
 
                                     {isReadOnly && (
-                                        <section className="space-y-4 rounded-lg border border-sidebar-border/70 p-4 dark:border-sidebar-border">
+                                        <section className={UI_PRESETS.sectionCard}>
                                             <div className="flex items-center justify-between gap-2">
-                                                <h2 className="text-lg font-semibold">Historico de becarios por centro</h2>
+                                                <h2 className="text-lg font-bold">Historico de becarios por centro</h2>
                                                 <p className="text-sm text-muted-foreground">Total: {internsHistory.length}</p>
                                             </div>
 
@@ -284,33 +296,33 @@ export default function EducationCenterForm({ mode, center, internsHistory = [] 
                                             ) : (
                                                 <div className="overflow-x-auto rounded-lg border border-sidebar-border/70 dark:border-sidebar-border">
                                                     <table className="w-full min-w-[980px] text-sm">
-                                                        <thead className="bg-muted/50 text-left">
+                                                        <thead className={UI_PRESETS.tableHead}>
                                                             <tr>
-                                                                <th className="px-4 py-3 font-medium">Becario</th>
-                                                                <th className="px-4 py-3 font-medium">Contacto</th>
-                                                                <th className="px-4 py-3 font-medium">Periodo</th>
-                                                                <th className="px-4 py-3 font-medium">Estado</th>
+                                                                <th className="px-4 py-3 font-semibold">Becario</th>
+                                                                <th className="px-4 py-3 font-semibold">Contacto</th>
+                                                                <th className="px-4 py-3 font-semibold">Periodo</th>
+                                                                <th className="px-4 py-3 font-semibold">Estado</th>
                                                             </tr>
                                                         </thead>
                                                         <tbody>
-                                                            {internsHistory.map((intern) => (
-                                                                <tr key={intern.id} className="border-t align-top">
+                                                            {internsHistory.map((intern, index) => (
+                                                                <tr key={intern.id} className={`border-t align-top ${stripedRowClass(index)}`}>
                                                                     <td className="px-4 py-3">
-                                                                        <p className="font-medium">
+                                                                        <p className="font-semibold">
                                                                             {intern.first_name} {intern.last_name}
                                                                         </p>
                                                                         <p className="text-muted-foreground">{intern.dni_nie}</p>
                                                                     </td>
                                                                     <td className="px-4 py-3">
-                                                                        <p>{intern.email}</p>
+                                                                        <p className="font-medium">{intern.email}</p>
                                                                         <p className="text-muted-foreground">{intern.phone}</p>
                                                                     </td>
                                                                     <td className="px-4 py-3">
-                                                                        <p>Inicio: {intern.internship_start_date ?? '-'}</p>
-                                                                        <p>Fin: {intern.internship_end_date ?? '-'}</p>
+                                                                        <p className="text-xs font-semibold text-muted-foreground">Inicio: {intern.internship_start_date ?? '-'}</p>
+                                                                        <p className="text-xs font-semibold text-muted-foreground">Fin: {intern.internship_end_date ?? '-'}</p>
                                                                     </td>
                                                                     <td className="px-4 py-3">
-                                                                        <p>{internStatusLabel(intern.status)}</p>
+                                                                        <p className="font-semibold">{internStatusLabel(intern.status)}</p>
                                                                         {intern.deleted_at && (
                                                                             <p className="text-xs text-muted-foreground">Eliminado del sistema</p>
                                                                         )}

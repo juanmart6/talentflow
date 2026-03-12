@@ -9,8 +9,11 @@ use App\Models\Intern;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\URL;
 use Inertia\Inertia;
 use Inertia\Response;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 
 class InternController extends Controller
 {
@@ -20,8 +23,7 @@ class InternController extends Controller
         $status = trim((string) $request->string('status')->toString());
         $educationCenterId = $request->integer('education_center_id');
 
-        $interns = Intern::query()
-            ->with('educationCenter')
+        $baseQuery = Intern::query()
             ->when($search !== '', function ($query) use ($search) {
                 $normalizedSearch = '%'.mb_strtolower($search).'%';
 
@@ -33,8 +35,22 @@ class InternController extends Controller
                         ->orWhereRaw('LOWER(email) LIKE ?', [$normalizedSearch]);
                 });
             })
+            ->when($educationCenterId, fn ($query) => $query->where('education_center_id', $educationCenterId));
+
+        $statusCountsRaw = (clone $baseQuery)
+            ->selectRaw('status, COUNT(*) as total')
+            ->groupBy('status')
+            ->pluck('total', 'status');
+
+        $statusCounts = [
+            'active' => (int) ($statusCountsRaw['active'] ?? 0),
+            'finished' => (int) ($statusCountsRaw['finished'] ?? 0),
+            'abandoned' => (int) ($statusCountsRaw['abandoned'] ?? 0),
+        ];
+
+        $interns = (clone $baseQuery)
+            ->with('educationCenter')
             ->when($status !== '', fn ($query) => $query->where('status', $status))
-            ->when($educationCenterId, fn ($query) => $query->where('education_center_id', $educationCenterId))
             ->orderBy('last_name')
             ->orderBy('first_name')
             ->paginate(10)
@@ -64,6 +80,7 @@ class InternController extends Controller
 
         return Inertia::render('interns', [
             'interns' => $interns,
+            'statusCounts' => $statusCounts,
             'filters' => [
                 'search' => $search,
                 'status' => $status,
@@ -80,6 +97,7 @@ class InternController extends Controller
         return Inertia::render('interns/form', [
             'mode' => 'create',
             'intern' => null,
+            'documentHistory' => $this->emptyDocumentHistory(),
             'educationCenters' => EducationCenter::query()
                 ->orderBy('name')
                 ->get(['id', 'name']),
@@ -90,10 +108,16 @@ class InternController extends Controller
     {
         $validated = $request->validated();
 
-        Intern::create($validated);
+        $intern = Intern::create(collect($validated)->except([
+            'collaboration_agreement_document',
+            'insurance_policy_document',
+            'dni_scan_document',
+        ])->all());
+
+        $this->syncUploadedDocuments($request, $intern);
 
         return redirect()
-            ->route('interns.index')
+            ->route('interns.show', $intern)
             ->with('success', 'Becario creado correctamente.');
     }
 
@@ -102,6 +126,7 @@ class InternController extends Controller
         return Inertia::render('interns/form', [
             'mode' => 'edit',
             'intern' => $intern,
+            'documentHistory' => $this->documentHistory($intern),
             'educationCenters' => EducationCenter::query()
                 ->orderBy('name')
                 ->get(['id', 'name']),
@@ -112,10 +137,16 @@ class InternController extends Controller
     {
         $validated = $request->validated();
 
-        $intern->update($validated);
+        $intern->update(collect($validated)->except([
+            'collaboration_agreement_document',
+            'insurance_policy_document',
+            'dni_scan_document',
+        ])->all());
+
+        $this->syncUploadedDocuments($request, $intern);
 
         return redirect()
-            ->route('interns.index')
+            ->route('interns.show', $intern)
             ->with('success', 'Becario actualizado correctamente.');
     }
 
@@ -133,9 +164,146 @@ class InternController extends Controller
         return Inertia::render('interns/form', [
             'mode' => 'show',
             'intern' => $intern,
+            'documentHistory' => $this->documentHistory($intern),
             'educationCenters' => EducationCenter::query()
                 ->orderBy('name')
                 ->get(['id', 'name']),
         ]);
+    }
+
+    public function previewDocument(Intern $intern, string $document, string $filename)
+    {
+        $path = $this->resolveDocumentPath($intern, $document, $filename);
+
+        return response()->file(Storage::disk('public')->path($path));
+    }
+
+    public function downloadDocument(Intern $intern, string $document, string $filename)
+    {
+        $path = $this->resolveDocumentPath($intern, $document, $filename);
+
+        return response()->download(Storage::disk('public')->path($path), basename($path));
+    }
+
+    private function storeInternDocument(UploadedFile $file, string $category, Intern $intern) : string
+    {
+        $directory = "interns/{$intern->id}/{$category}";
+
+        return $file->store($directory, 'public');
+    }
+
+    private function syncUploadedDocuments(Request $request, Intern $intern): void
+    {
+        $documentPaths = [];
+
+        foreach ($this->documentDefinitions() as $document => $definition) {
+            $requestField = $definition['request_field'];
+
+            if (!$request->hasFile($requestField)) {
+                continue;
+            }
+
+            $documentPaths[$definition['path_column']] = $this->storeInternDocument(
+                $request->file($requestField),
+                $definition['folder'],
+                $intern,
+            );
+        }
+
+        if (!empty($documentPaths)) {
+            $intern->update($documentPaths);
+            $intern->refresh();
+        }
+    }
+
+    private function resolveDocumentPath(Intern $intern, string $document, string $filename): string
+    {
+        $definition = $this->documentDefinitions()[$document] ?? null;
+
+        if ($definition === null) {
+            abort(404);
+        }
+
+        $safeFilename = basename($filename);
+
+        if ($safeFilename !== $filename) {
+            abort(404);
+        }
+
+        $path = "interns/{$intern->id}/{$definition['folder']}/{$safeFilename}";
+
+        if (!Storage::disk('public')->exists($path)) {
+            abort(404);
+        }
+
+        return $path;
+    }
+
+    private function documentHistory(Intern $intern): array
+    {
+        $history = [];
+
+        foreach ($this->documentDefinitions() as $document => $definition) {
+            $directory = "interns/{$intern->id}/{$definition['folder']}";
+            $files = Storage::disk('public')->exists($directory)
+                ? Storage::disk('public')->files($directory)
+                : [];
+
+            usort($files, fn (string $a, string $b) => Storage::disk('public')->lastModified($b) <=> Storage::disk('public')->lastModified($a));
+
+            $history[$document] = array_map(function (string $path) use ($intern, $document, $definition): array {
+                $filename = basename($path);
+
+                return [
+                    'filename' => $filename,
+                    'is_current' => $intern->{$definition['path_column']} === $path,
+                    'preview_url' => URL::route('interns.documents.preview', [
+                        'intern' => $intern->id,
+                        'document' => $document,
+                        'filename' => $filename,
+                    ]),
+                    'download_url' => URL::route('interns.documents.download', [
+                        'intern' => $intern->id,
+                        'document' => $document,
+                        'filename' => $filename,
+                    ]),
+                    'uploaded_at' => Carbon::createFromTimestamp(Storage::disk('public')->lastModified($path))->toDateTimeString(),
+                ];
+            }, $files);
+        }
+
+        return $history;
+    }
+
+    private function emptyDocumentHistory(): array
+    {
+        $history = [];
+
+        foreach (array_keys($this->documentDefinitions()) as $document) {
+            $history[$document] = [];
+        }
+
+        return $history;
+    }
+
+    private function documentDefinitions(): array
+    {
+        return [
+            'collaboration_agreement' => [
+                'request_field' => 'collaboration_agreement_document',
+                'path_column' => 'collaboration_agreement_path',
+                'folder' => 'collaboration-agreement',
+            ],
+            'insurance_policy' => [
+                'request_field' => 'insurance_policy_document',
+                'path_column' => 'insurance_policy_path',
+                'folder' => 'insurance-policy',
+            ],
+            'dni_scan' => [
+                'request_field' => 'dni_scan_document',
+                'path_column' => 'dni_scan_path',
+                'folder' => 'dni-scan',
+            ],
+        ];
     }
 }
