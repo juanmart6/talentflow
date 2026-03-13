@@ -283,10 +283,10 @@ class EducationCenterController extends Controller
             return false;
         }
 
-        return DB::table('interns')
+        return Intern::query()
             ->where('education_center_id', $educationCenterId)
             ->whereNull('deleted_at')
-            ->whereRaw("LOWER(TRIM(status)) IN ('active', 'activo', 'activa')")
+            ->where('status', 'active')
             ->exists();
     }
 }
