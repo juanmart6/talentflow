@@ -73,22 +73,6 @@ export default function EducationCenterForm({ mode, center, internsHistory = [] 
             <Head title={isCreate ? 'Nuevo Centro Educativo' : isReadOnly ? 'Ver Centro Educativo' : 'Editar Centro Educativo'} />
 
             <div className="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-4">
-                <div className={`grid auto-rows-min gap-4 ${isCreate ? 'md:grid-cols-3' : 'md:grid-cols-2'}`}>
-                    <div className={`rounded-xl bg-gradient-to-r p-4 ${MODE_CARD_CLASSES[mode]}`}>
-                        <p className="text-sm text-white/80">Modo</p>
-                        <p className="mt-2 text-2xl font-semibold">{isCreate ? 'Alta' : isReadOnly ? 'Consulta' : 'Edicion'}</p>
-                    </div>
-                    <div className={agreementCardClasses(hasAgreement)}>
-                        <p className={`text-sm ${agreementCardSubtextClasses(hasAgreement)}`}>Convenio actual</p>
-                        <p className="mt-2 text-2xl font-semibold">{hasAgreement ? 'Si' : 'No'}</p>
-                    </div>
-                    {isCreate && (
-                        <div className="rounded-xl bg-gradient-to-r from-slate-800 to-slate-700 p-4 text-white">
-                            <p className="text-sm text-slate-200">Campos obligatorios</p>
-                            <p className="mt-2 text-2xl font-semibold">13</p>
-                        </div>
-                    )}
-                </div>
 
                 <div className="relative min-h-[100vh] flex-1 overflow-hidden rounded-xl border border-sidebar-border/70 md:min-h-min dark:border-sidebar-border">
                     <div className="flex flex-col gap-4 p-4">

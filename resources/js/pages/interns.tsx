@@ -185,19 +185,19 @@ export default function InternsPage({ interns: internPagination, filters, educat
 
                 <section className="grid gap-3 md:grid-cols-4">
                     <div className={SUMMARY_CARD_CLASSES.neutral}>
-                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-200">Total filtrado</p>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Total filtrado</p>
                         <p className="mt-2 text-3xl font-semibold">{internPagination.total}</p>
                     </div>
                     <div className={SUMMARY_CARD_CLASSES.success}>
-                        <p className="text-xs font-semibold uppercase tracking-wide text-emerald-100">Activos</p>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">Activos</p>
                         <p className="mt-2 text-3xl font-semibold">{statusCounts.active}</p>
                     </div>
                     <div className={SUMMARY_CARD_CLASSES.info}>
-                        <p className="text-xs font-semibold uppercase tracking-wide text-sky-100">Finalizados</p>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-300">Finalizados</p>
                         <p className="mt-2 text-3xl font-semibold">{statusCounts.finished}</p>
                     </div>
                     <div className={SUMMARY_CARD_CLASSES.danger}>
-                        <p className="text-xs font-semibold uppercase tracking-wide text-rose-100">Abandonados</p>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-rose-700 dark:text-rose-300">Abandonados</p>
                         <p className="mt-2 text-3xl font-semibold">{statusCounts.abandoned}</p>
                     </div>
                 </section>
@@ -240,7 +240,7 @@ export default function InternsPage({ interns: internPagination, filters, educat
                         </div>
 
                         <div className="flex gap-2 md:justify-end">
-                            <Button type="submit">Buscar</Button>
+                            <Button type="submit" variant="search">Buscar</Button>
                             <Button type="button" variant="secondary" onClick={clearFilters}>
                                 Limpiar
                             </Button>

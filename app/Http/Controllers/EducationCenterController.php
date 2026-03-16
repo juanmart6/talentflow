@@ -18,15 +18,30 @@ class EducationCenterController extends Controller
 
     public function index(Request $request): Response
     {
+
         $search = trim((string) $request->string('search')->toString());
+        $agreementStatus = $request->string('agreement_status')->toString();
+
+        $today = now()->startOfDay();
+        $renewalLimit = now()->addDays(30)->startOfDay();
 
         $baseQuery = EducationCenter::query()
             ->when($search !== '', function ($query) use ($search) {
                 $query->whereRaw('LOWER(name) LIKE ?', ['%'.mb_strtolower($search).'%']);
+            })
+            ->when($agreementStatus !== '', function ($query) use ($agreementStatus, $today, $renewalLimit) {
+                $query->whereHas('latestCollaborationAgreement', function ($subQuery) use ($agreementStatus, $today, $renewalLimit) {
+                    if ($agreementStatus === 'expired') {
+                        $subQuery->where('expires_at', '<', $today);
+                    } elseif ($agreementStatus === 'renewal_soon') {
+                        $subQuery->where('expires_at', '>=', $today)
+                                 ->where('expires_at', '<=', $renewalLimit);
+                    } elseif ($agreementStatus === 'vigente') {
+                        $subQuery->where('expires_at', '>=', $today)
+                                 ->where('expires_at', '>', $renewalLimit);
+                    }
+                });
             });
-
-        $today = now()->startOfDay();
-        $renewalLimit = now()->addDays(30)->startOfDay();
 
         $summaryCenters = (clone $baseQuery)
             ->with('latestCollaborationAgreement')
@@ -57,7 +72,16 @@ class EducationCenterController extends Controller
                 $expiresAt = $center->latestCollaborationAgreement?->expires_at;
                 $today = now()->startOfDay();
                 $renewalLimit = now()->addDays(30)->startOfDay();
-
+                $status = null;
+                if ($expiresAt === null) {
+                    $status = 'expired';
+                } elseif ($expiresAt < $today) {
+                    $status = 'expired';
+                } elseif ($expiresAt >= $today && $expiresAt <= $renewalLimit) {
+                    $status = 'renewal_soon';
+                } elseif ($expiresAt > $renewalLimit) {
+                    $status = 'vigente';
+                }
                 return [
                     'id' => $center->id,
                     'name' => $center->name,
@@ -73,9 +97,7 @@ class EducationCenterController extends Controller
                         'agreed_slots' => $center->latestCollaborationAgreement->agreed_slots,
                         'pdf_path' => $center->latestCollaborationAgreement->pdf_path,
                     ] : null,
-                    'renewal_soon' => $expiresAt !== null
-                        && $today->lte($expiresAt)
-                        && $renewalLimit->gte($expiresAt),
+                    'status' => $status,
                 ];
             })
             ->withQueryString();
@@ -85,6 +107,7 @@ class EducationCenterController extends Controller
             'summaryCounts' => $summaryCounts,
             'filters' => [
                 'search' => $search,
+                'agreement_status' => $agreementStatus,
             ],
         ]);
     }
