@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\EducationCenterController;
 use App\Http\Controllers\InternController;
+use App\Http\Controllers\PracticeTaskController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use Laravel\Fortify\Features;
@@ -83,6 +84,30 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::delete('interns/{intern}', [InternController::class, 'destroy'])
         ->middleware('permission:interns.delete')
         ->name('interns.destroy');
+
+    Route::get('practice-tasks', [PracticeTaskController::class, 'index'])
+        ->name('practice-tasks.index');
+
+    Route::post('practice-task-types', [PracticeTaskController::class, 'storeType'])
+        ->name('practice-task-types.store');
+
+    Route::put('practice-task-types/{practice_task_type}', [PracticeTaskController::class, 'updateType'])
+        ->name('practice-task-types.update');
+
+    Route::post('practice-tasks', [PracticeTaskController::class, 'storeTask'])
+        ->name('practice-tasks.store');
+
+    Route::put('practice-tasks/{practice_task}', [PracticeTaskController::class, 'updateTask'])
+        ->name('practice-tasks.update');
+
+    Route::patch('practice-tasks/{practice_task}/status', [PracticeTaskController::class, 'updateStatus'])
+        ->name('practice-tasks.status');
+
+    Route::post('practice-tasks/{practice_task}/comments', [PracticeTaskController::class, 'storeComment'])
+        ->name('practice-tasks.comments.store');
+
+    Route::post('practice-tasks/{practice_task}/attachments', [PracticeTaskController::class, 'storeAttachment'])
+        ->name('practice-tasks.attachments.store');
 });
 
 require __DIR__.'/settings.php';

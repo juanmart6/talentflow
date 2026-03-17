@@ -9,6 +9,7 @@ use App\Models\EducationCenter;
 use App\Models\Intern;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
@@ -122,6 +123,7 @@ class EducationCenterController extends Controller
         return Inertia::render('education-centers/form', [
             'mode' => 'create',
             'center' => null,
+            'agreementHistory' => [],
         ]);
     }
 
@@ -202,8 +204,9 @@ class EducationCenterController extends Controller
                 'agreement_signed_at' => $latestAgreement?->signed_at?->toDateString(),
                 'agreement_expires_at' => $latestAgreement?->expires_at?->toDateString(),
                 'agreement_agreed_slots' => $latestAgreement?->agreed_slots,
-                'agreement_pdf_path' => $latestAgreement?->pdf_path,
+                'agreement_pdf_path' => $latestAgreement?->pdf_path ? Storage::disk('public')->url($latestAgreement->pdf_path) : null,
             ],
+            'agreementHistory' => $this->agreementHistory($educationCenter),
             'internsHistory' => $internsHistory,
         ]);
     }
@@ -231,8 +234,9 @@ class EducationCenterController extends Controller
                 'agreement_signed_at' => $latestAgreement?->signed_at?->toDateString(),
                 'agreement_expires_at' => $latestAgreement?->expires_at?->toDateString(),
                 'agreement_agreed_slots' => $latestAgreement?->agreed_slots,
-                'agreement_pdf_path' => $latestAgreement?->pdf_path,
+                'agreement_pdf_path' => $latestAgreement?->pdf_path ? Storage::disk('public')->url($latestAgreement->pdf_path) : null,
             ],
+            'agreementHistory' => $this->agreementHistory($educationCenter),
         ]);
     }
 
@@ -265,7 +269,7 @@ class EducationCenterController extends Controller
                     ->store('education-centers/agreements', 'public');
             }
 
-            if ($agreement) {
+            if ($agreement && ! $request->hasFile('agreement_pdf')) {
                 $agreement->update([
                     'signed_at' => $validated['agreement_signed_at'],
                     'expires_at' => $validated['agreement_expires_at'],
@@ -288,6 +292,31 @@ class EducationCenterController extends Controller
         return redirect()
             ->route('education-centers.index')
             ->with('success', 'Centro educativo actualizado correctamente.');
+    }
+
+    private function agreementHistory(EducationCenter $educationCenter): array
+    {
+        $agreements = $educationCenter
+            ->collaborationAgreements()
+            ->latest('signed_at')
+            ->latest('id')
+            ->get();
+
+        $currentAgreementId = $agreements->first()?->id;
+
+        return $agreements
+            ->map(fn (CollaborationAgreement $agreement): array => [
+                'id' => $agreement->id,
+                'is_current' => $agreement->id === $currentAgreementId,
+                'signed_at' => $agreement->signed_at?->toDateString(),
+                'expires_at' => $agreement->expires_at?->toDateString(),
+                'agreed_slots' => $agreement->agreed_slots,
+                'filename' => basename((string) $agreement->pdf_path),
+                'preview_url' => $agreement->pdf_path ? Storage::disk('public')->url($agreement->pdf_path) : null,
+                'uploaded_at' => $agreement->created_at?->toDateTimeString(),
+            ])
+            ->values()
+            ->all();
     }
 
     public function destroy(EducationCenter $educationCenter): RedirectResponse

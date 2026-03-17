@@ -6,13 +6,13 @@ import {
     SidebarContent,
     SidebarFooter,
     SidebarHeader,
-    SidebarMenu,
 } from '@/components/ui/sidebar';
+import logo from '@/assets/TF_logo.svg';
 import { dashboard } from '@/routes';
 import educationCenters from '@/routes/education-centers';
 import interns from '@/routes/interns';
+import practiceTasks from '@/routes/practice-tasks';
 import type { NavItem } from '@/types';
-import logo from '@/assets/TF_logo.svg';
 
 const mainNavItems: NavItem[] = [
     {
@@ -32,7 +32,7 @@ const mainNavItems: NavItem[] = [
     },
     {
         title: 'Prácticas y tareas',
-        href: '/practicas-tareas',
+        href: practiceTasks.index().url,
         icon: NotebookPen,
     },
     {
