@@ -23,10 +23,6 @@ class EducationCenterController extends Controller
 
         $search = trim((string) $request->string('search')->toString());
         $agreementStatus = $request->string('agreement_status')->toString();
-        if ($agreementStatus === 'vigente') {
-            // Backward compatibility with old frontend filter value.
-            $agreementStatus = 'valid';
-        }
 
         $today = now()->startOfDay();
         $renewalLimit = now()->addDays(30)->startOfDay();

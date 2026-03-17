@@ -326,16 +326,25 @@ export default function InternFormPage({ mode, intern, educationCenters, documen
                                         </div>
                                         <div className="grid gap-2">
                                             <FieldLabel htmlFor="status">Estado</FieldLabel>
-                                            <Select value={data.status} onValueChange={(value) => setData('status', value as 'active' | 'finished' | 'abandoned')} required>
-                                                <SelectTrigger id="status" className={UI_PRESETS.selectTrigger}>
-                                                    <SelectValue placeholder="Estado" />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem className={UI_PRESETS.selectItem} value="active">Activo</SelectItem>
-                                                    <SelectItem className={UI_PRESETS.selectItem} value="finished">Finalizado</SelectItem>
-                                                    <SelectItem className={UI_PRESETS.selectItem} value="abandoned">Abandonado</SelectItem>
-                                                </SelectContent>
-                                            </Select>
+                                            {isReadOnly ? (
+                                                <Input
+                                                    id="status"
+                                                    value={INTERN_STATUS_META[currentStatus].label}
+                                                    readOnly
+                                                    disabled
+                                                />
+                                            ) : (
+                                                <Select value={data.status} onValueChange={(value) => setData('status', value as 'active' | 'finished' | 'abandoned')} required>
+                                                    <SelectTrigger id="status" className={UI_PRESETS.selectTrigger}>
+                                                        <SelectValue placeholder="Estado" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem className={UI_PRESETS.selectItem} value="active">Activo</SelectItem>
+                                                        <SelectItem className={UI_PRESETS.selectItem} value="finished">Finalizado</SelectItem>
+                                                        <SelectItem className={UI_PRESETS.selectItem} value="abandoned">Abandonado</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                            )}
                                             <InputError message={errors.status} />
                                         </div>
                                         <div className="grid gap-2 md:col-span-2">

@@ -18,7 +18,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { CENTER_STATUS_META, type CenterStatus } from '@/lib/center-status';
+import { CENTER_STATUS_META, CENTER_STATUS_OPTIONS, type CenterStatus } from '@/lib/center-status';
 import { UI_PRESETS, stripedRowClass } from '@/lib/ui-presets';
 import { normalizePaginationLabel } from '@/lib/utils';
 import AppLayout from '@/layouts/app-layout';
@@ -72,15 +72,6 @@ type Props = {
         agreement_status: string;
     };
 };
-
-const STATUS_OPTIONS = [
-    { value: 'all', label: 'Todos' },
-    { value: 'vigente', label: CENTER_STATUS_META.valid.filterLabel },
-    { value: 'renewal_soon', label: CENTER_STATUS_META.renewal_soon.filterLabel },
-    { value: 'expired', label: CENTER_STATUS_META.expired.filterLabel },
-] as const;
-
-const INTERACTIVE_HOVER_CLASS = 'hover:bg-primary/90 hover:text-primary-foreground';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -238,7 +229,7 @@ export default function EducationCenters({ centers, filters }: Props) {
                                     <SelectValue placeholder="Estado del convenio" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {STATUS_OPTIONS.map((option) => (
+                                    {CENTER_STATUS_OPTIONS.map((option) => (
                                         <SelectItem className={UI_PRESETS.selectItem} key={option.value} value={option.value}>
                                             {option.label}
                                         </SelectItem>
@@ -274,7 +265,7 @@ export default function EducationCenters({ centers, filters }: Props) {
                                                 onClick={() =>
                                                     copyToClipboard(
                                                         [center.name, center.institutional_email, center.phone].filter(Boolean).join('\n'),
-                                                        'datos del centro',
+                                                        'Datos del centro',
                                                     )
                                                 }
                                                 title="Haz clic para copiar los datos del centro"
@@ -365,7 +356,7 @@ export default function EducationCenters({ centers, filters }: Props) {
                                     key={`${link.label}-${index}`}
                                     variant={link.active ? 'default' : 'outline'}
                                     size="sm"
-                                    className={INTERACTIVE_HOVER_CLASS}
+                                    className={UI_PRESETS.interactiveHover}
                                     disabled={!link.url}
                                     asChild={Boolean(link.url)}
                                 >
@@ -395,10 +386,10 @@ export default function EducationCenters({ centers, filters }: Props) {
                     </p>
 
                     <DialogFooter>
-                        <Button variant="secondary" className={INTERACTIVE_HOVER_CLASS} onClick={() => setCenterToDelete(null)}>
+                        <Button variant="secondary" className={UI_PRESETS.interactiveHover} onClick={() => setCenterToDelete(null)}>
                             Cancelar
                         </Button>
-                        <Button variant="destructive" className={INTERACTIVE_HOVER_CLASS} onClick={confirmDelete} disabled={isDeleting}>
+                        <Button variant="destructive" className={UI_PRESETS.interactiveHover} onClick={confirmDelete} disabled={isDeleting}>
                             {isDeleting ? 'Eliminando...' : 'Eliminar'}
                         </Button>
                     </DialogFooter>

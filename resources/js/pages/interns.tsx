@@ -83,8 +83,6 @@ const breadcrumbs: BreadcrumbItem[] = [
     },
 ];
 
-const INTERACTIVE_HOVER_CLASS = 'hover:bg-primary/90 hover:text-primary-foreground';
-
 function formatDate(date: string | null): string {
     if (!date) {
         return '-';
@@ -318,7 +316,7 @@ export default function InternsPage({ interns: internPagination, filters, educat
                                     key={`${link.label}-${index}`}
                                     variant={link.active ? 'default' : 'outline'}
                                     size="sm"
-                                    className={INTERACTIVE_HOVER_CLASS}
+                                    className={UI_PRESETS.interactiveHover}
                                     disabled={!link.url}
                                     asChild={Boolean(link.url)}
                                 >
@@ -351,10 +349,10 @@ export default function InternsPage({ interns: internPagination, filters, educat
                     </p>
 
                     <DialogFooter>
-                        <Button variant="secondary" className={INTERACTIVE_HOVER_CLASS} onClick={() => setInternToDelete(null)}>
+                        <Button variant="secondary" className={UI_PRESETS.interactiveHover} onClick={() => setInternToDelete(null)}>
                             Cancelar
                         </Button>
-                        <Button variant="destructive" className={INTERACTIVE_HOVER_CLASS} onClick={confirmDelete} disabled={isDeleting}>
+                        <Button variant="destructive" className={UI_PRESETS.interactiveHover} onClick={confirmDelete} disabled={isDeleting}>
                             {isDeleting ? 'Eliminando...' : 'Eliminar'}
                         </Button>
                     </DialogFooter>

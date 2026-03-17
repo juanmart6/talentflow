@@ -23,3 +23,10 @@ export const CENTER_STATUS_META: Record<CenterStatus, CenterStatusMeta> = {
         badgeClass: 'bg-red-100 text-red-700 ring-1 ring-red-300',
     },
 };
+
+export const CENTER_STATUS_OPTIONS = [
+    { value: 'all', label: 'Todos'},
+    { value: 'valid', label: CENTER_STATUS_META.valid.filterLabel },
+    { value: 'renewal_soon', label: CENTER_STATUS_META.renewal_soon.filterLabel },
+    { value: 'expired', label: CENTER_STATUS_META.expired.filterLabel },
+] as const;

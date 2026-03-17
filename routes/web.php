@@ -85,6 +85,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->middleware('permission:interns.delete')
         ->name('interns.destroy');
 
+        // Rutas para la gestión de tareas:
+
     Route::get('practice-tasks', [PracticeTaskController::class, 'index'])
         ->name('practice-tasks.index');
 
