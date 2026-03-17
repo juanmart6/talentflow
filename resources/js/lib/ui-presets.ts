@@ -20,6 +20,7 @@ export const UI_PRESETS = {
     tableCellCentered: 'px-4 py-3 text-center',
     tablePagination: 'flex flex-col gap-4 border-t border-sidebar-border/70 px-4 pt-4 md:flex-row md:items-center md:justify-between dark:border-sidebar-border',
     iconActionButton: 'cursor-pointer text-slate-600 hover:bg-primary/90 hover:text-primary-foreground dark:text-slate-300',
+    interactiveHover: 'hover:bg-primary/90 hover:text-primary-foreground',
     copyableCell: 'cursor-pointer transition-colors hover:bg-slate-100/70 dark:hover:bg-slate-800/50',
     sectionCard: 'space-y-4 rounded-xl border border-sidebar-border/70 bg-white/70 p-4 dark:border-sidebar-border dark:bg-slate-900/20',
 } as const;
