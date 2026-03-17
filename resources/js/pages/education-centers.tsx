@@ -40,7 +40,7 @@ type CenterRow = {
     contact_position: string;
     collaboration_agreements_count: number;
     latest_agreement: Agreement | null;
-    status: 'vigente' | 'renewal_soon' | 'expired';
+    status: 'valid' | 'renewal_soon' | 'expired';
 };
 
 type CentersPagination = {
@@ -66,7 +66,7 @@ type Props = {
 
 const STATUS_OPTIONS = [
     { value: '', label: 'Todos' },
-    { value: 'vigente', label: 'Convenio Vigente' },
+    { value: 'valid', label: 'Convenio Vigente' },
     { value: 'renewal_soon', label: 'Renovación próxima' },
     { value: 'expired', label: 'Convenio caducado' },
 ];
@@ -209,19 +209,17 @@ export default function EducationCenters({ centers, filters, summaryCounts }: Pr
             <Head title="Centros Educativos" />
 
             <div className="flex h-full flex-1 flex-col gap-6 overflow-x-auto rounded-xl p-6">
-                <div className="flex flex-col gap-4">
-                    <div>
-                        <h1 className="text-2xl font-bold">Centros Educativos</h1>
-                        <p className="text-sm text-muted-foreground">
-                            Gestiona centros, contacto principal y estado de convenios.
-                        </p>
-                    </div>
-                </div>
-
                 <div className="w-full max-w-5xl mx-auto">
+                    <div className="flex flex-col gap-6">
+                        <div className="flex flex-col gap-3 text-left">
+                            <h1 className="text-2xl font-bold">Centros Educativos</h1>
+                            <p className="text-sm text-muted-foreground">
+                                Gestiona centros, contacto principal y estado de convenios.
+                            </p>
+                        </div>
 
                 {/* Buscador en una sola línea */}
-                <div className="w-full mb-2">
+                <div className="w-full">
                     <div className="relative" style={{ minWidth: '320px', maxWidth: '520px', flex: '0 1 420px' }}>
                         <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                         <Input
@@ -234,7 +232,7 @@ export default function EducationCenters({ centers, filters, summaryCounts }: Pr
                 </div>
 
                 {/* Filtro de convenios y botón debajo, alineados */}
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between w-full gap-2 mb-2">
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                     <div className="flex flex-wrap gap-2">
                         {STATUS_OPTIONS.map(({ value, label }) => (
                             <button
@@ -247,22 +245,29 @@ export default function EducationCenters({ centers, filters, summaryCounts }: Pr
                             </button>
                         ))}
                     </div>
-                    <div className="flex justify-end mt-2 md:mt-0">
-                        <Button asChild>
+                    <div className="flex justify-end">
+                        <Button className={`h-9 ${unifiedHoverClass}`} asChild>
                             <Link href={educationCenters.create().url}>Nuevo centro</Link>
                         </Button>
                     </div>
                 </div>
 
                 <div className="relative w-full overflow-x-auto rounded-lg border border-sidebar-border/70 dark:border-sidebar-border">
-                <table className="w-full min-w-[980px] text-sm">
+                <table className="w-full min-w-[980px] table-fixed text-sm">
+                    <colgroup>
+                        <col className="w-[30%]" />
+                        <col className="w-[20%]" />
+                        <col className="w-[20%]" />
+                        <col className="w-[20%]" />
+                        <col className="w-[20%]" />
+                    </colgroup>
                     <thead className={UI_PRESETS.tableHead}>
                         <tr>
-                            <th className="px-4 py-3 text-center font-semibold w-40">Centro</th>
-                            <th className="px-4 py-3 text-center font-semibold w-40">Contacto</th>
-                            <th className="px-4 py-3 text-center font-semibold w-40">Convenio</th>
-                            <th className="px-4 py-3 text-center font-semibold w-40">Estado</th>
-                            <th className="px-4 py-3 text-center font-semibold w-40">Acciones</th>
+                            <th className="px-6 py-3 text-center font-semibold">Centro</th>
+                            <th className="px-6 py-3 text-center font-semibold">Contacto</th>
+                            <th className="px-6 py-3 text-center font-semibold">Convenio</th>
+                            <th className="px-6 py-3 text-center font-semibold">Estado</th>
+                            <th className="px-7 py-3 text-center font-semibold">Acciones</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -270,7 +275,7 @@ export default function EducationCenters({ centers, filters, summaryCounts }: Pr
                             centers.data.map((center, index) => (
                                 <tr key={center.id} className={`border-t align-middle ${stripedRowClass(index)}`}>
                                     <td
-                                        className={`px-4 py-3 text-center w-40 ${copyableCellClass}`}
+                                        className={`px-6 py-3 text-center ${copyableCellClass}`}
                                         onClick={() =>
                                             copyToClipboard(
                                                 [center.name, center.institutional_email, center.phone].filter(Boolean).join('\n'),
@@ -283,11 +288,11 @@ export default function EducationCenters({ centers, filters, summaryCounts }: Pr
                                         <p className="text-sm font-medium text-muted-foreground">{center.institutional_email}</p>
                                         <p className="text-muted-foreground">{center.phone}</p>
                                     </td>
-                                    <td className="px-4 py-3 text-center w-40">
+                                    <td className="px-6 py-3 text-center">
                                         <p className="font-semibold">{center.contact_name}</p>
                                         <p className="text-muted-foreground">{center.contact_position}</p>
                                     </td>
-                                    <td className="px-4 py-3 text-center w-40">
+                                    <td className="px-6 py-3 text-center">
                                         {center.latest_agreement ? (
                                             <>
                                                 <p className="text-xs font-semibold text-muted-foreground">
@@ -304,7 +309,7 @@ export default function EducationCenters({ centers, filters, summaryCounts }: Pr
                                             <p className="text-muted-foreground">Sin convenio registrado</p>
                                         )}
                                     </td>
-                                    <td className="px-4 py-3 text-center w-40">
+                                    <td className="px-6 py-3 text-center whitespace-nowrap">
                                         {center.status === 'expired' ? (
                                             <span className="inline-flex rounded-full bg-red-100 px-2 py-1 text-xs font-semibold uppercase text-red-700 ring-1 ring-red-300">
                                                 Caducado
@@ -319,7 +324,7 @@ export default function EducationCenters({ centers, filters, summaryCounts }: Pr
                                             </span>
                                         )}
                                     </td>
-                                    <td className="px-4 py-3 text-center w-40">
+                                    <td className="px-7 py-3 text-center whitespace-nowrap">
                                         <div className="flex justify-center gap-2">
                                             <Button
                                                 variant="outline"
@@ -388,15 +393,16 @@ export default function EducationCenters({ centers, filters, summaryCounts }: Pr
                         ))}
                     </div>
                 </div>
+                    </div>
                 </div>
             </div>
 
             <Dialog open={centerToDelete !== null} onOpenChange={(open) => !open && setCenterToDelete(null)}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Confirmar eliminacion</DialogTitle>
+                        <DialogTitle>Confirmar eliminación</DialogTitle>
                         <DialogDescription>
-                            Esta accion eliminara el centro educativo seleccionado.
+                            Esta acción eliminará el centro educativo seleccionado.
                         </DialogDescription>
                     </DialogHeader>
 

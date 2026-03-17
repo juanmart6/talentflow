@@ -3,7 +3,7 @@ import { FieldLabel, SectionIntro } from '@/components/form-ui';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { MODE_CARD_CLASSES, UI_PRESETS, agreementCardClasses, agreementCardSubtextClasses, stripedRowClass } from '@/lib/ui-presets';
+import { UI_PRESETS, stripedRowClass } from '@/lib/ui-presets';
 import AppLayout from '@/layouts/app-layout';
 import educationCenters from '@/routes/education-centers';
 import type { BreadcrumbItem } from '@/types';
@@ -25,7 +25,7 @@ type CenterFormData = {
     agreement_pdf_path?: string | null;
 };
 
-    type InternHistoryItem = {
+type InternHistoryItem = {
     id: number;
     first_name: string;
     last_name: string;
@@ -36,7 +36,7 @@ type CenterFormData = {
     internship_start_date: string | null;
     internship_end_date: string | null;
     deleted_at: string | null;
-    };
+};
 
 type Props = {
     mode: 'create' | 'edit' | 'show';
@@ -62,6 +62,7 @@ function internStatusLabel(status: string): string {
 export default function EducationCenterForm({ mode, center, internsHistory = [] }: Props) {
     const isCreate = mode === 'create';
     const isReadOnly = mode === 'show';
+    const unifiedHoverClass = 'hover:bg-primary/90 hover:text-primary-foreground';
     const formRoute = isCreate
         ? educationCenters.store.form()
         : educationCenters.update.form(center?.id ?? 0);
@@ -72,26 +73,23 @@ export default function EducationCenterForm({ mode, center, internsHistory = [] 
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={isCreate ? 'Nuevo Centro Educativo' : isReadOnly ? 'Ver Centro Educativo' : 'Editar Centro Educativo'} />
 
-            <div className="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-4">
+            <div className="flex h-full flex-1 flex-col gap-6 overflow-x-auto rounded-xl p-6">
+                <div className="w-full max-w-5xl mx-auto">
+                    <div className="flex flex-col gap-6">
+                        {isCreate && (
+                            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                                <div className="flex flex-col gap-3">
+                                    <h1 className="text-2xl font-bold">Nuevo Centro Educativo</h1>
+                                    <p className="text-sm text-muted-foreground">
+                                        Completa la información del centro, contacto y convenio principal.
+                                    </p>
+                                </div>
 
-                <div className="relative min-h-[100vh] flex-1 overflow-hidden rounded-xl border border-sidebar-border/70 md:min-h-min dark:border-sidebar-border">
-                    <div className="flex flex-col gap-4 p-4">
-                        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                            <div>
-                                <h1 className="text-2xl font-extrabold">
-                                    {isCreate ? 'Nuevo Centro Educativo' : isReadOnly ? 'Ver Centro Educativo' : 'Editar Centro Educativo'}
-                                </h1>
-                                <p className="text-sm text-muted-foreground">
-                                    {isReadOnly
-                                        ? 'Consulta la informacion del centro, contacto y convenio principal.'
-                                        : 'Completa la informacion del centro, contacto y convenio principal.'}
-                                </p>
+                                <Button variant="secondary" className={unifiedHoverClass} asChild>
+                                    <Link href={educationCenters.index().url}>Volver al listado</Link>
+                                </Button>
                             </div>
-
-                            <Button variant="secondary" asChild>
-                                <Link href={educationCenters.index().url}>Volver al listado</Link>
-                            </Button>
-                        </div>
+                        )}
 
                         <Form
                             {...formRoute}
@@ -102,160 +100,160 @@ export default function EducationCenterForm({ mode, center, internsHistory = [] 
                             {({ processing, errors }) => (
                                 <>
                                     <fieldset disabled={isReadOnly} className="space-y-6">
-                                    <section className={UI_PRESETS.sectionCard}>
-                                        <SectionIntro
-                                            title="Datos del centro"
-                                            description="Informacion principal del centro educativo y sus canales de contacto."
-                                        />
+                                        <section className={UI_PRESETS.sectionCard}>
+                                            <SectionIntro
+                                                title="Datos del centro"
+                                                description="Información principal del centro educativo y sus canales de contacto."
+                                            />
 
-                                        <div className="grid gap-4 md:grid-cols-2">
-                                            <div className="grid gap-2 md:col-span-2">
-                                                <FieldLabel htmlFor="name">Nombre</FieldLabel>
-                                                <Input id="name" name="name" defaultValue={center?.name ?? ''} required />
-                                                <InputError message={errors.name} />
+                                            <div className="grid gap-4 md:grid-cols-2">
+                                                <div className="grid gap-2 md:col-span-2">
+                                                    <FieldLabel htmlFor="name">Nombre</FieldLabel>
+                                                    <Input id="name" name="name" defaultValue={center?.name ?? ''} required />
+                                                    <InputError message={errors.name} />
+                                                </div>
+
+                                                <div className="grid gap-2 md:col-span-2">
+                                                    <FieldLabel htmlFor="address">Dirección</FieldLabel>
+                                                    <Input id="address" name="address" defaultValue={center?.address ?? ''} required />
+                                                    <InputError message={errors.address} />
+                                                </div>
+
+                                                <div className="grid gap-2">
+                                                    <FieldLabel htmlFor="phone">Teléfono</FieldLabel>
+                                                    <Input id="phone" name="phone" defaultValue={center?.phone ?? ''} required />
+                                                    <InputError message={errors.phone} />
+                                                </div>
+
+                                                <div className="grid gap-2">
+                                                    <FieldLabel htmlFor="institutional_email">Email institucional</FieldLabel>
+                                                    <Input
+                                                        id="institutional_email"
+                                                        type="email"
+                                                        name="institutional_email"
+                                                        defaultValue={center?.institutional_email ?? ''}
+                                                        required
+                                                    />
+                                                    <InputError message={errors.institutional_email} />
+                                                </div>
+
+                                                <div className="grid gap-2 md:col-span-2">
+                                                    <FieldLabel htmlFor="website">Web (opcional)</FieldLabel>
+                                                    <Input id="website" name="website" defaultValue={center?.website ?? ''} />
+                                                    <InputError message={errors.website} />
+                                                </div>
                                             </div>
-
-                                    <div className="grid gap-2 md:col-span-2">
-                                        <FieldLabel htmlFor="address">Direccion</FieldLabel>
-                                        <Input id="address" name="address" defaultValue={center?.address ?? ''} required />
-                                        <InputError message={errors.address} />
-                                    </div>
-
-                                    <div className="grid gap-2">
-                                        <FieldLabel htmlFor="phone">Telefono</FieldLabel>
-                                        <Input id="phone" name="phone" defaultValue={center?.phone ?? ''} required />
-                                        <InputError message={errors.phone} />
-                                    </div>
-
-                                    <div className="grid gap-2">
-                                        <FieldLabel htmlFor="institutional_email">Email institucional</FieldLabel>
-                                        <Input
-                                            id="institutional_email"
-                                            type="email"
-                                            name="institutional_email"
-                                            defaultValue={center?.institutional_email ?? ''}
-                                            required
-                                        />
-                                        <InputError message={errors.institutional_email} />
-                                    </div>
-
-                                    <div className="grid gap-2 md:col-span-2">
-                                        <FieldLabel htmlFor="website">Web (opcional)</FieldLabel>
-                                        <Input id="website" name="website" defaultValue={center?.website ?? ''} />
-                                        <InputError message={errors.website} />
-                                    </div>
-                                        </div>
-                                    </section>
+                                        </section>
 
                                     <section className={UI_PRESETS.sectionCard}>
                                         <SectionIntro
                                             title="Persona de contacto"
-                                            description="Responsable de coordinacion entre el centro y la organizacion."
+                                            description="Responsable de coordinación entre el centro y la organización."
                                         />
 
-                                <div className="grid gap-4 md:grid-cols-2">
-                                    <div className="grid gap-2">
-                                        <FieldLabel htmlFor="contact_name">Nombre</FieldLabel>
-                                        <Input
-                                            id="contact_name"
-                                            name="contact_name"
-                                            defaultValue={center?.contact_name ?? ''}
-                                            required
-                                        />
-                                        <InputError message={errors.contact_name} />
-                                    </div>
+                                        <div className="grid gap-4 md:grid-cols-2">
+                                            <div className="grid gap-2">
+                                                <FieldLabel htmlFor="contact_name">Nombre</FieldLabel>
+                                                <Input
+                                                    id="contact_name"
+                                                    name="contact_name"
+                                                    defaultValue={center?.contact_name ?? ''}
+                                                    required
+                                                />
+                                                <InputError message={errors.contact_name} />
+                                            </div>
 
-                                    <div className="grid gap-2">
-                                        <FieldLabel htmlFor="contact_position">Cargo</FieldLabel>
-                                        <Input
-                                            id="contact_position"
-                                            name="contact_position"
-                                            defaultValue={center?.contact_position ?? ''}
-                                            required
-                                        />
-                                        <InputError message={errors.contact_position} />
-                                    </div>
+                                            <div className="grid gap-2">
+                                                <FieldLabel htmlFor="contact_position">Cargo</FieldLabel>
+                                                <Input
+                                                    id="contact_position"
+                                                    name="contact_position"
+                                                    defaultValue={center?.contact_position ?? ''}
+                                                    required
+                                                />
+                                                <InputError message={errors.contact_position} />
+                                            </div>
 
-                                    <div className="grid gap-2">
-                                        <FieldLabel htmlFor="contact_phone">Telefono</FieldLabel>
-                                        <Input
-                                            id="contact_phone"
-                                            name="contact_phone"
-                                            defaultValue={center?.contact_phone ?? ''}
-                                            required
-                                        />
-                                        <InputError message={errors.contact_phone} />
-                                    </div>
+                                            <div className="grid gap-2">
+                                                <FieldLabel htmlFor="contact_phone">Teléfono</FieldLabel>
+                                                <Input
+                                                    id="contact_phone"
+                                                    name="contact_phone"
+                                                    defaultValue={center?.contact_phone ?? ''}
+                                                    required
+                                                />
+                                                <InputError message={errors.contact_phone} />
+                                            </div>
 
-                                    <div className="grid gap-2">
-                                        <FieldLabel htmlFor="contact_email">Email</FieldLabel>
-                                        <Input
-                                            id="contact_email"
-                                            type="email"
-                                            name="contact_email"
-                                            defaultValue={center?.contact_email ?? ''}
-                                            required
-                                        />
-                                        <InputError message={errors.contact_email} />
-                                    </div>
+                                            <div className="grid gap-2">
+                                                <FieldLabel htmlFor="contact_email">Email</FieldLabel>
+                                                <Input
+                                                    id="contact_email"
+                                                    type="email"
+                                                    name="contact_email"
+                                                    defaultValue={center?.contact_email ?? ''}
+                                                    required
+                                                />
+                                                <InputError message={errors.contact_email} />
+                                            </div>
                                         </div>
                                     </section>
 
                                     <section className={UI_PRESETS.sectionCard}>
                                         <SectionIntro
-                                            title="Convenio de colaboracion"
+                                            title="Convenio de colaboración"
                                             description="Fechas, plazas acordadas y documento principal del convenio."
                                         />
 
-                                <div className="grid gap-4 md:grid-cols-2">
-                                    <div className="grid gap-2">
-                                        <FieldLabel htmlFor="agreement_signed_at">Fecha de firma</FieldLabel>
-                                        <Input
-                                            id="agreement_signed_at"
-                                            type="date"
-                                            name="agreement_signed_at"
-                                            defaultValue={center?.agreement_signed_at ?? ''}
-                                            required
-                                        />
-                                        <InputError message={errors.agreement_signed_at} />
-                                    </div>
+                                        <div className="grid gap-4 md:grid-cols-2">
+                                            <div className="grid gap-2">
+                                                <FieldLabel htmlFor="agreement_signed_at">Fecha de firma</FieldLabel>
+                                                <Input
+                                                    id="agreement_signed_at"
+                                                    type="date"
+                                                    name="agreement_signed_at"
+                                                    defaultValue={center?.agreement_signed_at ?? ''}
+                                                    required
+                                                />
+                                                <InputError message={errors.agreement_signed_at} />
+                                            </div>
 
-                                    <div className="grid gap-2">
-                                        <FieldLabel htmlFor="agreement_expires_at">Fecha de vencimiento</FieldLabel>
-                                        <Input
-                                            id="agreement_expires_at"
-                                            type="date"
-                                            name="agreement_expires_at"
-                                            defaultValue={center?.agreement_expires_at ?? ''}
-                                            required
-                                        />
-                                        <InputError message={errors.agreement_expires_at} />
-                                    </div>
+                                            <div className="grid gap-2">
+                                                <FieldLabel htmlFor="agreement_expires_at">Fecha de vencimiento</FieldLabel>
+                                                <Input
+                                                    id="agreement_expires_at"
+                                                    type="date"
+                                                    name="agreement_expires_at"
+                                                    defaultValue={center?.agreement_expires_at ?? ''}
+                                                    required
+                                                />
+                                                <InputError message={errors.agreement_expires_at} />
+                                            </div>
 
-                                    <div className="grid gap-2">
-                                        <FieldLabel htmlFor="agreement_agreed_slots">Plazas acordadas</FieldLabel>
-                                        <Input
-                                            id="agreement_agreed_slots"
-                                            type="number"
-                                            min={1}
-                                            name="agreement_agreed_slots"
-                                            defaultValue={center?.agreement_agreed_slots ?? 1}
-                                            required
-                                        />
-                                        <InputError message={errors.agreement_agreed_slots} />
-                                    </div>
+                                            <div className="grid gap-2">
+                                                <FieldLabel htmlFor="agreement_agreed_slots">Plazas acordadas</FieldLabel>
+                                                <Input
+                                                    id="agreement_agreed_slots"
+                                                    type="number"
+                                                    min={1}
+                                                    name="agreement_agreed_slots"
+                                                    defaultValue={center?.agreement_agreed_slots ?? 1}
+                                                    required
+                                                />
+                                                <InputError message={errors.agreement_agreed_slots} />
+                                            </div>
 
-                                    <div className="grid gap-2">
-                                        <FieldLabel htmlFor="agreement_pdf">Documento PDF</FieldLabel>
-                                        <Input
-                                            id="agreement_pdf"
-                                            type="file"
-                                            name="agreement_pdf"
-                                            accept="application/pdf"
-                                            required={isCreate}
-                                        />
-                                        <InputError message={errors.agreement_pdf} />
-                                    </div>
+                                            <div className="grid gap-2">
+                                                <FieldLabel htmlFor="agreement_pdf">Documento PDF</FieldLabel>
+                                                <Input
+                                                    id="agreement_pdf"
+                                                    type="file"
+                                                    name="agreement_pdf"
+                                                    accept="application/pdf"
+                                                    required={isCreate}
+                                                />
+                                                <InputError message={errors.agreement_pdf} />
+                                            </div>
                                         </div>
 
                                         {!isCreate && center?.agreement_pdf_path && (
@@ -269,7 +267,7 @@ export default function EducationCenterForm({ mode, center, internsHistory = [] 
                                     {isReadOnly && (
                                         <section className={UI_PRESETS.sectionCard}>
                                             <div className="flex items-center justify-between gap-2">
-                                                <h2 className="text-lg font-bold">Historico de becarios por centro</h2>
+                                                <h2 className="text-lg font-bold">Histórico de becarios por centro</h2>
                                                 <p className="text-sm text-muted-foreground">Total: {internsHistory.length}</p>
                                             </div>
 
@@ -278,34 +276,34 @@ export default function EducationCenterForm({ mode, center, internsHistory = [] 
                                                     No hay becarios registrados para este centro.
                                                 </p>
                                             ) : (
-                                                <div className="overflow-x-auto rounded-lg border border-sidebar-border/70 dark:border-sidebar-border">
+                                                <div className="relative w-full overflow-x-auto rounded-lg border border-sidebar-border/70 dark:border-sidebar-border">
                                                     <table className="w-full min-w-[980px] text-sm">
                                                         <thead className={UI_PRESETS.tableHead}>
                                                             <tr>
-                                                                <th className="px-4 py-3 font-semibold">Becario</th>
-                                                                <th className="px-4 py-3 font-semibold">Contacto</th>
-                                                                <th className="px-4 py-3 font-semibold">Periodo</th>
-                                                                <th className="px-4 py-3 font-semibold">Estado</th>
+                                                                <th className="px-4 py-3 text-center font-semibold">Becario</th>
+                                                                <th className="px-4 py-3 text-center font-semibold">Contacto</th>
+                                                                <th className="px-4 py-3 text-center font-semibold">Período</th>
+                                                                <th className="px-4 py-3 text-center font-semibold">Estado</th>
                                                             </tr>
                                                         </thead>
                                                         <tbody>
                                                             {internsHistory.map((intern, index) => (
-                                                                <tr key={intern.id} className={`border-t align-top ${stripedRowClass(index)}`}>
-                                                                    <td className="px-4 py-3">
+                                                                <tr key={intern.id} className={`border-t align-middle ${stripedRowClass(index)}`}>
+                                                                    <td className="px-4 py-3 text-center">
                                                                         <p className="font-semibold">
                                                                             {intern.first_name} {intern.last_name}
                                                                         </p>
                                                                         <p className="text-muted-foreground">{intern.dni_nie}</p>
                                                                     </td>
-                                                                    <td className="px-4 py-3">
+                                                                    <td className="px-4 py-3 text-center">
                                                                         <p className="font-medium">{intern.email}</p>
                                                                         <p className="text-muted-foreground">{intern.phone}</p>
                                                                     </td>
-                                                                    <td className="px-4 py-3">
+                                                                    <td className="px-4 py-3 text-center">
                                                                         <p className="text-xs font-semibold text-muted-foreground">Inicio: {intern.internship_start_date ?? '-'}</p>
                                                                         <p className="text-xs font-semibold text-muted-foreground">Fin: {intern.internship_end_date ?? '-'}</p>
                                                                     </td>
-                                                                    <td className="px-4 py-3">
+                                                                    <td className="px-4 py-3 text-center">
                                                                         <p className="font-semibold">{internStatusLabel(intern.status)}</p>
                                                                         {intern.deleted_at && (
                                                                             <p className="text-xs text-muted-foreground">Eliminado del sistema</p>
@@ -320,22 +318,19 @@ export default function EducationCenterForm({ mode, center, internsHistory = [] 
                                         </section>
                                     )}
 
-                                    <div className="flex gap-2 border-t border-sidebar-border/70 pt-2 dark:border-sidebar-border">
+                                    <div className="flex flex-col gap-2 border-t border-sidebar-border/70 pt-4 md:flex-row md:items-center md:justify-end dark:border-sidebar-border">
                                         {isReadOnly ? (
                                             <>
-                                                <Button asChild>
-                                                    <Link href={educationCenters.edit(center?.id ?? 0).url}>Editar</Link>
-                                                </Button>
-                                                <Button type="button" variant="secondary" asChild>
+                                                <Button type="button" variant="secondary" className={unifiedHoverClass} asChild>
                                                     <Link href={educationCenters.index().url}>Volver al listado</Link>
                                                 </Button>
                                             </>
                                         ) : (
                                             <>
-                                                <Button disabled={processing}>
+                                                <Button className={unifiedHoverClass} disabled={processing}>
                                                     {processing ? 'Guardando...' : 'Guardar'}
                                                 </Button>
-                                                <Button type="button" variant="secondary" asChild>
+                                                <Button type="button" variant="secondary" className={unifiedHoverClass} asChild>
                                                     <Link href={educationCenters.index().url}>Cancelar</Link>
                                                 </Button>
                                             </>

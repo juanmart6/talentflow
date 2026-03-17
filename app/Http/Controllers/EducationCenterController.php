@@ -6,6 +6,7 @@ use App\Http\Requests\EducationCenters\StoreEducationCenterRequest;
 use App\Http\Requests\EducationCenters\UpdateEducationCenterRequest;
 use App\Models\CollaborationAgreement;
 use App\Models\EducationCenter;
+use App\Models\Intern;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -21,6 +22,10 @@ class EducationCenterController extends Controller
 
         $search = trim((string) $request->string('search')->toString());
         $agreementStatus = $request->string('agreement_status')->toString();
+        if ($agreementStatus === 'vigente') {
+            // Backward compatibility with old frontend filter value.
+            $agreementStatus = 'valid';
+        }
 
         $today = now()->startOfDay();
         $renewalLimit = now()->addDays(30)->startOfDay();
@@ -36,7 +41,7 @@ class EducationCenterController extends Controller
                     } elseif ($agreementStatus === 'renewal_soon') {
                         $subQuery->where('expires_at', '>=', $today)
                                  ->where('expires_at', '<=', $renewalLimit);
-                    } elseif ($agreementStatus === 'vigente') {
+                    } elseif ($agreementStatus === 'valid') {
                         $subQuery->where('expires_at', '>=', $today)
                                  ->where('expires_at', '>', $renewalLimit);
                     }
@@ -80,7 +85,7 @@ class EducationCenterController extends Controller
                 } elseif ($expiresAt >= $today && $expiresAt <= $renewalLimit) {
                     $status = 'renewal_soon';
                 } elseif ($expiresAt > $renewalLimit) {
-                    $status = 'vigente';
+                    $status = 'valid';
                 }
                 return [
                     'id' => $center->id,
