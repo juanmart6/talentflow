@@ -1,6 +1,6 @@
 import { Head, Link, router } from '@inertiajs/react';
 import { useEffect, useMemo, useState } from 'react';
-import { Eye, Pencil, Search, Trash2 } from 'lucide-react';
+import { CirclePlus, Eye, FileSpreadsheet, Pencil, Search, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -73,6 +73,8 @@ type Props = {
         search: string;
         status: string;
         education_center_id: number | null;
+        date_from: string;
+        date_to: string;
     };
 };
 
@@ -97,6 +99,9 @@ export default function InternsPage({ interns: internPagination, filters, educat
     const [educationCenterId, setEducationCenterId] = useState(
         filters.education_center_id ? String(filters.education_center_id) : 'all',
     );
+    
+    const [dateFrom, setDateFrom] = useState(filters.date_from ?? '');
+    const [dateTo, setDateTo] = useState(filters.date_to ?? '');
     const [internToDelete, setInternToDelete] = useState<InternRow | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
 
@@ -110,17 +115,26 @@ export default function InternsPage({ interns: internPagination, filters, educat
         return `Mostrando ${internPagination.from} - ${internPagination.to} de ${internPagination.total} becarios`;
     }, [internPagination.from, internPagination.to, internPagination.total, hasRows]);
 
+    const hasInvalidDateRange = dateFrom !== '' && dateTo !== '' && dateFrom > dateTo;
+
     useEffect(() => {
         const normalizedSearch = search.trim();
         const normalizedFilter = (filters.search ?? '').trim();
         const currentStatus = filters.status || 'all';
         const currentEducationCenterId = filters.education_center_id ? String(filters.education_center_id) : 'all';
-
+        const currentDateFrom = filters.date_from ?? '';
+        const currentDateTo = filters.date_to ?? '';
         if (
             normalizedSearch === normalizedFilter &&
             status === currentStatus &&
-            educationCenterId === currentEducationCenterId
+            educationCenterId === currentEducationCenterId &&
+            dateFrom === currentDateFrom &&
+            dateTo === currentDateTo
         ) {
+            return;
+        }
+
+        if (hasInvalidDateRange) {
             return;
         }
 
@@ -131,6 +145,8 @@ export default function InternsPage({ interns: internPagination, filters, educat
                     search: normalizedSearch || undefined,
                     status: status === 'all' ? undefined : status,
                     education_center_id: educationCenterId === 'all' ? undefined : educationCenterId,
+                    date_from: dateFrom || undefined,
+                    date_to: dateTo || undefined,
                 },
                 {
                     preserveState: true,
@@ -141,7 +157,7 @@ export default function InternsPage({ interns: internPagination, filters, educat
         }, 300);
 
         return () => window.clearTimeout(timeoutId);
-    }, [search, status, educationCenterId, filters.search, filters.status, filters.education_center_id]);
+    }, [search, status, educationCenterId, dateFrom, dateTo, filters.search, filters.status, filters.education_center_id, filters.date_from, filters.date_to, hasInvalidDateRange]);
 
     const confirmDelete = () => {
         if (!internToDelete) {
@@ -157,6 +173,25 @@ export default function InternsPage({ interns: internPagination, filters, educat
                 setInternToDelete(null);
             },
         });
+    };
+
+    const handleExport = () => {
+        if (hasInvalidDateRange) {
+            return;
+        }
+
+        const params: Record<string, string> = {};
+        const normalizedSearch = search.trim();
+
+        if (normalizedSearch) params.search = normalizedSearch;
+        if (status !== 'all') params.status = status;
+        if (educationCenterId !== 'all') params.education_center_id = educationCenterId;
+        if (dateFrom) params.date_from = dateFrom;
+        if (dateTo) params.date_to = dateTo;
+
+        window.location.href = interns.export({
+            query: params,
+        }).url;
     };
 
     return (
@@ -175,50 +210,105 @@ export default function InternsPage({ interns: internPagination, filters, educat
 
                 <div className={UI_PRESETS.pageSection}>
                     <form onSubmit={(event) => event.preventDefault()} className={`${UI_PRESETS.filterBar} mb-2`}>
-                        <div className="grid gap-3 md:grid-cols-[1.5fr_auto_auto] md:items-center">
-                            <div className="relative" style={{ minWidth: '320px', maxWidth: '520px', flex: '0 1 420px' }}>
-                                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                                <Input
-                                    value={search}
-                                    onChange={(event) => setSearch(event.target.value)}
-                                    placeholder="Buscar por nombre, DNI o email"
-                                    className={`${UI_PRESETS.simpleSearchInput} h-9 pl-9 text-sm`}
-                                />
+                        <div className="flex flex-col gap-3">
+                            <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+                                <div className="relative min-w-0 flex-1">
+                                    <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                                    <Input
+                                        value={search}
+                                        onChange={(event) => setSearch(event.target.value)}
+                                        placeholder="Buscar por nombre, DNI o email"
+                                        className={`${UI_PRESETS.simpleSearchInput} h-9 pl-9 text-sm`}
+                                    />
+                                </div>
+
+                                <div className="flex items-center gap-2 lg:ml-auto lg:shrink-0">
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="icon"
+                                        className={`${UI_PRESETS.iconActionButton} text-emerald-600`}
+                                        onClick={handleExport}
+                                        disabled={hasInvalidDateRange}
+                                        title="Exportar Excel"
+                                        aria-label="Exportar Excel"
+                                    >
+                                        <FileSpreadsheet />
+                                    </Button>
+                                    <Button
+                                        asChild
+                                        variant="outline"
+                                        size="icon"
+                                        className={`${UI_PRESETS.iconActionButton} text-sky-600`}
+                                        title="Nuevo becario"
+                                        aria-label="Nuevo becario"
+                                    >
+                                        <Link href={interns.create().url}>
+                                            <CirclePlus />
+                                        </Link>
+                                    </Button>
+                                </div>
                             </div>
 
-                            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                                <Select value={status} onValueChange={setStatus}>
-                                    <SelectTrigger className={`${UI_PRESETS.selectTrigger} min-w-[180px]`}>
-                                        <SelectValue placeholder="Estado" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem className={UI_PRESETS.selectItem} value="all">Todos los estados</SelectItem>
-                                        <SelectItem className={UI_PRESETS.selectItem} value="active">Activo</SelectItem>
-                                        <SelectItem className={UI_PRESETS.selectItem} value="finished">Finalizado</SelectItem>
-                                        <SelectItem className={UI_PRESETS.selectItem} value="abandoned">Abandonado</SelectItem>
-                                    </SelectContent>
-                                </Select>
+                            <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+                                <div className="flex flex-col gap-1">
+                                    <span className="text-xs font-medium text-muted-foreground">Estado</span>
+                                    <Select value={status} onValueChange={setStatus}>
+                                        <SelectTrigger className={`${UI_PRESETS.selectTrigger} w-full`}>
+                                            <SelectValue placeholder="Estado" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem className={UI_PRESETS.selectItem} value="all">Todos los estados</SelectItem>
+                                            <SelectItem className={UI_PRESETS.selectItem} value="active">Activo</SelectItem>
+                                            <SelectItem className={UI_PRESETS.selectItem} value="finished">Finalizado</SelectItem>
+                                            <SelectItem className={UI_PRESETS.selectItem} value="abandoned">Abandonado</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
 
-                                <Select value={educationCenterId} onValueChange={setEducationCenterId}>
-                                    <SelectTrigger className={`${UI_PRESETS.selectTrigger} min-w-[220px]`}>
-                                        <SelectValue placeholder="Centro educativo" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem className={UI_PRESETS.selectItem} value="all">Todos los centros</SelectItem>
-                                        {educationCenters.map((center) => (
-                                            <SelectItem className={UI_PRESETS.selectItem} key={center.id} value={String(center.id)}>
-                                                {center.name}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                                <div className="flex flex-col gap-1">
+                                    <span className="text-xs font-medium text-muted-foreground">Centro educativo</span>
+                                    <Select value={educationCenterId} onValueChange={setEducationCenterId}>
+                                        <SelectTrigger className={`${UI_PRESETS.selectTrigger} w-full`}>
+                                            <SelectValue placeholder="Centro educativo" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem className={UI_PRESETS.selectItem} value="all">Todos los centros</SelectItem>
+                                            {educationCenters.map((center) => (
+                                                <SelectItem className={UI_PRESETS.selectItem} key={center.id} value={String(center.id)}>
+                                                    {center.name}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+
+                                <div className="flex flex-col gap-1">
+                                    <span className="text-xs font-medium text-muted-foreground">Desde</span>
+                                    <Input
+                                        type="date"
+                                        value={dateFrom}
+                                        onChange={(event) => setDateFrom(event.target.value)}
+                                        className={`${UI_PRESETS.simpleSearchInput} h-9 text-sm`}
+                                    />
+                                </div>
+
+                                <div className="flex flex-col gap-1">
+                                    <span className="text-xs font-medium text-muted-foreground">Hasta</span>
+                                    <Input
+                                        type="date"
+                                        value={dateTo}
+                                        onChange={(event) => setDateTo(event.target.value)}
+                                        className={`${UI_PRESETS.simpleSearchInput} h-9 text-sm`}
+                                    />
+                                </div>
                             </div>
 
-                            <div className="flex gap-2 md:justify-end">
-                                <Button asChild>
-                                    <Link href={interns.create().url}>Nuevo becario</Link>
-                                </Button>
-                            </div>
+                            {hasInvalidDateRange ? (
+                                <p className="text-sm font-medium text-destructive">
+                                    La fecha &quot;Desde&quot; no puede ser posterior a la fecha &quot;Hasta&quot;.
+                                </p>
+                            ) : null}
                         </div>
                     </form>
 

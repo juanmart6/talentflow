@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exports\EducationCentersExport;
 use App\Http\Requests\EducationCenters\StoreEducationCenterRequest;
 use App\Http\Requests\EducationCenters\UpdateEducationCenterRequest;
 use App\Models\CollaborationAgreement;
@@ -14,36 +15,21 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
 use Inertia\Response;
+use Maatwebsite\Excel\Facades\Excel;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class EducationCenterController extends Controller
 {
 
     public function index(Request $request): Response
     {
-
         $search = trim((string) $request->string('search')->toString());
         $agreementStatus = $request->string('agreement_status')->toString();
 
         $today = now()->startOfDay();
         $renewalLimit = now()->addDays(30)->startOfDay();
 
-        $baseQuery = EducationCenter::query()
-            ->when($search !== '', function ($query) use ($search) {
-                $query->whereRaw('LOWER(name) LIKE ?', ['%'.mb_strtolower($search).'%']);
-            })
-            ->when($agreementStatus !== '', function ($query) use ($agreementStatus, $today, $renewalLimit) {
-                $query->whereHas('latestCollaborationAgreement', function ($subQuery) use ($agreementStatus, $today, $renewalLimit) {
-                    if ($agreementStatus === 'expired') {
-                        $subQuery->where('expires_at', '<', $today);
-                    } elseif ($agreementStatus === 'renewal_soon') {
-                        $subQuery->where('expires_at', '>=', $today)
-                                 ->where('expires_at', '<=', $renewalLimit);
-                    } elseif ($agreementStatus === 'valid') {
-                        $subQuery->where('expires_at', '>=', $today)
-                                 ->where('expires_at', '>', $renewalLimit);
-                    }
-                });
-            });
+        $baseQuery = $this->filteredBaseQuery($request);
 
         $summaryCenters = (clone $baseQuery)
             ->with('latestCollaborationAgreement')
@@ -71,19 +57,7 @@ class EducationCenterController extends Controller
             ->orderBy('name')
             ->paginate(10)
             ->through(function (EducationCenter $center): array {
-                $expiresAt = $center->latestCollaborationAgreement?->expires_at;
-                $today = now()->startOfDay();
-                $renewalLimit = now()->addDays(30)->startOfDay();
-                $status = null;
-                if ($expiresAt === null) {
-                    $status = 'expired';
-                } elseif ($expiresAt < $today) {
-                    $status = 'expired';
-                } elseif ($expiresAt >= $today && $expiresAt <= $renewalLimit) {
-                    $status = 'renewal_soon';
-                } elseif ($expiresAt > $renewalLimit) {
-                    $status = 'valid';
-                }
+                $status = $this->resolveCenterStatus($center->latestCollaborationAgreement);
                 return [
                     'id' => $center->id,
                     'name' => $center->name,
@@ -112,6 +86,32 @@ class EducationCenterController extends Controller
                 'agreement_status' => $agreementStatus,
             ],
         ]);
+    }
+
+    public function export(Request $request): BinaryFileResponse
+    {
+        $rows = $this->filteredBaseQuery($request)
+            ->with('latestCollaborationAgreement')
+            ->orderBy('name')
+            ->get()
+            ->map(function (EducationCenter $center): array {
+                return [
+                    'Centro' => $center->name,
+                    'Email institucional' => $center->institutional_email,
+                    'Telefono' => $center->phone,
+                    'Contacto' => $center->contact_name,
+                    'Cargo contacto' => $center->contact_position,
+                    'Firma convenio' => $center->latestCollaborationAgreement?->signed_at?->toDateString() ?? '-',
+                    'Vence convenio' => $center->latestCollaborationAgreement?->expires_at?->toDateString() ?? '-',
+                    'Plazas' => $center->latestCollaborationAgreement?->agreed_slots ?? '-',
+                    'Estado' => $this->centerStatusLabel($this->resolveCenterStatus($center->latestCollaborationAgreement)),
+                ];
+            });
+
+        return Excel::download(
+            new EducationCentersExport($rows),
+            'education-centers.xlsx',
+        );
     }
 
     public function create(): Response
@@ -163,7 +163,7 @@ class EducationCenterController extends Controller
             ->collaborationAgreements()
             ->latest('signed_at')
             ->first();
-
+ 
         $internsHistory = $educationCenter
             ->interns()
             ->withTrashed()
@@ -288,6 +288,59 @@ class EducationCenterController extends Controller
         return redirect()
             ->route('education-centers.index')
             ->with('success', 'Centro educativo actualizado correctamente.');
+    }
+
+    private function filteredBaseQuery(Request $request)
+    {
+        $search = trim((string) $request->string('search')->toString());
+        $agreementStatus = $request->string('agreement_status')->toString();
+        $today = now()->startOfDay();
+        $renewalLimit = now()->addDays(30)->startOfDay();
+
+        return EducationCenter::query()
+            ->when($search !== '', function ($query) use ($search) {
+                $query->whereRaw('LOWER(name) LIKE ?', ['%'.mb_strtolower($search).'%']);
+            })
+            ->when($agreementStatus !== '', function ($query) use ($agreementStatus, $today, $renewalLimit) {
+                $query->whereHas('latestCollaborationAgreement', function ($subQuery) use ($agreementStatus, $today, $renewalLimit) {
+                    if ($agreementStatus === 'expired') {
+                        $subQuery->where('expires_at', '<', $today);
+                    } elseif ($agreementStatus === 'renewal_soon') {
+                        $subQuery->where('expires_at', '>=', $today)
+                            ->where('expires_at', '<=', $renewalLimit);
+                    } elseif ($agreementStatus === 'valid') {
+                        $subQuery->where('expires_at', '>=', $today)
+                            ->where('expires_at', '>', $renewalLimit);
+                    }
+                });
+            });
+    }
+
+    private function resolveCenterStatus(?CollaborationAgreement $agreement): string
+    {
+        $expiresAt = $agreement?->expires_at;
+        $today = now()->startOfDay();
+        $renewalLimit = now()->addDays(30)->startOfDay();
+
+        if ($expiresAt === null || $expiresAt < $today) {
+            return 'expired';
+        }
+
+        if ($expiresAt <= $renewalLimit) {
+            return 'renewal_soon';
+        }
+
+        return 'valid';
+    }
+
+    private function centerStatusLabel(string $status): string
+    {
+        return match ($status) {
+            'valid' => 'Vigente',
+            'renewal_soon' => 'Renovacion proxima',
+            'expired' => 'Caducado',
+            default => $status,
+        };
     }
 
     private function agreementHistory(EducationCenter $educationCenter): array

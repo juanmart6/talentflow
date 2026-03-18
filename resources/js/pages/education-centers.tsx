@@ -1,6 +1,6 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Eye, Pencil, Search, Trash2 } from 'lucide-react';
+import { CirclePlus, Eye, FileSpreadsheet, Pencil, Search, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -197,6 +197,19 @@ export default function EducationCenters({ centers, filters }: Props) {
         });
     };
 
+    const handleExport = () => {
+        const params = new URLSearchParams();
+        const normalizedSearch = search.trim();
+
+        if (normalizedSearch) params.set('search', normalizedSearch);
+        if (agreementStatus !== 'all') params.set('agreement_status', agreementStatus);
+
+        const queryString = params.toString();
+        const exportUrl = `${educationCenters.index().url}/export${queryString ? `?${queryString}` : ''}`;
+
+        window.location.href = exportUrl;
+    };
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Centros Educativos" />
@@ -237,9 +250,29 @@ export default function EducationCenters({ centers, filters }: Props) {
                                 </SelectContent>
                             </Select>
 
-                            <div className="flex justify-end">
-                                <Button asChild>
-                                    <Link href={educationCenters.create().url}>Nuevo centro</Link>
+                            <div className="flex items-center gap-2 md:ml-auto md:shrink-0">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="icon"
+                                    className={`${UI_PRESETS.iconActionButton} text-emerald-600`}
+                                    onClick={handleExport}
+                                    title="Exportar Excel"
+                                    aria-label="Exportar Excel"
+                                >
+                                    <FileSpreadsheet />
+                                </Button>
+                                <Button
+                                    asChild
+                                    variant="outline"
+                                    size="icon"
+                                    className={`${UI_PRESETS.iconActionButton} text-sky-600`}
+                                    title="Nuevo centro"
+                                    aria-label="Nuevo centro"
+                                >
+                                    <Link href={educationCenters.create().url}>
+                                        <CirclePlus />
+                                    </Link>
                                 </Button>
                             </div>
                         </div>
@@ -375,9 +408,9 @@ export default function EducationCenters({ centers, filters }: Props) {
             <Dialog open={centerToDelete !== null} onOpenChange={(open) => !open && setCenterToDelete(null)}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Confirmar eliminación</DialogTitle>
+                        <DialogTitle>Confirmar eliminaciÃ³n</DialogTitle>
                         <DialogDescription>
-                            Esta acción eliminará el centro educativo seleccionado.
+                            Esta acciÃ³n eliminarÃ¡ el centro educativo seleccionado.
                         </DialogDescription>
                     </DialogHeader>
 

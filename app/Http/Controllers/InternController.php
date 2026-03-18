@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exports\InternsExport;
 use App\Http\Requests\Interns\StoreInternRequest;
 use App\Http\Requests\Interns\UpdateInternRequest;
 use App\Models\EducationCenter;
@@ -14,28 +15,19 @@ use Inertia\Inertia;
 use Inertia\Response;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Maatwebsite\Excel\Facades\Excel;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class InternController extends Controller
 {
     public function index(Request $request): Response
     {
-        $search = trim((string) $request->string('search')->toString());
         $status = trim((string) $request->string('status')->toString());
+        $search = trim((string) $request->string('search')->toString());
         $educationCenterId = $request->integer('education_center_id');
-
-        $baseQuery = Intern::query()
-            ->when($search !== '', function ($query) use ($search) {
-                $normalizedSearch = '%'.mb_strtolower($search).'%';
-
-                $query->where(function ($subQuery) use ($normalizedSearch) {
-                    $subQuery
-                        ->whereRaw('LOWER(first_name) LIKE ?', [$normalizedSearch])
-                        ->orWhereRaw('LOWER(last_name) LIKE ?', [$normalizedSearch])
-                        ->orWhereRaw('LOWER(dni_nie) LIKE ?', [$normalizedSearch])
-                        ->orWhereRaw('LOWER(email) LIKE ?', [$normalizedSearch]);
-                });
-            })
-            ->when($educationCenterId, fn ($query) => $query->where('education_center_id', $educationCenterId));
+        $date_from = $request->string('date_from')->toString();
+        $date_to = $request->string('date_to')->toString();
+        $baseQuery = $this->filteredBaseQuery($request);
 
         $statusCountsRaw = (clone $baseQuery)
             ->selectRaw('status, COUNT(*) as total')
@@ -48,9 +40,10 @@ class InternController extends Controller
             'abandoned' => (int) ($statusCountsRaw['abandoned'] ?? 0),
         ];
 
-        $interns = (clone $baseQuery)
+        $internsQuery = $this->applyStatusFilter(clone $baseQuery, $status);
+
+        $interns = $internsQuery
             ->with('educationCenter')
-            ->when($status !== '', fn ($query) => $query->where('status', $status))
             ->orderBy('last_name')
             ->orderBy('first_name')
             ->paginate(10)
@@ -85,11 +78,85 @@ class InternController extends Controller
                 'search' => $search,
                 'status' => $status,
                 'education_center_id' => $educationCenterId,
+                'date_from' => $date_from,
+                'date_to' => $date_to,
             ],
             'educationCenters' => EducationCenter::query()
                 ->orderBy('name')
                 ->get(['id', 'name']),
         ]);
+    }
+
+    public function export(Request $request): BinaryFileResponse
+    {
+        $status = trim((string) $request->string('status')->toString());
+
+        $exportRows = $this->applyStatusFilter($this->filteredBaseQuery($request), $status)
+            ->with('educationCenter')
+            ->orderBy('last_name')
+            ->orderBy('first_name')
+            ->get()
+            ->map(fn (Intern $intern): array => [
+                'Becario' => trim($intern->first_name.' '.$intern->last_name),
+                'DNI/NIE' => $intern->dni_nie,
+                'Centro' => $intern->educationCenter?->name ?? '-',
+                'Fecha inicio' => $intern->internship_start_date?->toDateString() ?? '-',
+                'Fecha fin' => $intern->internship_end_date?->toDateString() ?? '-',
+                'Estado' => $this->internStatusLabel($intern->status),
+            ]);
+
+        return Excel::download(
+            new InternsExport($exportRows),
+            'interns.xlsx',
+        );
+    }
+
+    private function filteredBaseQuery(Request $request)
+    {
+        $search = trim((string) $request->string('search')->toString());
+        $educationCenterId = $request->integer('education_center_id');
+        $date_from = $request->string('date_from')->toString();
+        $date_to = $request->string('date_to')->toString();
+
+        return Intern::query()
+            ->when($search !== '', function ($query) use ($search) {
+                $normalizedSearch = '%'.mb_strtolower($search).'%';
+
+                $query->where(function ($subQuery) use ($normalizedSearch) {
+                    $subQuery
+                        ->whereRaw('LOWER(first_name) LIKE ?', [$normalizedSearch])
+                        ->orWhereRaw('LOWER(last_name) LIKE ?', [$normalizedSearch])
+                        ->orWhereRaw('LOWER(dni_nie) LIKE ?', [$normalizedSearch])
+                        ->orWhereRaw('LOWER(email) LIKE ?', [$normalizedSearch]);
+                });
+            })
+            ->when($educationCenterId, fn ($query) => $query->where('education_center_id', $educationCenterId))
+            ->when($date_from !== '' && $date_to !== '', function ($query) use ($date_from, $date_to) {
+                $query
+                    ->whereDate('internship_start_date', '<=', $date_to)
+                    ->whereDate('internship_end_date', '>=', $date_from);
+            })
+            ->when($date_from !== '' && $date_to === '', function ($query) use ($date_from) {
+                $query->whereDate('internship_end_date', '>=', $date_from);
+            })
+            ->when($date_from === '' && $date_to !== '', function ($query) use ($date_to) {
+                $query->whereDate('internship_start_date', '<=', $date_to);
+            });
+    }
+
+    private function applyStatusFilter($query, string $status)
+    {
+        return $query->when($status !== '', fn ($query) => $query->where('status', $status));
+    }
+
+    private function internStatusLabel(string $status): string
+    {
+        return match ($status) {
+            'active' => 'Activo',
+            'finished' => 'Finalizado',
+            'abandoned' => 'Abandonado',
+            default => $status,
+        };
     }
 
     public function create(): Response

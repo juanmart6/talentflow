@@ -21,6 +21,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->middleware('permission:education-centers.view')
         ->name('education-centers.index');
 
+    Route::get('education-centers/export', [EducationCenterController::class, 'export'])
+        ->middleware('permission:education-centers.view')
+        ->name('education-centers.export');
+
     Route::get('education-centers/create', [EducationCenterController::class, 'create'])
         ->middleware('permission:education-centers.create')
         ->name('education-centers.create');
@@ -50,6 +54,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('interns', [InternController::class, 'index'])
         ->middleware('permission:interns.view')
         ->name('interns.index');
+
+    Route::get('interns/export', [InternController::class, 'export'])
+        ->middleware('permission:interns.view')
+        ->name('interns.export');
 
     Route::get('interns/create', [InternController::class, 'create'])
         ->middleware('permission:interns.create')
