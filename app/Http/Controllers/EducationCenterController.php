@@ -25,7 +25,6 @@ class EducationCenterController extends Controller
     {
         $search = trim((string) $request->string('search')->toString());
         $agreementStatus = $request->string('agreement_status')->toString();
-
         $today = now()->startOfDay();
         $renewalLimit = now()->addDays(30)->startOfDay();
 
@@ -200,7 +199,8 @@ class EducationCenterController extends Controller
                 'agreement_signed_at' => $latestAgreement?->signed_at?->toDateString(),
                 'agreement_expires_at' => $latestAgreement?->expires_at?->toDateString(),
                 'agreement_agreed_slots' => $latestAgreement?->agreed_slots,
-                'agreement_pdf_path' => $latestAgreement?->pdf_path ? Storage::disk('public')->url($latestAgreement->pdf_path) : null,
+                // Corregido: uso correcto de Storage::url para obtener la URL pública del archivo
+                'agreement_pdf_path' => $latestAgreement?->pdf_path ? Storage::url($latestAgreement->pdf_path) : null,
             ],
             'agreementHistory' => $this->agreementHistory($educationCenter),
             'internsHistory' => $internsHistory,
@@ -230,7 +230,8 @@ class EducationCenterController extends Controller
                 'agreement_signed_at' => $latestAgreement?->signed_at?->toDateString(),
                 'agreement_expires_at' => $latestAgreement?->expires_at?->toDateString(),
                 'agreement_agreed_slots' => $latestAgreement?->agreed_slots,
-                'agreement_pdf_path' => $latestAgreement?->pdf_path ? Storage::disk('public')->url($latestAgreement->pdf_path) : null,
+                // Corregido: uso correcto de Storage::url para obtener la URL pública del archivo
+                'agreement_pdf_path' => $latestAgreement?->pdf_path ? Storage::url($latestAgreement->pdf_path) : null,
             ],
             'agreementHistory' => $this->agreementHistory($educationCenter),
         ]);
@@ -353,15 +354,17 @@ class EducationCenterController extends Controller
 
         $currentAgreementId = $agreements->first()?->id;
 
+        // Nos aseguramos de que signed_at y expires_at sean instancias de Carbon antes de llamar a toDateString()
         return $agreements
             ->map(fn (CollaborationAgreement $agreement): array => [
                 'id' => $agreement->id,
                 'is_current' => $agreement->id === $currentAgreementId,
-                'signed_at' => $agreement->signed_at?->toDateString(),
-                'expires_at' => $agreement->expires_at?->toDateString(),
+                'signed_at' => $agreement->signed_at ? (\Illuminate\Support\Carbon::parse($agreement->signed_at)->toDateString()) : null,
+                'expires_at' => $agreement->expires_at ? (\Illuminate\Support\Carbon::parse($agreement->expires_at)->toDateString()) : null,
                 'agreed_slots' => $agreement->agreed_slots,
                 'filename' => basename((string) $agreement->pdf_path),
-                'preview_url' => $agreement->pdf_path ? Storage::disk('public')->url($agreement->pdf_path) : null,
+                // Corregido: uso correcto de Storage::url para obtener la URL pública del archivo
+                'preview_url' => $agreement->pdf_path ? Storage::url($agreement->pdf_path) : null,
                 'uploaded_at' => $agreement->created_at?->toDateTimeString(),
             ])
             ->values()

@@ -400,7 +400,7 @@ export default function PracticeTasksPage({
             <Head title="Prácticas y tareas" />
 
             <div className={UI_PRESETS.pageContent}>
-                <div className="mx-auto flex w-full max-w-[1480px] flex-col gap-6">
+                <div className="flex w-full flex-col gap-6">
                     <div>
                         <h1 className="text-2xl font-bold">Prácticas y tareas</h1>
                         <p className="text-sm text-muted-foreground">
@@ -500,7 +500,7 @@ export default function PracticeTasksPage({
                                     key={column.status}
                                     className={cn('flex min-h-[520px] flex-col rounded-2xl border p-3', STATUS_META[column.status].columnClass)}
                                     onDragOver={(event) => event.preventDefault()}
-                                    onDrop={(event) => onTaskDrop(event, column.status)}
+                                    onDrop={(event) => onTaskDrop(event as DragEvent<HTMLDivElement>, column.status)}
                                 >
                                     <div className="mb-3 flex items-center justify-between gap-3">
                                         <div>
