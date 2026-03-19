@@ -1,6 +1,6 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { CirclePlus, Eye, FileSpreadsheet, Pencil, Search, Trash2 } from 'lucide-react';
+import { CirclePlus, Eye, FileSpreadsheet, MapPin, Pencil, Search, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -73,6 +73,7 @@ type Props = {
     };
 };
 
+// Definición de breadcrumbs para la navegación:
 const breadcrumbs: BreadcrumbItem[] = [
     {
         title: 'Centros Educativos',
@@ -80,6 +81,7 @@ const breadcrumbs: BreadcrumbItem[] = [
     },
 ];
 
+// Contiene toda la lógica de la vista:
 export default function EducationCenters({ centers, filters }: Props) {
     const page = usePage<{ flash?: { success?: string; error?: string } }>();
     const lastFlashRef = useRef<string | null>(null);
@@ -104,6 +106,7 @@ export default function EducationCenters({ centers, filters }: Props) {
         });
     };
 
+    // Función para copiar al portapapeles:
     const copyToClipboard = async (value: string, label: string) => {
         try {
             if (!value.trim()) {
@@ -130,6 +133,7 @@ export default function EducationCenters({ centers, filters }: Props) {
         }
     };
 
+    // Efecto para mostrar mensajes flash:
     useEffect(() => {
         const successMessage = page.props.flash?.success;
         const errorMessage = page.props.flash?.error;
@@ -150,6 +154,7 @@ export default function EducationCenters({ centers, filters }: Props) {
         }
     }, [page.props.flash?.success, page.props.flash?.error]);
 
+    // Resumen de paginación:
     const paginationSummary = useMemo(() => {
         if (!hasRows || centers.from === null || centers.to === null) {
             return 'Sin resultados';
@@ -158,6 +163,7 @@ export default function EducationCenters({ centers, filters }: Props) {
         return `Mostrando ${centers.from} - ${centers.to} de ${centers.total} centros`;
     }, [centers.from, centers.to, centers.total, hasRows]);
 
+    // Efecto para manejar la búsqueda con debounce:
     useEffect(() => {
         const normalizedSearch = search.trim();
         const normalizedFilter = (filters.search ?? '').trim();
@@ -181,6 +187,7 @@ export default function EducationCenters({ centers, filters }: Props) {
         return () => window.clearTimeout(timeoutId);
     }, [search, filters.search, agreementStatus]);
 
+    // Función para confirmar eliminación:
     const confirmDelete = () => {
         if (!centerToDelete) {
             return;
@@ -197,6 +204,7 @@ export default function EducationCenters({ centers, filters }: Props) {
         });
     };
 
+    // Función para manejar exportación:
     const handleExport = () => {
         const params = new URLSearchParams();
         const normalizedSearch = search.trim();
@@ -210,6 +218,7 @@ export default function EducationCenters({ centers, filters }: Props) {
         window.location.href = exportUrl;
     };
 
+    // Renderizado de la vista:
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Centros Educativos" />
@@ -293,19 +302,23 @@ export default function EducationCenters({ centers, filters }: Props) {
                                 {hasRows ? (
                                     centers.data.map((center, index) => (
                                         <tr key={center.id} className={`border-t align-middle ${stripedRowClass(index)}`}>
-                                            <td
-                                                className={`${UI_PRESETS.tableCellCentered} w-40 ${UI_PRESETS.copyableCell}`}
-                                                onClick={() =>
-                                                    copyToClipboard(
-                                                        [center.name, center.institutional_email, center.phone].filter(Boolean).join('\n'),
-                                                        'Datos del centro',
-                                                    )
-                                                }
-                                                title="Haz clic para copiar los datos del centro"
-                                            >
-                                                <p className="font-semibold">{center.name}</p>
-                                                <p className="text-sm font-medium text-muted-foreground">{center.institutional_email}</p>
-                                                <p className="text-muted-foreground">{center.phone}</p>
+                                            <td className={`${UI_PRESETS.tableCellCentered} w-40`}>
+                                                <div
+                                                    className="cursor-pointer"
+                                                    onClick={() =>
+                                                        copyToClipboard(
+                                                            [center.name, center.institutional_email, center.phone].filter(Boolean).join('\n'),
+                                                            'Datos del centro',
+                                                        )
+                                                    }
+                                                    title="Haz clic para copiar los datos del centro"
+                                                >
+                                                    <p className="font-semibold">{center.name}</p>
+                                                    <p className="text-sm font-medium text-muted-foreground">
+                                                        {center.institutional_email}
+                                                    </p>
+                                                    <p className="text-muted-foreground">{center.phone}</p>
+                                                </div>
                                             </td>
                                             <td className={`${UI_PRESETS.tableCellCentered} w-40`}>
                                                 <p className="font-semibold">{center.contact_name}</p>
@@ -335,6 +348,27 @@ export default function EducationCenters({ centers, filters }: Props) {
                                             </td>
                                             <td className={`${UI_PRESETS.tableCellCentered} w-40`}>
                                                 <div className="flex justify-center gap-2">
+                                                    {center.address && (
+                                                        <Button
+                                                            variant="outline"
+                                                            size="icon"
+                                                            className={UI_PRESETS.iconActionButton}
+                                                            asChild
+                                                            title="Ver en Google Maps"
+                                                            aria-label="Ver en Google Maps"
+                                                        >
+                                                            <a
+                                                                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                                                                    center.address,
+                                                                )}`}
+                                                                target="_blank"
+                                                                rel="noreferrer"
+                                                            >
+                                                                <MapPin className="h-4 w-4" aria-hidden="true" />
+                                                                <span className="sr-only">Ver en Google Maps</span>
+                                                            </a>
+                                                        </Button>
+                                                    )}
                                                     <Button
                                                         variant="outline"
                                                         size="icon"
@@ -408,9 +442,9 @@ export default function EducationCenters({ centers, filters }: Props) {
             <Dialog open={centerToDelete !== null} onOpenChange={(open) => !open && setCenterToDelete(null)}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Confirmar eliminaciÃ³n</DialogTitle>
+                        <DialogTitle>Confirmar eliminación</DialogTitle>
                         <DialogDescription>
-                            Esta acciÃ³n eliminarÃ¡ el centro educativo seleccionado.
+                            Esta acción eliminará el centro educativo seleccionado.
                         </DialogDescription>
                     </DialogHeader>
 

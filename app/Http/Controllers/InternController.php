@@ -13,6 +13,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\URL;
 use Inertia\Inertia;
 use Inertia\Response;
+use Throwable;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Maatwebsite\Excel\Facades\Excel;
@@ -20,6 +21,7 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class InternController extends Controller
 {
+    // Listado de becarios con filtros y conteo por estado:
     public function index(Request $request): Response
     {
         $status = trim((string) $request->string('status')->toString());
@@ -87,6 +89,7 @@ class InternController extends Controller
         ]);
     }
 
+    // Exportación de becarios a Excel con filtros aplicados:
     public function export(Request $request): BinaryFileResponse
     {
         $status = trim((string) $request->string('status')->toString());
@@ -100,8 +103,12 @@ class InternController extends Controller
                 'Becario' => trim($intern->first_name.' '.$intern->last_name),
                 'DNI/NIE' => $intern->dni_nie,
                 'Centro' => $intern->educationCenter?->name ?? '-',
-                'Fecha inicio' => $intern->internship_start_date?->toDateString() ?? '-',
-                'Fecha fin' => $intern->internship_end_date?->toDateString() ?? '-',
+                'Fecha inicio' => $intern->internship_start_date
+                    ? Carbon::parse($intern->internship_start_date)->toDateString()
+                    : '-',
+                'Fecha fin' => $intern->internship_end_date
+                    ? Carbon::parse($intern->internship_end_date)->toDateString()
+                    : '-',
                 'Estado' => $this->internStatusLabel($intern->status),
             ]);
 
@@ -111,6 +118,7 @@ class InternController extends Controller
         );
     }
 
+    // Consulta base para aplicar filtros de búsqueda, centro educativo y fechas:
     private function filteredBaseQuery(Request $request)
     {
         $search = trim((string) $request->string('search')->toString());
@@ -144,11 +152,13 @@ class InternController extends Controller
             });
     }
 
+    // Aplica filtro de estado a una consulta de becarios:
     private function applyStatusFilter($query, string $status)
     {
         return $query->when($status !== '', fn ($query) => $query->where('status', $status));
     }
 
+    // Traduce el estado del becario a una etiqueta legible:
     private function internStatusLabel(string $status): string
     {
         return match ($status) {
@@ -159,6 +169,7 @@ class InternController extends Controller
         };
     }
 
+    // Formulario de creación de becario:
     public function create(): Response
     {
         return Inertia::render('interns/form', [
@@ -171,23 +182,32 @@ class InternController extends Controller
         ]);
     }
 
+    // Almacenamiento de nuevo becario:
     public function store(StoreInternRequest $request): RedirectResponse
     {
         $validated = $request->validated();
 
-        $intern = Intern::create(collect($validated)->except([
-            'collaboration_agreement_document',
-            'insurance_policy_document',
-            'dni_scan_document',
-        ])->all());
+        try {
+            $intern = Intern::create(collect($validated)->except([
+                'collaboration_agreement_document',
+                'insurance_policy_document',
+                'dni_scan_document',
+            ])->all());
 
-        $this->syncUploadedDocuments($request, $intern);
+            $this->syncUploadedDocuments($request, $intern);
+        } catch (Throwable $exception) {
+            report($exception);
+            return redirect()
+                ->route('interns.index')
+                ->with('error', 'No se pudo crear el becario. Intenta de nuevo más tarde.');
+        }
 
         return redirect()
             ->route('interns.show', $intern)
             ->with('success', 'Becario creado correctamente.');
     }
 
+    // Formulario de edición de becario:
     public function edit(Intern $intern): Response
     {
         return Inertia::render('interns/form', [
@@ -200,32 +220,49 @@ class InternController extends Controller
         ]);
     }
 
+    // Actualización de un becario:
     public function update(UpdateInternRequest $request, Intern $intern): RedirectResponse
     {
         $validated = $request->validated();
 
-        $intern->update(collect($validated)->except([
-            'collaboration_agreement_document',
-            'insurance_policy_document',
-            'dni_scan_document',
-        ])->all());
+        try {
+            $intern->update(collect($validated)->except([
+                'collaboration_agreement_document',
+                'insurance_policy_document',
+                'dni_scan_document',
+            ])->all());
 
-        $this->syncUploadedDocuments($request, $intern);
+            $this->syncUploadedDocuments($request, $intern);
+        } catch (Throwable $exception) {
+            report($exception);
+            return redirect()
+                ->route('interns.index')
+                ->with('error', 'No se pudo actualizar el becario. Intenta de nuevo más tarde.');
+        }
 
         return redirect()
             ->route('interns.show', $intern)
             ->with('success', 'Becario actualizado correctamente.');
     }
 
+    // Eliminación de un becario:
     public function destroy(Intern $intern): RedirectResponse
     {
-        $intern->delete();
+        try {
+            $intern->delete();
+        } catch (Throwable $exception) {
+            report($exception);
+            return redirect()
+                ->route('interns.index')
+                ->with('error', 'No se pudo eliminar el becario. Intenta de nuevo más tarde.');
+        }
 
         return redirect()
             ->route('interns.index')
             ->with('success', 'Becario eliminado correctamente.');
     }
 
+    // Visualización de un becario:
     public function show(Intern $intern): Response
     {
         return Inertia::render('interns/form', [
@@ -238,6 +275,7 @@ class InternController extends Controller
         ]);
     }
 
+    // Vista previa de un documento de becario:
     public function previewDocument(Intern $intern, string $document, string $filename)
     {
         $path = $this->resolveDocumentPath($intern, $document, $filename);
@@ -245,6 +283,7 @@ class InternController extends Controller
         return response()->file(Storage::disk('public')->path($path));
     }
 
+    // Descarga de un documento de becario:
     public function downloadDocument(Intern $intern, string $document, string $filename)
     {
         $path = $this->resolveDocumentPath($intern, $document, $filename);
@@ -252,6 +291,7 @@ class InternController extends Controller
         return response()->download(Storage::disk('public')->path($path), basename($path));
     }
 
+    // Almacenamiento de un documento subido para un becario:
     private function storeInternDocument(UploadedFile $file, string $category, Intern $intern) : string
     {
         $directory = "interns/{$intern->id}/{$category}";
@@ -259,6 +299,7 @@ class InternController extends Controller
         return $file->store($directory, 'public');
     }
 
+    // Sincroniza los documentos subidos en la solicitud con el becario, almacenándolos y actualizando las rutas en la base de datos:
     private function syncUploadedDocuments(Request $request, Intern $intern): void
     {
         $documentPaths = [];
@@ -283,6 +324,7 @@ class InternController extends Controller
         }
     }
 
+    // Resuelve la ruta de un documento de becario para su visualización o descarga, validando su existencia y seguridad:
     private function resolveDocumentPath(Intern $intern, string $document, string $filename): string
     {
         $definition = $this->documentDefinitions()[$document] ?? null;
@@ -306,6 +348,7 @@ class InternController extends Controller
         return $path;
     }
 
+    // Obtiene el historial de documentos subidos para un becario, organizados por categoría y ordenados por fecha de subida:
     private function documentHistory(Intern $intern): array
     {
         $history = [];
@@ -342,6 +385,7 @@ class InternController extends Controller
         return $history;
     }
 
+    // Genera una estructura vacía para el historial de documentos, útil para la vista cuando no hay documentos subidos:
     private function emptyDocumentHistory(): array
     {
         $history = [];
@@ -353,6 +397,7 @@ class InternController extends Controller
         return $history;
     }
 
+    // Define las categorías de documentos para los becarios, incluyendo el campo de solicitud, la columna de ruta en la base de datos y la carpeta de almacenamiento:
     private function documentDefinitions(): array
     {
         return [

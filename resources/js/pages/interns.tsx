@@ -21,6 +21,7 @@ import {
 import { INTERN_STATUS_META } from '@/lib/intern-status';
 import { UI_PRESETS, stripedRowClass } from '@/lib/ui-presets';
 import { normalizePaginationLabel } from '@/lib/utils';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import AppLayout from '@/layouts/app-layout';
 import interns from '@/routes/interns';
 import type { BreadcrumbItem } from '@/types';
@@ -78,6 +79,7 @@ type Props = {
     };
 };
 
+// Definición de breadcrumbs para la navegación:
 const breadcrumbs: BreadcrumbItem[] = [
     {
         title: 'Gestión de Becarios',
@@ -85,6 +87,7 @@ const breadcrumbs: BreadcrumbItem[] = [
     },
 ];
 
+// Función para formatear fechas, mostrando un guion si no hay fecha disponible:
 function formatDate(date: string | null): string {
     if (!date) {
         return '-';
@@ -93,6 +96,15 @@ function formatDate(date: string | null): string {
     return date;
 }
 
+// Función para obtener las iniciales del becario, utilizando la primera letra del nombre y apellido, o un signo de interrogación si no hay información disponible:
+function getInitials(intern: InternRow): string {
+    const firstInitial = intern.first_name?.trim()[0] ?? '';
+    const lastInitial = intern.last_name?.trim()[0] ?? '';
+
+    return (firstInitial + lastInitial).toUpperCase() || '?';
+}
+
+// Contiene toda la lógica de la vista:
 export default function InternsPage({ interns: internPagination, filters, educationCenters }: Props) {
     const [search, setSearch] = useState(filters.search ?? '');
     const [status, setStatus] = useState(filters.status || 'all');
@@ -117,6 +129,7 @@ export default function InternsPage({ interns: internPagination, filters, educat
 
     const hasInvalidDateRange = dateFrom !== '' && dateTo !== '' && dateFrom > dateTo;
 
+    // Efecto para manejar la búsqueda con debounce y sincronización de filtros:
     useEffect(() => {
         const normalizedSearch = search.trim();
         const normalizedFilter = (filters.search ?? '').trim();
@@ -138,6 +151,7 @@ export default function InternsPage({ interns: internPagination, filters, educat
             return;
         }
 
+        // Utilizamos un timeout para implementar debounce, evitando hacer una petición en cada pulsación del usuario. Si el usuario sigue escribiendo o cambiando filtros, el timeout se reiniciará.
         const timeoutId = window.setTimeout(() => {
             router.get(
                 interns.index().url,
@@ -159,6 +173,7 @@ export default function InternsPage({ interns: internPagination, filters, educat
         return () => window.clearTimeout(timeoutId);
     }, [search, status, educationCenterId, dateFrom, dateTo, filters.search, filters.status, filters.education_center_id, filters.date_from, filters.date_to, hasInvalidDateRange]);
 
+    // Función para confirmar eliminación de un becario, mostrando un diálogo de confirmación y manejando la petición de eliminación a través de Inertia.js. Si la eliminación es exitosa, se cierra el diálogo y se muestra un mensaje flash.
     const confirmDelete = () => {
         if (!internToDelete) {
             return;
@@ -175,6 +190,7 @@ export default function InternsPage({ interns: internPagination, filters, educat
         });
     };
 
+    // Función para manejar exportación de becarios, generando un archivo Excel con los filtros aplicados.
     const handleExport = () => {
         if (hasInvalidDateRange) {
             return;
@@ -194,6 +210,7 @@ export default function InternsPage({ interns: internPagination, filters, educat
         }).url;
     };
 
+    // Renderizado de la vista:
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Gestión de Becarios" />
@@ -329,9 +346,18 @@ export default function InternsPage({ interns: internPagination, filters, educat
                                     internPagination.data.map((intern, index) => (
                                         <tr key={intern.id} className={`border-t align-middle ${stripedRowClass(index)}`}>
                                             <td className={`${UI_PRESETS.tableCellCentered} w-40`}>
-                                                <p className="font-semibold">
-                                                    {intern.first_name} {intern.last_name}
-                                                </p>
+                                                <div className="flex items-center justify-center gap-3">
+                                                    <Avatar className="bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-50">
+                                                        <AvatarFallback className="text-xs font-semibold">
+                                                            {getInitials(intern)}
+                                                        </AvatarFallback>
+                                                    </Avatar>
+                                                    <div className="text-left">
+                                                        <p className="font-semibold">
+                                                            {intern.first_name} {intern.last_name}
+                                                        </p>
+                                                    </div>
+                                                </div>
                                             </td>
                                             <td className={`${UI_PRESETS.tableCellCentered} w-40 font-mono text-xs font-semibold md:text-sm`}>
                                                 {intern.dni_nie}

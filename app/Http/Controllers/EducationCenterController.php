@@ -13,6 +13,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Throwable;
 use Inertia\Inertia;
 use Inertia\Response;
 use Maatwebsite\Excel\Facades\Excel;
@@ -20,7 +21,7 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class EducationCenterController extends Controller
 {
-
+    // Lista y filtrado de centros educativos:
     public function index(Request $request): Response
     {
         $search = trim((string) $request->string('search')->toString());
@@ -87,6 +88,7 @@ class EducationCenterController extends Controller
         ]);
     }
 
+    // Exportación de centros educativos a Excel:
     public function export(Request $request): BinaryFileResponse
     {
         $rows = $this->filteredBaseQuery($request)
@@ -113,6 +115,7 @@ class EducationCenterController extends Controller
         );
     }
 
+    // Creación de nuevo centro educativo:
     public function create(): Response
     {
         return Inertia::render('education-centers/form', [
@@ -122,40 +125,49 @@ class EducationCenterController extends Controller
         ]);
     }
 
+    // Almacenamiento de nuevo centro educativo:
     public function store(StoreEducationCenterRequest $request): RedirectResponse
     {
         $validated = $request->validated();
 
-        DB::transaction(function () use ($request, $validated): void {
-            $center = EducationCenter::create([
-                'name' => $validated['name'],
-                'address' => $validated['address'],
-                'phone' => $validated['phone'],
-                'institutional_email' => $validated['institutional_email'],
-                'website' => $validated['website'] ?? null,
-                'contact_name' => $validated['contact_name'],
-                'contact_position' => $validated['contact_position'],
-                'contact_phone' => $validated['contact_phone'],
-                'contact_email' => $validated['contact_email'],
-            ]);
+        try {
+            DB::transaction(function () use ($request, $validated): void {
+                $center = EducationCenter::create([
+                    'name' => $validated['name'],
+                    'address' => $validated['address'],
+                    'phone' => $validated['phone'],
+                    'institutional_email' => $validated['institutional_email'],
+                    'website' => $validated['website'] ?? null,
+                    'contact_name' => $validated['contact_name'],
+                    'contact_position' => $validated['contact_position'],
+                    'contact_phone' => $validated['contact_phone'],
+                    'contact_email' => $validated['contact_email'],
+                ]);
 
-            $agreementPdfPath = $request->file('agreement_pdf')
-                ->store('education-centers/agreements', 'public');
+                $agreementPdfPath = $request->file('agreement_pdf')
+                    ->store('education-centers/agreements', 'public');
 
-            CollaborationAgreement::create([
-                'education_center_id' => $center->id,
-                'signed_at' => $validated['agreement_signed_at'],
-                'expires_at' => $validated['agreement_expires_at'],
-                'agreed_slots' => $validated['agreement_agreed_slots'],
-                'pdf_path' => $agreementPdfPath,
-            ]);
-        });
+                CollaborationAgreement::create([
+                    'education_center_id' => $center->id,
+                    'signed_at' => $validated['agreement_signed_at'],
+                    'expires_at' => $validated['agreement_expires_at'],
+                    'agreed_slots' => $validated['agreement_agreed_slots'],
+                    'pdf_path' => $agreementPdfPath,
+                ]);
+            });
+        } catch (Throwable $exception) {
+            report($exception);
+            return redirect()
+                ->route('education-centers.index')
+                ->with('error', 'No se pudo crear el centro educativo. Inténtalo de nuevo más tarde.');
+        }
 
         return redirect()
             ->route('education-centers.index')
             ->with('success', 'Centro educativo creado correctamente.');
     }
 
+    // Visualización de un centro educativo:
     public function show(EducationCenter $educationCenter): Response
     {
         $latestAgreement = $educationCenter
@@ -199,7 +211,6 @@ class EducationCenterController extends Controller
                 'agreement_signed_at' => $latestAgreement?->signed_at?->toDateString(),
                 'agreement_expires_at' => $latestAgreement?->expires_at?->toDateString(),
                 'agreement_agreed_slots' => $latestAgreement?->agreed_slots,
-                // Corregido: uso correcto de Storage::url para obtener la URL pública del archivo
                 'agreement_pdf_path' => $latestAgreement?->pdf_path ? Storage::url($latestAgreement->pdf_path) : null,
             ],
             'agreementHistory' => $this->agreementHistory($educationCenter),
@@ -207,6 +218,7 @@ class EducationCenterController extends Controller
         ]);
     }
 
+    // Edición de un centro educativo:
     public function edit(EducationCenter $educationCenter): Response
     {
         $latestAgreement = $educationCenter
@@ -230,67 +242,75 @@ class EducationCenterController extends Controller
                 'agreement_signed_at' => $latestAgreement?->signed_at?->toDateString(),
                 'agreement_expires_at' => $latestAgreement?->expires_at?->toDateString(),
                 'agreement_agreed_slots' => $latestAgreement?->agreed_slots,
-                // Corregido: uso correcto de Storage::url para obtener la URL pública del archivo
                 'agreement_pdf_path' => $latestAgreement?->pdf_path ? Storage::url($latestAgreement->pdf_path) : null,
             ],
             'agreementHistory' => $this->agreementHistory($educationCenter),
         ]);
     }
 
+    // Actualización de un centro educativo:
     public function update(UpdateEducationCenterRequest $request, EducationCenter $educationCenter): RedirectResponse
     {
         $validated = $request->validated();
 
-        DB::transaction(function () use ($request, $educationCenter, $validated): void {
-            $educationCenter->update([
-                'name' => $validated['name'],
-                'address' => $validated['address'],
-                'phone' => $validated['phone'],
-                'institutional_email' => $validated['institutional_email'],
-                'website' => $validated['website'] ?? null,
-                'contact_name' => $validated['contact_name'],
-                'contact_position' => $validated['contact_position'],
-                'contact_phone' => $validated['contact_phone'],
-                'contact_email' => $validated['contact_email'],
-            ]);
+        try {
+            DB::transaction(function () use ($request, $educationCenter, $validated): void {
+                $educationCenter->update([
+                    'name' => $validated['name'],
+                    'address' => $validated['address'],
+                    'phone' => $validated['phone'],
+                    'institutional_email' => $validated['institutional_email'],
+                    'website' => $validated['website'] ?? null,
+                    'contact_name' => $validated['contact_name'],
+                    'contact_position' => $validated['contact_position'],
+                    'contact_phone' => $validated['contact_phone'],
+                    'contact_email' => $validated['contact_email'],
+                ]);
 
-            $agreement = CollaborationAgreement::query()
-                ->where('education_center_id', $educationCenter->id)
-                ->latest('signed_at')
-                ->first();
+                $agreement = CollaborationAgreement::query()
+                    ->where('education_center_id', $educationCenter->id)
+                    ->latest('signed_at')
+                    ->first();
 
-            $agreementPdfPath = $agreement?->pdf_path;
+                $agreementPdfPath = $agreement?->pdf_path;
 
-            if ($request->hasFile('agreement_pdf')) {
-                $agreementPdfPath = $request->file('agreement_pdf')
-                    ->store('education-centers/agreements', 'public');
-            }
+                if ($request->hasFile('agreement_pdf')) {
+                    $agreementPdfPath = $request->file('agreement_pdf')
+                        ->store('education-centers/agreements', 'public');
+                }
 
-            if ($agreement && ! $request->hasFile('agreement_pdf')) {
-                $agreement->update([
+                if ($agreement && ! $request->hasFile('agreement_pdf')) {
+                    $agreement->update([
+                        'signed_at' => $validated['agreement_signed_at'],
+                        'expires_at' => $validated['agreement_expires_at'],
+                        'agreed_slots' => $validated['agreement_agreed_slots'],
+                        'pdf_path' => $agreementPdfPath,
+                    ]);
+
+                    return;
+                }
+
+                CollaborationAgreement::create([
+                    'education_center_id' => $educationCenter->id,
                     'signed_at' => $validated['agreement_signed_at'],
                     'expires_at' => $validated['agreement_expires_at'],
                     'agreed_slots' => $validated['agreement_agreed_slots'],
                     'pdf_path' => $agreementPdfPath,
                 ]);
-
-                return;
-            }
-
-            CollaborationAgreement::create([
-                'education_center_id' => $educationCenter->id,
-                'signed_at' => $validated['agreement_signed_at'],
-                'expires_at' => $validated['agreement_expires_at'],
-                'agreed_slots' => $validated['agreement_agreed_slots'],
-                'pdf_path' => $agreementPdfPath,
-            ]);
-        });
+            });
+        } catch (Throwable $exception) {
+            report($exception);
+            return redirect()
+                ->route('education-centers.index')
+                ->with('error', 'No se pudo actualizar el centro educativo. Intenta de nuevo más tarde.');
+        }
 
         return redirect()
             ->route('education-centers.index')
             ->with('success', 'Centro educativo actualizado correctamente.');
     }
 
+    // Consulta base para filtrado de centros educativos:
     private function filteredBaseQuery(Request $request)
     {
         $search = trim((string) $request->string('search')->toString());
@@ -317,6 +337,7 @@ class EducationCenterController extends Controller
             });
     }
 
+    // Determina el estado de un centro educativo basado en su acuerdo de colaboración más reciente:
     private function resolveCenterStatus(?CollaborationAgreement $agreement): string
     {
         $expiresAt = $agreement?->expires_at;
@@ -334,6 +355,7 @@ class EducationCenterController extends Controller
         return 'valid';
     }
 
+    // Traduce el estado del centro educativo a una etiqueta legible:
     private function centerStatusLabel(string $status): string
     {
         return match ($status) {
@@ -344,6 +366,7 @@ class EducationCenterController extends Controller
         };
     }
 
+    // Obtiene el historial de acuerdos de colaboración de un centro educativo:
     private function agreementHistory(EducationCenter $educationCenter): array
     {
         $agreements = $educationCenter
@@ -354,7 +377,6 @@ class EducationCenterController extends Controller
 
         $currentAgreementId = $agreements->first()?->id;
 
-        // Nos aseguramos de que signed_at y expires_at sean instancias de Carbon antes de llamar a toDateString()
         return $agreements
             ->map(fn (CollaborationAgreement $agreement): array => [
                 'id' => $agreement->id,
@@ -363,7 +385,6 @@ class EducationCenterController extends Controller
                 'expires_at' => $agreement->expires_at ? (\Illuminate\Support\Carbon::parse($agreement->expires_at)->toDateString()) : null,
                 'agreed_slots' => $agreement->agreed_slots,
                 'filename' => basename((string) $agreement->pdf_path),
-                // Corregido: uso correcto de Storage::url para obtener la URL pública del archivo
                 'preview_url' => $agreement->pdf_path ? Storage::url($agreement->pdf_path) : null,
                 'uploaded_at' => $agreement->created_at?->toDateTimeString(),
             ])
@@ -371,6 +392,7 @@ class EducationCenterController extends Controller
             ->all();
     }
 
+    // Eliminación de un centro educativo:
     public function destroy(EducationCenter $educationCenter): RedirectResponse
     {
         if ($this->hasActiveInterns($educationCenter->id)) {
@@ -379,13 +401,21 @@ class EducationCenterController extends Controller
                 ->with('error', 'No se puede eliminar el centro porque tiene becarios activos.');
         }
 
-        $educationCenter->delete();
+        try {
+            $educationCenter->delete();
+        } catch (Throwable $exception) {
+            report($exception);
+            return redirect()
+                ->route('education-centers.index')
+                ->with('error', 'No se pudo eliminar el centro educativo. Intenta de nuevo más tarde.');
+        }
 
         return redirect()
             ->route('education-centers.index')
             ->with('success', 'Centro educativo eliminado correctamente.');
     }
 
+    // Verifica si un centro educativo tiene becarios activos asociados:
     private function hasActiveInterns(int $educationCenterId): bool
     {
         if (! Schema::hasTable('interns')) {
