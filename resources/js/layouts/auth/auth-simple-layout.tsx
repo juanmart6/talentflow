@@ -1,34 +1,44 @@
 import { Link } from '@inertiajs/react';
 import AppLogoIcon from '@/components/app-logo-icon';
+import { cn } from '@/lib/utils';
 import { home } from '@/routes';
-import type { AuthLayoutProps } from '@/types';
+
+type AuthSimpleLayoutProps = {
+    children: React.ReactNode;
+    title?: string;
+    description?: string;
+    containerClassName?: string;
+};
 
 export default function AuthSimpleLayout({
     children,
     title,
     description,
-}: AuthLayoutProps) {
+    containerClassName,
+}: AuthSimpleLayoutProps) {
     return (
-        <div className="flex min-h-svh flex-col items-center justify-center gap-6 bg-background p-6 md:p-10">
-            <div className="w-full max-w-sm">
-                <div className="flex flex-col gap-8">
-                    <div className="flex flex-col items-center gap-4">
+        <div className="relative z-20 -mt-7 flex min-h-svh flex-col items-center justify-center gap-2 bg-background p-6 md:-mt-10 md:p-10">
+            <div className={cn('relative z-20 w-full max-w-sm', containerClassName)}>
+                <div className="relative z-20 flex flex-col gap-1 md:gap-2">
+                    <div className="relative z-30 flex flex-col items-center gap-0">
                         <Link
                             href={home()}
-                            className="flex flex-col items-center gap-2 font-medium"
+                            className="flex flex-col items-center font-medium"
                         >
-                            <div className="mb-1 flex h-9 w-9 items-center justify-center rounded-md">
-                                <AppLogoIcon className="size-9 fill-current text-[var(--foreground)] dark:text-white" />
-                            </div>
-                            <span className="sr-only">{title}</span>
+                            <AppLogoIcon className="h-44 w-44 scale-[1.5] fill-current text-[var(--foreground)] dark:text-white md:h-56 md:w-56" />
+                            {title && <span className="sr-only">{title}</span>}
                         </Link>
 
-                        <div className="space-y-2 text-center">
-                            <h1 className="text-xl font-medium">{title}</h1>
-                            <p className="text-center text-sm text-muted-foreground">
-                                {description}
-                            </p>
-                        </div>
+                        {(title || description) && (
+                            <div className="space-y-2 text-center">
+                                {title && <h1 className="text-xl font-medium">{title}</h1>}
+                                {description && (
+                                    <p className="text-center text-sm text-muted-foreground">
+                                        {description}
+                                    </p>
+                                )}
+                            </div>
+                        )}
                     </div>
                     {children}
                 </div>

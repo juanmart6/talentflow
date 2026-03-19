@@ -264,7 +264,7 @@ export default function EducationCenters({ centers, filters }: Props) {
                                     type="button"
                                     variant="outline"
                                     size="icon"
-                                    className={`${UI_PRESETS.iconActionButton} text-emerald-600`}
+                                    className={UI_PRESETS.iconActionButtonSuccess}
                                     onClick={handleExport}
                                     title="Exportar Excel"
                                     aria-label="Exportar Excel"
@@ -275,7 +275,7 @@ export default function EducationCenters({ centers, filters }: Props) {
                                     asChild
                                     variant="outline"
                                     size="icon"
-                                    className={`${UI_PRESETS.iconActionButton} text-sky-600`}
+                                    className={UI_PRESETS.iconActionButtonPrimary}
                                     title="Nuevo centro"
                                     aria-label="Nuevo centro"
                                 >
@@ -392,7 +392,7 @@ export default function EducationCenters({ centers, filters }: Props) {
                                                     <Button
                                                         variant="outline"
                                                         size="icon"
-                                                        className={UI_PRESETS.iconActionButton}
+                                                        className={UI_PRESETS.iconActionButtonDanger}
                                                         aria-label="Eliminar centro"
                                                         title="Eliminar centro"
                                                         onClick={() => setCenterToDelete(center)}
@@ -421,9 +421,9 @@ export default function EducationCenters({ centers, filters }: Props) {
                             {centers.links.map((link, index) => (
                                 <Button
                                     key={`${link.label}-${index}`}
-                                    variant={link.active ? 'default' : 'outline'}
+                                    variant='outline'
                                     size="sm"
-                                    className={UI_PRESETS.interactiveHover}
+                                    className={`${UI_PRESETS.paginationButton} ${link.active ? UI_PRESETS.paginationButtonActive : ''}`}
                                     disabled={!link.url}
                                     asChild={Boolean(link.url)}
                                 >
@@ -465,3 +465,4 @@ export default function EducationCenters({ centers, filters }: Props) {
         </AppLayout>
     );
 }
+

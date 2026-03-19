@@ -105,7 +105,7 @@ function FileUploadField({ id, label, accept, file, error, onChange }: FileUploa
             <div className="flex min-h-9 min-w-0 items-center gap-3 text-sm">
                 <label
                     htmlFor={id}
-                    className="inline-flex h-9 shrink-0 cursor-pointer items-center whitespace-nowrap rounded-md border border-slate-300 bg-white px-4 text-sm font-medium text-slate-700 shadow-xs transition-colors hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900/40"
+                    className="inline-flex h-9 shrink-0 cursor-pointer items-center whitespace-nowrap rounded-md border border-[#2563eb]/35 bg-white px-4 text-sm font-medium text-[#1d4ed8] shadow-xs transition-colors hover:border-[#2563eb]/60 hover:bg-[#2563eb]/10 dark:border-[#2563eb]/45 dark:bg-slate-950 dark:text-sky-300 dark:hover:bg-[#2563eb]/20"
                 >
                     Seleccionar archivo
                 </label>
@@ -128,7 +128,6 @@ function FileUploadField({ id, label, accept, file, error, onChange }: FileUploa
 export default function InternFormPage({ mode, intern, educationCenters, documentHistory }: Props) {
     const isCreate = mode === 'create';
     const isReadOnly = mode === 'show';
-    const unifiedHoverClass = 'hover:bg-primary/90 hover:text-primary-foreground';
     const [expandedHistory, setExpandedHistory] = useState<Record<keyof DocumentHistory, boolean>>({
         collaboration_agreement: false,
         insurance_policy: false,
@@ -198,7 +197,7 @@ export default function InternFormPage({ mode, intern, educationCenters, documen
                                     </p>
                                 </div>
 
-                                <Button variant="secondary" className={unifiedHoverClass} asChild>
+                                <Button variant="secondary" asChild>
                                     <Link href={interns.index().url}>Volver al listado</Link>
                                 </Button>
                             </div>
@@ -431,13 +430,13 @@ export default function InternFormPage({ mode, intern, educationCenters, documen
 
                             <div className="flex flex-col gap-2 border-t border-sidebar-border/70 pt-4 md:flex-row md:items-center md:justify-end dark:border-sidebar-border">
                                 {isReadOnly ? (
-                                    <Button type="button" variant="secondary" className={unifiedHoverClass} asChild>
+                                    <Button type="button" variant="secondary" asChild>
                                         <Link href={interns.index().url}>Volver al listado</Link>
                                     </Button>
                                 ) : (
                                     <>
-                                        <Button className={unifiedHoverClass} disabled={processing}>{processing ? 'Guardando...' : 'Guardar'}</Button>
-                                        <Button type="button" variant="secondary" className={unifiedHoverClass} asChild>
+                                        <Button disabled={processing}>{processing ? 'Guardando...' : 'Guardar'}</Button>
+                                        <Button type="button" variant="secondary" asChild>
                                             <Link href={interns.index().url}>Cancelar</Link>
                                         </Button>
                                     </>
@@ -450,3 +449,4 @@ export default function InternFormPage({ mode, intern, educationCenters, documen
         </AppLayout>
     );
 }
+

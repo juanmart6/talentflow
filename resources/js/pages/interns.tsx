@@ -244,7 +244,7 @@ export default function InternsPage({ interns: internPagination, filters, educat
                                         type="button"
                                         variant="outline"
                                         size="icon"
-                                        className={`${UI_PRESETS.iconActionButton} text-emerald-600`}
+                                        className={UI_PRESETS.iconActionButtonSuccess}
                                         onClick={handleExport}
                                         disabled={hasInvalidDateRange}
                                         title="Exportar Excel"
@@ -256,7 +256,7 @@ export default function InternsPage({ interns: internPagination, filters, educat
                                         asChild
                                         variant="outline"
                                         size="icon"
-                                        className={`${UI_PRESETS.iconActionButton} text-sky-600`}
+                                        className={UI_PRESETS.iconActionButtonPrimary}
                                         title="Nuevo becario"
                                         aria-label="Nuevo becario"
                                     >
@@ -401,7 +401,7 @@ export default function InternsPage({ interns: internPagination, filters, educat
                                                     <Button
                                                         variant="outline"
                                                         size="icon"
-                                                        className={UI_PRESETS.iconActionButton}
+                                                        className={UI_PRESETS.iconActionButtonDanger}
                                                         aria-label="Eliminar becario"
                                                         title="Eliminar becario"
                                                         onClick={() => setInternToDelete(intern)}
@@ -430,9 +430,9 @@ export default function InternsPage({ interns: internPagination, filters, educat
                             {internPagination.links.map((link, index) => (
                                 <Button
                                     key={`${link.label}-${index}`}
-                                    variant={link.active ? 'default' : 'outline'}
+                                    variant='outline'
                                     size="sm"
-                                    className={UI_PRESETS.interactiveHover}
+                                    className={`${UI_PRESETS.paginationButton} ${link.active ? UI_PRESETS.paginationButtonActive : ''}`}
                                     disabled={!link.url}
                                     asChild={Boolean(link.url)}
                                 >
@@ -477,3 +477,4 @@ export default function InternsPage({ interns: internPagination, filters, educat
         </AppLayout>
     );
 }
+

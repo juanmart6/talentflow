@@ -90,7 +90,7 @@ function FileUploadField({ id, name, label, accept, error, required, selectedFil
             <div className="flex min-h-9 items-center gap-3 text-sm">
                 <label
                     htmlFor={id}
-                    className="inline-flex h-9 cursor-pointer items-center rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 shadow-xs transition-colors hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900/40"
+                    className="inline-flex h-9 cursor-pointer items-center rounded-md border border-[#2563eb]/35 bg-white px-3 text-sm font-medium text-[#1d4ed8] shadow-xs transition-colors hover:border-[#2563eb]/60 hover:bg-[#2563eb]/10 dark:border-[#2563eb]/45 dark:bg-slate-950 dark:text-sky-300 dark:hover:bg-[#2563eb]/20"
                 >
                     Seleccionar archivo
                 </label>
@@ -115,7 +115,6 @@ function FileUploadField({ id, name, label, accept, error, required, selectedFil
 export default function EducationCenterForm({ mode, center, agreementHistory = [], internsHistory = [] }: Props) {
     const isCreate = mode === 'create';
     const isReadOnly = mode === 'show';
-    const unifiedHoverClass = 'hover:bg-primary/90 hover:text-primary-foreground';
     const [selectedAgreementFileName, setSelectedAgreementFileName] = useState<string | null>(null);
     const formRoute = isCreate
         ? educationCenters.store.form()
@@ -137,7 +136,7 @@ export default function EducationCenterForm({ mode, center, agreementHistory = [
                                     </p>
                                 </div>
 
-                                <Button variant="secondary" className={unifiedHoverClass} asChild>
+                                <Button variant="secondary" asChild>
                                     <Link href={educationCenters.index().url}>Volver al listado</Link>
                                 </Button>
                             </div>
@@ -409,15 +408,15 @@ export default function EducationCenterForm({ mode, center, agreementHistory = [
 
                                     <div className="flex flex-col gap-2 border-t border-sidebar-border/70 pt-4 md:flex-row md:items-center md:justify-end dark:border-sidebar-border">
                                         {isReadOnly ? (
-                                            <Button type="button" variant="secondary" className={unifiedHoverClass} asChild>
+                                            <Button type="button" variant="secondary" asChild>
                                                 <Link href={educationCenters.index().url}>Volver al listado</Link>
                                             </Button>
                                         ) : (
                                             <>
-                                                <Button className={unifiedHoverClass} disabled={processing}>
+                                                <Button disabled={processing}>
                                                     {processing ? 'Guardando...' : 'Guardar'}
                                                 </Button>
-                                                <Button type="button" variant="secondary" className={unifiedHoverClass} asChild>
+                                                <Button type="button" variant="secondary" asChild>
                                                     <Link href={educationCenters.index().url}>Cancelar</Link>
                                                 </Button>
                                             </>
@@ -432,3 +431,4 @@ export default function EducationCenterForm({ mode, center, agreementHistory = [
         </AppLayout>
     );
 }
+
