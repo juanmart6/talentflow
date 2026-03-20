@@ -1,6 +1,6 @@
 import { Head, Link, router } from '@inertiajs/react';
 import { useEffect, useMemo, useState } from 'react';
-import { CirclePlus, Eye, FileSpreadsheet, Pencil, Search, Trash2 } from 'lucide-react';
+import { CirclePlus, Eye, FileSpreadsheet, FilterX, Pencil, Search, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -93,7 +93,13 @@ function formatDate(date: string | null): string {
         return '-';
     }
 
-    return date;
+    const [year, month, day] = date.slice(0, 10).split('-');
+
+    if (!year || !month || !day) {
+        return date;
+    }
+
+    return `${day}/${month}/${year}`;
 }
 
 // Función para obtener las iniciales del becario, utilizando la primera letra del nombre y apellido, o un signo de interrogación si no hay información disponible:
@@ -116,6 +122,8 @@ export default function InternsPage({ interns: internPagination, filters, educat
     const [dateTo, setDateTo] = useState(filters.date_to ?? '');
     const [internToDelete, setInternToDelete] = useState<InternRow | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
+    const hasActiveFilters =
+        search.trim() !== '' || status !== 'all' || educationCenterId !== 'all' || dateFrom !== '' || dateTo !== '';
 
     const hasRows = internPagination.data.length > 0;
 
@@ -210,6 +218,20 @@ export default function InternsPage({ interns: internPagination, filters, educat
         }).url;
     };
 
+    const handleClearFilters = () => {
+        setSearch('');
+        setStatus('all');
+        setEducationCenterId('all');
+        setDateFrom('');
+        setDateTo('');
+
+        router.get(interns.index().url, {}, {
+            preserveState: true,
+            preserveScroll: true,
+            replace: true,
+        });
+    };
+
     // Renderizado de la vista:
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -240,6 +262,18 @@ export default function InternsPage({ interns: internPagination, filters, educat
                                 </div>
 
                                 <div className="flex items-center gap-2 lg:ml-auto lg:shrink-0">
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="icon"
+                                        className={UI_PRESETS.iconActionButton}
+                                        onClick={handleClearFilters}
+                                        disabled={!hasActiveFilters}
+                                        title="Limpiar filtros"
+                                        aria-label="Limpiar filtros"
+                                    >
+                                        <FilterX />
+                                    </Button>
                                     <Button
                                         type="button"
                                         variant="outline"

@@ -1,5 +1,5 @@
-import { Form, Head, Link } from '@inertiajs/react';
-import { useState } from 'react';
+import { Form, Head, Link, usePage } from '@inertiajs/react';
+import { useEffect, useRef, useState } from 'react';
 import { FieldLabel, SectionIntro } from '@/components/form-ui';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { UI_PRESETS, stripedRowClass } from '@/lib/ui-presets';
 import AppLayout from '@/layouts/app-layout';
 import educationCenters from '@/routes/education-centers';
+import { toast } from 'sonner';
 import type { BreadcrumbItem } from '@/types';
 
 type CenterFormData = {
@@ -72,6 +73,20 @@ function internStatusLabel(status: string): string {
     return status;
 }
 
+function formatSpanishDate(date: string | null): string {
+    if (!date) {
+        return '-';
+    }
+
+    const [year, month, day] = date.slice(0, 10).split('-');
+
+    if (!year || !month || !day) {
+        return date;
+    }
+
+    return `${day}/${month}/${year}`;
+}
+
 type FileUploadFieldProps = {
     id: string;
     name: string;
@@ -115,10 +130,32 @@ function FileUploadField({ id, name, label, accept, error, required, selectedFil
 export default function EducationCenterForm({ mode, center, agreementHistory = [], internsHistory = [] }: Props) {
     const isCreate = mode === 'create';
     const isReadOnly = mode === 'show';
+    const page = usePage<{ flash?: { success?: string; error?: string } }>();
+    const lastFlashRef = useRef<string | null>(null);
     const [selectedAgreementFileName, setSelectedAgreementFileName] = useState<string | null>(null);
     const formRoute = isCreate
         ? educationCenters.store.form()
         : educationCenters.update.form(center?.id ?? 0);
+
+    useEffect(() => {
+        const successMessage = page.props.flash?.success;
+        const errorMessage = page.props.flash?.error;
+        const flashKey = successMessage ? `success:${successMessage}` : errorMessage ? `error:${errorMessage}` : null;
+
+        if (!flashKey || lastFlashRef.current === flashKey) {
+            return;
+        }
+
+        lastFlashRef.current = flashKey;
+
+        if (successMessage) {
+            toast.success(successMessage);
+        }
+
+        if (errorMessage) {
+            toast.error(errorMessage);
+        }
+    }, [page.props.flash?.success, page.props.flash?.error]);
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -326,10 +363,10 @@ export default function EducationCenterForm({ mode, center, agreementHistory = [
                                                                 </div>
 
                                                                 <div className="mt-2 grid gap-1 text-sm text-muted-foreground">
-                                                                    <p>Firma: {agreement.signed_at ?? '-'}</p>
-                                                                    <p>Vence: {agreement.expires_at ?? '-'}</p>
+                                                                    <p>Firma: {formatSpanishDate(agreement.signed_at)}</p>
+                                                                    <p>Vence: {formatSpanishDate(agreement.expires_at)}</p>
                                                                     <p>Plazas: {agreement.agreed_slots ?? '-'}</p>
-                                                                    <p>Subido: {agreement.uploaded_at ?? '-'}</p>
+                                                                    <p>Subido: {formatSpanishDate(agreement.uploaded_at)}</p>
                                                                 </div>
 
                                                                 {agreement.preview_url && (

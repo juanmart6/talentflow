@@ -186,13 +186,19 @@ class InternController extends Controller
     public function store(StoreInternRequest $request): RedirectResponse
     {
         $validated = $request->validated();
+        $internPayload = collect($validated)->except([
+            'collaboration_agreement_document',
+            'insurance_policy_document',
+            'dni_scan_document',
+        ])->all();
+
+        if (($internPayload['status'] ?? null) !== 'abandoned') {
+            $internPayload['abandonment_reason'] = null;
+            $internPayload['abandonment_date'] = null;
+        }
 
         try {
-            $intern = Intern::create(collect($validated)->except([
-                'collaboration_agreement_document',
-                'insurance_policy_document',
-                'dni_scan_document',
-            ])->all());
+            $intern = Intern::create($internPayload);
 
             $this->syncUploadedDocuments($request, $intern);
         } catch (Throwable $exception) {
@@ -224,13 +230,19 @@ class InternController extends Controller
     public function update(UpdateInternRequest $request, Intern $intern): RedirectResponse
     {
         $validated = $request->validated();
+        $internPayload = collect($validated)->except([
+            'collaboration_agreement_document',
+            'insurance_policy_document',
+            'dni_scan_document',
+        ])->all();
+
+        if (($internPayload['status'] ?? null) !== 'abandoned') {
+            $internPayload['abandonment_reason'] = null;
+            $internPayload['abandonment_date'] = null;
+        }
 
         try {
-            $intern->update(collect($validated)->except([
-                'collaboration_agreement_document',
-                'insurance_policy_document',
-                'dni_scan_document',
-            ])->all());
+            $intern->update($internPayload);
 
             $this->syncUploadedDocuments($request, $intern);
         } catch (Throwable $exception) {

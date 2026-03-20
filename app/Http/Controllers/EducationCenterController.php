@@ -306,7 +306,7 @@ class EducationCenterController extends Controller
         }
 
         return redirect()
-            ->route('education-centers.index')
+            ->route('education-centers.show', $educationCenter)
             ->with('success', 'Centro educativo actualizado correctamente.');
     }
 

@@ -408,21 +408,6 @@ export default function PracticeTasksPage({
                         </p>
                     </div>
 
-                    <div className="grid gap-3 md:grid-cols-3">
-                        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-                            <p className={UI_PRESETS.summaryCardTitle}>Tareas</p>
-                            <p className={UI_PRESETS.summaryCardValue}>{summary.total}</p>
-                        </div>
-                        <div className="rounded-xl border border-amber-200 bg-white p-4 shadow-sm dark:border-amber-800/70 dark:bg-slate-900">
-                            <p className={UI_PRESETS.summaryCardTitle}>Próximas</p>
-                            <p className={UI_PRESETS.summaryCardValue}>{summary.upcoming}</p>
-                        </div>
-                        <div className="rounded-xl border border-rose-200 bg-white p-4 shadow-sm dark:border-rose-800/70 dark:bg-slate-900">
-                            <p className={UI_PRESETS.summaryCardTitle}>Retrasadas</p>
-                            <p className={UI_PRESETS.summaryCardValue}>{summary.overdue}</p>
-                        </div>
-                    </div>
-
                     <div className={cn(UI_PRESETS.filterBar, 'space-y-3')}>
                         <div className="grid gap-3 xl:grid-cols-[minmax(280px,1.3fr)_220px_240px_220px_auto_auto] xl:items-center">
                             <Input

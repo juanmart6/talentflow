@@ -22,6 +22,7 @@ class InternFactory extends Factory
         $status = $this->faker->randomElement(['active', 'finished', 'abandoned']);
 
         $abandonmentReason = null;
+        $abandonmentDate = null;
         if ($status === 'abandoned') {
             $abandonmentReason = $this->faker->randomElement([
                 'Motivos personales',
@@ -29,6 +30,7 @@ class InternFactory extends Factory
                 'Incompatibilidad horaria',
                 'Baja medica prolongada',
             ]);
+            $abandonmentDate = $this->faker->dateTimeBetween($startDate, $endDate);
         }
 
         return [
@@ -60,6 +62,7 @@ class InternFactory extends Factory
             'required_hours' => $this->faker->randomElement([240, 300, 320, 360, 400]),
             'status' => $status,
             'abandonment_reason' => $abandonmentReason,
+            'abandonment_date' => $abandonmentDate,
         ];
     }
 

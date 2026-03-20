@@ -34,6 +34,7 @@ class Intern extends Model
         'required_hours',
         'status',
         'abandonment_reason',
+        'abandonment_date',
         'collaboration_agreement_path',
         'insurance_policy_path',
         'dni_scan_path',
@@ -44,6 +45,7 @@ class Intern extends Model
         return [
             'internship_start_date' => 'date',
             'internship_end_date' => 'date',
+            'abandonment_date' => 'date',
             'required_hours' => 'integer',
             'deleted_at' => 'datetime',
         ];

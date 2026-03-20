@@ -1,6 +1,6 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { CirclePlus, Eye, FileSpreadsheet, MapPin, Pencil, Search, Trash2 } from 'lucide-react';
+import { CirclePlus, Copy, Eye, FileSpreadsheet, FilterX, MapPin, Pencil, Search, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -81,6 +81,20 @@ const breadcrumbs: BreadcrumbItem[] = [
     },
 ];
 
+function formatSpanishDate(date: string | null): string {
+    if (!date) {
+        return '-';
+    }
+
+    const [year, month, day] = date.slice(0, 10).split('-');
+
+    if (!year || !month || !day) {
+        return date;
+    }
+
+    return `${day}/${month}/${year}`;
+}
+
 // Contiene toda la lógica de la vista:
 export default function EducationCenters({ centers, filters }: Props) {
     const page = usePage<{ flash?: { success?: string; error?: string } }>();
@@ -89,6 +103,7 @@ export default function EducationCenters({ centers, filters }: Props) {
     const [centerToDelete, setCenterToDelete] = useState<CenterRow | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
     const [agreementStatus, setAgreementStatus] = useState(filters.agreement_status || 'all');
+    const hasActiveFilters = search.trim() !== '' || agreementStatus !== 'all';
 
     const hasRows = centers.data.length > 0;
 
@@ -218,6 +233,17 @@ export default function EducationCenters({ centers, filters }: Props) {
         window.location.href = exportUrl;
     };
 
+    const handleClearFilters = () => {
+        setSearch('');
+        setAgreementStatus('all');
+
+        router.get(educationCenters.index().url, {}, {
+            preserveState: true,
+            preserveScroll: true,
+            replace: true,
+        });
+    };
+
     // Renderizado de la vista:
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -260,6 +286,18 @@ export default function EducationCenters({ centers, filters }: Props) {
                             </Select>
 
                             <div className="flex items-center gap-2 md:ml-auto md:shrink-0">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="icon"
+                                    className={UI_PRESETS.iconActionButton}
+                                    onClick={handleClearFilters}
+                                    disabled={!hasActiveFilters}
+                                    title="Limpiar filtros"
+                                    aria-label="Limpiar filtros"
+                                >
+                                    <FilterX />
+                                </Button>
                                 <Button
                                     type="button"
                                     variant="outline"
@@ -313,7 +351,10 @@ export default function EducationCenters({ centers, filters }: Props) {
                                                     }
                                                     title="Haz clic para copiar los datos del centro"
                                                 >
-                                                    <p className="font-semibold">{center.name}</p>
+                                                    <p className="inline-flex items-center gap-1.5 font-semibold">
+                                                        {center.name}
+                                                        <Copy className="size-3.5 text-muted-foreground" />
+                                                    </p>
                                                     <p className="text-sm font-medium text-muted-foreground">
                                                         {center.institutional_email}
                                                     </p>
@@ -328,10 +369,10 @@ export default function EducationCenters({ centers, filters }: Props) {
                                                 {center.latest_agreement ? (
                                                     <>
                                                         <p className="text-xs font-semibold text-muted-foreground">
-                                                            Firma: {center.latest_agreement.signed_at ?? '-'}
+                                                            Firma: {formatSpanishDate(center.latest_agreement.signed_at)}
                                                         </p>
                                                         <p className="text-xs font-semibold text-muted-foreground">
-                                                            Vence: {center.latest_agreement.expires_at ?? '-'}
+                                                            Vence: {formatSpanishDate(center.latest_agreement.expires_at)}
                                                         </p>
                                                         <p className="text-xs font-semibold text-muted-foreground">
                                                             Plazas: {center.latest_agreement.agreed_slots ?? '-'}

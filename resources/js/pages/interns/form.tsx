@@ -1,5 +1,5 @@
-import { Head, Link, useForm } from '@inertiajs/react';
-import { FormEvent, useState } from 'react';
+import { Head, Link, useForm, usePage } from '@inertiajs/react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 import { FieldLabel, SectionIntro } from '@/components/form-ui';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,7 @@ import { INTERN_STATUS_META, type InternStatus } from '@/lib/intern-status';
 import { UI_PRESETS } from '@/lib/ui-presets';
 import AppLayout from '@/layouts/app-layout';
 import interns from '@/routes/interns';
+import { toast } from 'sonner';
 import type { BreadcrumbItem } from '@/types';
 
 type EducationCenterOption = {
@@ -38,6 +39,7 @@ type InternFormData = {
     required_hours?: number | null;
     status?: 'active' | 'finished' | 'abandoned';
     abandonment_reason?: string | null;
+    abandonment_date?: string | null;
     collaboration_agreement_path?: string | null;
     insurance_policy_path?: string | null;
     dni_scan_path?: string | null;
@@ -128,6 +130,8 @@ function FileUploadField({ id, label, accept, file, error, onChange }: FileUploa
 export default function InternFormPage({ mode, intern, educationCenters, documentHistory }: Props) {
     const isCreate = mode === 'create';
     const isReadOnly = mode === 'show';
+    const page = usePage<{ flash?: { success?: string; error?: string } }>();
+    const lastFlashRef = useRef<string | null>(null);
     const [expandedHistory, setExpandedHistory] = useState<Record<keyof DocumentHistory, boolean>>({
         collaboration_agreement: false,
         insurance_policy: false,
@@ -155,12 +159,34 @@ export default function InternFormPage({ mode, intern, educationCenters, documen
         required_hours: intern?.required_hours ?? 0,
         status: intern?.status ?? 'active',
         abandonment_reason: intern?.abandonment_reason ?? '',
+        abandonment_date: toDateInput(intern?.abandonment_date),
         collaboration_agreement_document: null as File | null,
         insurance_policy_document: null as File | null,
         dni_scan_document: null as File | null,
     });
 
     const currentStatus = data.status as InternStatus;
+    const isAbandoned = data.status === 'abandoned';
+
+    useEffect(() => {
+        const successMessage = page.props.flash?.success;
+        const errorMessage = page.props.flash?.error;
+        const flashKey = successMessage ? `success:${successMessage}` : errorMessage ? `error:${errorMessage}` : null;
+
+        if (!flashKey || lastFlashRef.current === flashKey) {
+            return;
+        }
+
+        lastFlashRef.current = flashKey;
+
+        if (successMessage) {
+            toast.success(successMessage);
+        }
+
+        if (errorMessage) {
+            toast.error(errorMessage);
+        }
+    }, [page.props.flash?.success, page.props.flash?.error]);
 
     const submit = (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
@@ -351,6 +377,17 @@ export default function InternFormPage({ mode, intern, educationCenters, documen
                                             <Input id="abandonment_reason" value={data.abandonment_reason} onChange={(e) => setData('abandonment_reason', e.target.value)} />
                                             <InputError message={errors.abandonment_reason} />
                                         </div>
+                                        <div className="grid gap-2">
+                                            <FieldLabel htmlFor="abandonment_date">Fecha abandono (opcional)</FieldLabel>
+                                            <Input
+                                                id="abandonment_date"
+                                                type="date"
+                                                value={data.abandonment_date}
+                                                onChange={(e) => setData('abandonment_date', e.target.value)}
+                                                required={isAbandoned}
+                                            />
+                                            <InputError message={errors.abandonment_date} />
+                                        </div>
                                     </div>
                                 </section>
 
@@ -392,7 +429,7 @@ export default function InternFormPage({ mode, intern, educationCenters, documen
                                                                             setExpandedHistory((previous) => ({ ...previous, [documentType]: !previous[documentType] }));
                                                                         }
                                                                     }}
-                                                                    className="text-xs font-semibold text-primary underline"
+                                                                    className="cursor-pointer text-xs font-semibold text-primary underline"
                                                                 >
                                                                     {expandedHistory[documentType] ? 'Ocultar historial' : `Ver historial (${documents.length - 1})`}
                                                                 </span>

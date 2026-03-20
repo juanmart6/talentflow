@@ -43,6 +43,7 @@ trait InternValidationRules
 
             'status' => ['required', Rule::in(['active', 'finished', 'abandoned'])],
             'abandonment_reason' => ['nullable', 'string', 'max:1000'],
+            'abandonment_date' => ['required_if:status,abandoned', 'nullable', 'date', 'after_or_equal:internship_start_date'],
 
             'collaboration_agreement_document' => ['nullable', 'file', 'mimes:pdf,jpeg,jpg,png', 'max:5120'],
             'insurance_policy_document' => ['nullable', 'file', 'mimes:pdf,jpeg,jpg,png', 'max:5120'],
@@ -59,6 +60,8 @@ trait InternValidationRules
             'internship_end_date.after_or_equal' => 'La fecha de finalización debe ser igual o posterior a la fecha de inicio.',
             'required_hours.min' => 'Las horas requeridas deben ser al menos 1.',
             'status.in' => 'El estado debe ser Activo, Finalizado o Abandonado.',
+            'abandonment_date.required_if' => 'La fecha de abandono es obligatoria cuando el estado es Abandonado.',
+            'abandonment_date.after_or_equal' => 'La fecha de abandono debe ser igual o posterior a la fecha de inicio.',
 
             'collaboration_agreement_document.mimes' => 'El convenio debe ser un archivo PDF, JPEG, JPG o PNG.',
             'insurance_policy_document.mimes' => 'El seguro debe ser un archivo PDF, JPEG, JPG o PNG.',
