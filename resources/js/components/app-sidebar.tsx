@@ -1,4 +1,4 @@
-import { Award, Clock9, GraduationCap, LayoutGrid, NotebookPen, School, Users } from 'lucide-react';
+﻿import { Award, Clock9, GraduationCap, LayoutGrid, NotebookPen, School, Users } from 'lucide-react';
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
 import {
@@ -11,7 +11,6 @@ import logo from '@/assets/TF_logo.svg';
 import { dashboard } from '@/routes';
 import educationCenters from '@/routes/education-centers';
 import interns from '@/routes/interns';
-import practiceTasks from '@/routes/practice-tasks';
 import type { NavItem } from '@/types';
 
 const mainNavItems: NavItem[] = [
@@ -32,7 +31,7 @@ const mainNavItems: NavItem[] = [
     },
     {
         title: 'Prácticas y tareas',
-        href: practiceTasks.index().url,
+        href: '/practice-tasks',
         icon: NotebookPen,
     },
     {

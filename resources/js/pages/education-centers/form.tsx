@@ -187,7 +187,10 @@ export default function EducationCenterForm({ mode, center, agreementHistory = [
                         >
                             {({ processing, errors }) => (
                                 <>
-                                    <fieldset disabled={isReadOnly} className="space-y-6">
+                                    <fieldset
+                                        disabled={isReadOnly}
+                                        className={`space-y-6 ${isReadOnly ? UI_PRESETS.readOnlyFieldset : ''}`}
+                                    >
                                         <section className={UI_PRESETS.sectionCard}>
                                             <SectionIntro
                                                 title="Datos del centro"

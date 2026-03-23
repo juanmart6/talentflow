@@ -230,7 +230,10 @@ export default function InternFormPage({ mode, intern, educationCenters, documen
                         )}
 
                         <form onSubmit={submit} className="space-y-6">
-                            <fieldset disabled={isReadOnly} className="space-y-6">
+                            <fieldset
+                                disabled={isReadOnly}
+                                className={`space-y-6 ${isReadOnly ? UI_PRESETS.readOnlyFieldset : ''}`}
+                            >
                                 <section className={UI_PRESETS.sectionCard}>
                                     <SectionIntro
                                         title="Datos personales"

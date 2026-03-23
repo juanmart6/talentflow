@@ -13,8 +13,8 @@ export const CENTER_STATUS_META: Record<CenterStatus, CenterStatusMeta> = {
         badgeClass: 'bg-emerald-100 text-emerald-700 ring-1 ring-emerald-300',
     },
     renewal_soon: {
-        label: 'Renovacion proxima',
-        filterLabel: 'Renovacion proxima',
+        label: 'Renovación próxima',
+        filterLabel: 'Renovación próxima',
         badgeClass: 'bg-amber-100 text-amber-700 ring-1 ring-amber-300',
     },
     expired: {
@@ -25,7 +25,7 @@ export const CENTER_STATUS_META: Record<CenterStatus, CenterStatusMeta> = {
 };
 
 export const CENTER_STATUS_OPTIONS = [
-    { value: 'all', label: 'Todos'},
+    { value: 'all', label: 'Todos los centros'},
     { value: 'valid', label: CENTER_STATUS_META.valid.filterLabel },
     { value: 'renewal_soon', label: CENTER_STATUS_META.renewal_soon.filterLabel },
     { value: 'expired', label: CENTER_STATUS_META.expired.filterLabel },

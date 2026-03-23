@@ -28,6 +28,8 @@ export const UI_PRESETS = {
     interactiveHover: 'hover:bg-[#2563eb]/8 hover:text-[#1d4ed8] dark:hover:bg-[#2563eb]/16 dark:hover:text-sky-100',
     copyableCell: 'cursor-pointer transition-colors hover:bg-slate-100/70 dark:hover:bg-slate-800/50',
     sectionCard: 'space-y-4 rounded-xl border border-sidebar-border/70 bg-white/70 p-4 dark:border-sidebar-border dark:bg-slate-900/20',
+    readOnlyFieldset:
+        '[&_input:disabled]:opacity-100 [&_input:disabled]:text-foreground [&_input:disabled]:bg-slate-100/90 dark:[&_input:disabled]:bg-slate-900/45 [&_button:disabled]:opacity-100 [&_button:disabled]:text-foreground [&_button:disabled]:bg-slate-100/90 dark:[&_button:disabled]:bg-slate-900/45',
 } as const;
 
 export const MODE_CARD_CLASSES: Record<'create' | 'edit' | 'show', string> = {
