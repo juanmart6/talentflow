@@ -2,10 +2,7 @@
 
 use App\Http\Controllers\EducationCenterController;
 use App\Http\Controllers\InternController;
-use App\Models\Intern;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Laravel\Fortify\Features;
 
@@ -15,7 +12,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::inertia('dashboard', 'dashboard')->name('dashboard');
 
-    // Rutas para la gestiÃ³n de centros educativos:
+    // Rutas para la gestión de centros educativos:
 
     Route::get('education-centers', [EducationCenterController::class, 'index'])
         ->middleware('permission:education-centers.view')
@@ -49,7 +46,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->middleware('permission:education-centers.delete')
         ->name('education-centers.destroy');
 
-        // Rutas para la gestiÃ³n de becarios:
+        // Rutas para la gestión de becarios:
 
     Route::get('interns', [InternController::class, 'index'])
         ->middleware('permission:interns.view')
@@ -93,23 +90,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->middleware('permission:interns.delete')
         ->name('interns.destroy');
 
-    Route::get('practice-tasks', function (Request $request) {
-        $viewMode = $request->user()?->hasAnyRole(['admin', 'tutor']) ? 'tutor' : 'intern';
+        // Rutas para el módulo de prácticas y tareas:
 
-        return Inertia::render('practice-tasks', [
-            'viewMode' => $viewMode,
-            'interns' => $viewMode === 'tutor'
-                ? Intern::query()
-                    ->get(['id', 'first_name', 'last_name'])
-                    ->map(fn (Intern $intern): array => [
-                        'id' => (string) $intern->id,
-                        'name' => trim("{$intern->first_name} {$intern->last_name}"),
-                    ])
-                    ->sortBy(fn (array $intern): string => mb_strtolower(Str::ascii($intern['name'])))
-                    ->values()
-                : [],
-        ]);
-    })
+    Route::inertia('practice-tasks', 'practice-tasks')
         ->name('practice-tasks.index');
 });
 

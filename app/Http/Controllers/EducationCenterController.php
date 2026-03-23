@@ -360,7 +360,7 @@ class EducationCenterController extends Controller
     {
         return match ($status) {
             'valid' => 'Vigente',
-            'renewal_soon' => 'Renovacion proxima',
+            'renewal_soon' => 'Renovación próxima',
             'expired' => 'Caducado',
             default => $status,
         };
