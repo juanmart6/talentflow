@@ -1,6 +1,6 @@
-import { Head, Link, useForm, usePage } from '@inertiajs/react';
-import { FormEvent, useEffect, useRef, useState } from 'react';
-import { FieldLabel, SectionIntro } from '@/components/form-ui';
+﻿import { Head, Link, useForm, usePage } from '@inertiajs/react';
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { FieldLabel, FormPageHeader, SectionIntro } from '@/components/form-ui';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,6 +13,12 @@ import { toast } from 'sonner';
 import type { BreadcrumbItem } from '@/types';
 
 type EducationCenterOption = {
+    id: number;
+    name: string;
+    training_programs: TrainingProgramOption[];
+};
+
+type TrainingProgramOption = {
     id: number;
     name: string;
 };
@@ -30,14 +36,14 @@ type InternFormData = {
     city?: string;
     province?: string;
     country?: string;
-    training_cycle?: string;
+    training_program_id?: number | null;
     academic_year?: string;
     academic_tutor_name?: string;
     academic_tutor_email?: string | null;
     internship_start_date?: string | null;
     internship_end_date?: string | null;
     required_hours?: number | null;
-    status?: 'active' | 'finished' | 'abandoned';
+    status?: InternStatus;
     abandonment_reason?: string | null;
     abandonment_date?: string | null;
     collaboration_agreement_path?: string | null;
@@ -130,6 +136,7 @@ function FileUploadField({ id, label, accept, file, error, onChange }: FileUploa
 export default function InternFormPage({ mode, intern, educationCenters, documentHistory }: Props) {
     const isCreate = mode === 'create';
     const isReadOnly = mode === 'show';
+    const hasEducationCenters = educationCenters.length > 0;
     const page = usePage<{ flash?: { success?: string; error?: string } }>();
     const lastFlashRef = useRef<string | null>(null);
     const [expandedHistory, setExpandedHistory] = useState<Record<keyof DocumentHistory, boolean>>({
@@ -140,6 +147,7 @@ export default function InternFormPage({ mode, intern, educationCenters, documen
 
     const { data, setData, post, transform, processing, errors } = useForm({
         education_center_id: intern?.education_center_id ? String(intern.education_center_id) : '',
+        training_program_id: intern?.training_program_id ? String(intern.training_program_id) : '',
         first_name: intern?.first_name ?? '',
         last_name: intern?.last_name ?? '',
         dni_nie: intern?.dni_nie ?? '',
@@ -150,14 +158,13 @@ export default function InternFormPage({ mode, intern, educationCenters, documen
         city: intern?.city ?? '',
         province: intern?.province ?? '',
         country: intern?.country ?? 'España',
-        training_cycle: intern?.training_cycle ?? '',
         academic_year: intern?.academic_year ?? '',
         academic_tutor_name: intern?.academic_tutor_name ?? '',
         academic_tutor_email: intern?.academic_tutor_email ?? '',
         internship_start_date: toDateInput(intern?.internship_start_date),
         internship_end_date: toDateInput(intern?.internship_end_date),
         required_hours: intern?.required_hours ?? 0,
-        status: intern?.status ?? 'active',
+        status: intern?.status === 'abandoned' ? 'abandoned' : 'active',
         abandonment_reason: intern?.abandonment_reason ?? '',
         abandonment_date: toDateInput(intern?.abandonment_date),
         collaboration_agreement_document: null as File | null,
@@ -165,8 +172,43 @@ export default function InternFormPage({ mode, intern, educationCenters, documen
         dni_scan_document: null as File | null,
     });
 
-    const currentStatus = data.status as InternStatus;
+    const computedStatus = useMemo<InternStatus>(() => {
+        if (data.status === 'abandoned') {
+            return 'abandoned';
+        }
+
+        if (!data.internship_start_date || !data.internship_end_date) {
+            return 'active';
+        }
+
+        const today = new Date().toISOString().slice(0, 10);
+
+        if (today < data.internship_start_date) {
+            return 'upcoming_active';
+        }
+
+        if (today > data.internship_end_date) {
+            return 'finished';
+        }
+
+        return 'active';
+    }, [data.status, data.internship_start_date, data.internship_end_date]);
     const isAbandoned = data.status === 'abandoned';
+    const selectedCenter = useMemo(
+        () => educationCenters.find((center) => String(center.id) === data.education_center_id) ?? null,
+        [educationCenters, data.education_center_id],
+    );
+    const availableTrainingPrograms = selectedCenter?.training_programs ?? [];
+    const hasTrainingPrograms = availableTrainingPrograms.length > 0;
+
+    useEffect(() => {
+        if (
+            data.training_program_id !== ''
+            && !availableTrainingPrograms.some((program) => String(program.id) === data.training_program_id)
+        ) {
+            setData('training_program_id', '');
+        }
+    }, [availableTrainingPrograms, data.training_program_id, setData]);
 
     useEffect(() => {
         const successMessage = page.props.flash?.success;
@@ -188,6 +230,13 @@ export default function InternFormPage({ mode, intern, educationCenters, documen
         }
     }, [page.props.flash?.success, page.props.flash?.error]);
 
+    const showAgreementDateToastIfNeeded = (formErrors: Partial<Record<string, string>>) => {
+        const agreementDateError = formErrors.internship_end_date;
+        if (agreementDateError?.includes('Las fechas de practicas deben estar dentro del periodo de un convenio del centro educativo.')) {
+            toast.error('Las fechas de practicas deben estar dentro del periodo de un convenio del centro educativo.');
+        }
+    };
+
     const submit = (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
 
@@ -196,7 +245,16 @@ export default function InternFormPage({ mode, intern, educationCenters, documen
         }
 
         if (isCreate) {
-            post(interns.store().url, { preserveScroll: true, forceFormData: true });
+            if (!hasEducationCenters) {
+                toast.error('No hay centros educativos disponibles. Crea un centro antes de crear un becario.');
+                return;
+            }
+
+            post(interns.store().url, {
+                preserveScroll: true,
+                forceFormData: true,
+                onError: (formErrors) => showAgreementDateToastIfNeeded(formErrors),
+            });
             return;
         }
 
@@ -204,6 +262,7 @@ export default function InternFormPage({ mode, intern, educationCenters, documen
         post(interns.update(intern?.id ?? 0).url, {
             preserveScroll: true,
             forceFormData: true,
+            onError: (formErrors) => showAgreementDateToastIfNeeded(formErrors),
         });
     };
 
@@ -211,28 +270,22 @@ export default function InternFormPage({ mode, intern, educationCenters, documen
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={isCreate ? 'Nuevo Becario' : isReadOnly ? 'Ver Becario' : 'Editar Becario'} />
 
-            <div className="flex h-full flex-1 flex-col gap-6 overflow-x-auto rounded-xl p-6">
-                <div className="w-full max-w-5xl mx-auto">
-                    <div className="flex flex-col gap-6">
-                        {isCreate && (
-                            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                                <div className="flex flex-col gap-3">
-                                    <h1 className="text-2xl font-bold">Nuevo Becario</h1>
-                                    <p className="text-sm text-muted-foreground">
-                                        Completa datos personales, académicos y período de prácticas.
-                                    </p>
-                                </div>
-
-                                <Button variant="secondary" asChild>
-                                    <Link href={interns.index().url}>Volver al listado</Link>
-                                </Button>
-                            </div>
+            <div className={UI_PRESETS.pageContent}>
+                <div className={UI_PRESETS.pageSection}>
+                    <FormPageHeader
+                        title={isCreate ? 'Nuevo Becario' : isReadOnly ? 'Ver Becario' : 'Editar Becario'}
+                        description="Completa datos personales, académicos y período de prácticas."
+                        action={(
+                            <Button variant="secondary" asChild>
+                                <Link href={interns.index().url}>Volver al listado</Link>
+                            </Button>
                         )}
+                    />
 
-                        <form onSubmit={submit} className="space-y-6">
+                    <form onSubmit={submit} className="space-y-2">
                             <fieldset
                                 disabled={isReadOnly}
-                                className={`space-y-6 ${isReadOnly ? UI_PRESETS.readOnlyFieldset : ''}`}
+                                className={`space-y-2 ${isReadOnly ? UI_PRESETS.readOnlyFieldset : ''}`}
                             >
                                 <section className={UI_PRESETS.sectionCard}>
                                     <SectionIntro
@@ -243,52 +296,52 @@ export default function InternFormPage({ mode, intern, educationCenters, documen
                                     <div className="grid gap-4 md:grid-cols-2">
                                         <div className="grid gap-2">
                                             <FieldLabel htmlFor="first_name">Nombre</FieldLabel>
-                                            <Input id="first_name" value={data.first_name} onChange={(e) => setData('first_name', e.target.value)} required />
+                                            <Input id="first_name" value={data.first_name} onChange={(e) => setData('first_name', e.target.value)} className={UI_PRESETS.simpleSearchInput} required />
                                             <InputError message={errors.first_name} />
                                         </div>
                                         <div className="grid gap-2">
                                             <FieldLabel htmlFor="last_name">Apellidos</FieldLabel>
-                                            <Input id="last_name" value={data.last_name} onChange={(e) => setData('last_name', e.target.value)} required />
+                                            <Input id="last_name" value={data.last_name} onChange={(e) => setData('last_name', e.target.value)} className={UI_PRESETS.simpleSearchInput} required />
                                             <InputError message={errors.last_name} />
                                         </div>
                                         <div className="grid gap-2">
                                             <FieldLabel htmlFor="dni_nie">DNI/NIE</FieldLabel>
-                                            <Input id="dni_nie" value={data.dni_nie} onChange={(e) => setData('dni_nie', e.target.value)} required />
+                                            <Input id="dni_nie" value={data.dni_nie} onChange={(e) => setData('dni_nie', e.target.value)} className={UI_PRESETS.simpleSearchInput} required />
                                             <InputError message={errors.dni_nie} />
                                         </div>
                                         <div className="grid gap-2">
                                             <FieldLabel htmlFor="email">Email</FieldLabel>
-                                            <Input id="email" type="email" value={data.email} onChange={(e) => setData('email', e.target.value)} required />
+                                            <Input id="email" type="email" value={data.email} onChange={(e) => setData('email', e.target.value)} className={UI_PRESETS.simpleSearchInput} required />
                                             <InputError message={errors.email} />
                                         </div>
                                         <div className="grid gap-2">
                                             <FieldLabel htmlFor="phone">Teléfono</FieldLabel>
-                                            <Input id="phone" value={data.phone} onChange={(e) => setData('phone', e.target.value)} required />
+                                            <Input id="phone" value={data.phone} onChange={(e) => setData('phone', e.target.value)} className={UI_PRESETS.simpleSearchInput} required />
                                             <InputError message={errors.phone} />
                                         </div>
                                         <div className="grid gap-2 md:col-span-2">
                                             <FieldLabel htmlFor="address_line">Dirección</FieldLabel>
-                                            <Input id="address_line" value={data.address_line} onChange={(e) => setData('address_line', e.target.value)} required />
+                                            <Input id="address_line" value={data.address_line} onChange={(e) => setData('address_line', e.target.value)} className={UI_PRESETS.simpleSearchInput} required />
                                             <InputError message={errors.address_line} />
                                         </div>
                                         <div className="grid gap-2">
                                             <FieldLabel htmlFor="postal_code">Código postal</FieldLabel>
-                                            <Input id="postal_code" value={data.postal_code} onChange={(e) => setData('postal_code', e.target.value)} required />
+                                            <Input id="postal_code" value={data.postal_code} onChange={(e) => setData('postal_code', e.target.value)} className={UI_PRESETS.simpleSearchInput} required />
                                             <InputError message={errors.postal_code} />
                                         </div>
                                         <div className="grid gap-2">
                                             <FieldLabel htmlFor="city">Ciudad</FieldLabel>
-                                            <Input id="city" value={data.city} onChange={(e) => setData('city', e.target.value)} required />
+                                            <Input id="city" value={data.city} onChange={(e) => setData('city', e.target.value)} className={UI_PRESETS.simpleSearchInput} required />
                                             <InputError message={errors.city} />
                                         </div>
                                         <div className="grid gap-2">
                                             <FieldLabel htmlFor="province">Provincia</FieldLabel>
-                                            <Input id="province" value={data.province} onChange={(e) => setData('province', e.target.value)} required />
+                                            <Input id="province" value={data.province} onChange={(e) => setData('province', e.target.value)} className={UI_PRESETS.simpleSearchInput} required />
                                             <InputError message={errors.province} />
                                         </div>
                                         <div className="grid gap-2">
                                             <FieldLabel htmlFor="country">País</FieldLabel>
-                                            <Input id="country" value={data.country} onChange={(e) => setData('country', e.target.value)} required />
+                                            <Input id="country" value={data.country} onChange={(e) => setData('country', e.target.value)} className={UI_PRESETS.simpleSearchInput} required />
                                             <InputError message={errors.country} />
                                         </div>
                                     </div>
@@ -303,7 +356,14 @@ export default function InternFormPage({ mode, intern, educationCenters, documen
                                     <div className="grid gap-4 md:grid-cols-2">
                                         <div className="grid gap-2 md:col-span-2">
                                             <FieldLabel htmlFor="education_center_id">Centro educativo</FieldLabel>
-                                            <Select value={data.education_center_id} onValueChange={(value) => setData('education_center_id', value)} required>
+                                            <Select
+                                                value={data.education_center_id}
+                                                onValueChange={(value) => {
+                                                    setData('education_center_id', value);
+                                                    setData('training_program_id', '');
+                                                }}
+                                                required
+                                            >
                                                 <SelectTrigger id="education_center_id" className={UI_PRESETS.selectTrigger}>
                                                     <SelectValue placeholder="Selecciona un centro" />
                                                 </SelectTrigger>
@@ -316,40 +376,74 @@ export default function InternFormPage({ mode, intern, educationCenters, documen
                                                 </SelectContent>
                                             </Select>
                                             <InputError message={errors.education_center_id} />
+                                            {!hasEducationCenters ? (
+                                                <p className="text-xs text-destructive">
+                                                    No hay centros educativos disponibles. Crea uno primero para poder dar de alta becarios.
+                                                </p>
+                                            ) : null}
                                         </div>
                                         <div className="grid gap-2">
-                                            <FieldLabel htmlFor="training_cycle">Ciclo formativo</FieldLabel>
-                                            <Input id="training_cycle" value={data.training_cycle} onChange={(e) => setData('training_cycle', e.target.value)} required />
-                                            <InputError message={errors.training_cycle} />
+                                            <FieldLabel htmlFor="training_program_id">Ciclo formativo</FieldLabel>
+                                            <Select
+                                                value={data.training_program_id}
+                                                onValueChange={(value) => setData('training_program_id', value)}
+                                                disabled={!selectedCenter || !hasTrainingPrograms}
+                                                required
+                                            >
+                                                <SelectTrigger id="training_program_id" className={UI_PRESETS.selectTrigger}>
+                                                    <SelectValue
+                                                        placeholder={
+                                                            !selectedCenter
+                                                                ? 'Selecciona primero un centro'
+                                                                : hasTrainingPrograms
+                                                                    ? 'Selecciona un grado'
+                                                                    : 'El centro no tiene grados'
+                                                        }
+                                                    />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {availableTrainingPrograms.map((program) => (
+                                                        <SelectItem className={UI_PRESETS.selectItem} key={program.id} value={String(program.id)}>
+                                                            {program.name}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                            <InputError message={errors.training_program_id} />
+                                            {selectedCenter && !hasTrainingPrograms ? (
+                                                <p className="text-xs text-destructive">
+                                                    El centro seleccionado no tiene grados formativos configurados.
+                                                </p>
+                                            ) : null}
                                         </div>
                                         <div className="grid gap-2">
                                             <FieldLabel htmlFor="academic_year">Año académico</FieldLabel>
-                                            <Input id="academic_year" value={data.academic_year} onChange={(e) => setData('academic_year', e.target.value)} required />
+                                            <Input id="academic_year" value={data.academic_year} onChange={(e) => setData('academic_year', e.target.value)} className={UI_PRESETS.simpleSearchInput} required />
                                             <InputError message={errors.academic_year} />
                                         </div>
                                         <div className="grid gap-2">
                                             <FieldLabel htmlFor="academic_tutor_name">Tutor académico</FieldLabel>
-                                            <Input id="academic_tutor_name" value={data.academic_tutor_name} onChange={(e) => setData('academic_tutor_name', e.target.value)} required />
+                                            <Input id="academic_tutor_name" value={data.academic_tutor_name} onChange={(e) => setData('academic_tutor_name', e.target.value)} className={UI_PRESETS.simpleSearchInput} required />
                                             <InputError message={errors.academic_tutor_name} />
                                         </div>
                                         <div className="grid gap-2">
                                             <FieldLabel htmlFor="academic_tutor_email">Email tutor (opcional)</FieldLabel>
-                                            <Input id="academic_tutor_email" type="email" value={data.academic_tutor_email} onChange={(e) => setData('academic_tutor_email', e.target.value)} />
+                                            <Input id="academic_tutor_email" type="email" value={data.academic_tutor_email} onChange={(e) => setData('academic_tutor_email', e.target.value)} className={UI_PRESETS.simpleSearchInput} />
                                             <InputError message={errors.academic_tutor_email} />
                                         </div>
                                         <div className="grid gap-2">
                                             <FieldLabel htmlFor="internship_start_date">Fecha inicio</FieldLabel>
-                                            <Input id="internship_start_date" type="date" value={data.internship_start_date} onChange={(e) => setData('internship_start_date', e.target.value)} required />
+                                            <Input id="internship_start_date" type="date" value={data.internship_start_date} onChange={(e) => setData('internship_start_date', e.target.value)} className={UI_PRESETS.simpleSearchInput} required />
                                             <InputError message={errors.internship_start_date} />
                                         </div>
                                         <div className="grid gap-2">
                                             <FieldLabel htmlFor="internship_end_date">Fecha fin</FieldLabel>
-                                            <Input id="internship_end_date" type="date" value={data.internship_end_date} onChange={(e) => setData('internship_end_date', e.target.value)} required />
-                                            <InputError message={errors.internship_end_date} />
+                                            <Input id="internship_end_date" type="date" value={data.internship_end_date} onChange={(e) => setData('internship_end_date', e.target.value)} className={UI_PRESETS.simpleSearchInput} required />
+                                            <InputError message={errors.internship_end_date === 'Las fechas de practicas deben estar dentro del periodo de un convenio del centro educativo.' ? '' : errors.internship_end_date} />
                                         </div>
                                         <div className="grid gap-2">
                                             <FieldLabel htmlFor="required_hours">Horas requeridas</FieldLabel>
-                                            <Input id="required_hours" type="number" min={1} value={data.required_hours} onChange={(e) => setData('required_hours', Number(e.target.value))} required />
+                                            <Input id="required_hours" type="number" min={1} value={data.required_hours} onChange={(e) => setData('required_hours', Number(e.target.value))} className={UI_PRESETS.simpleSearchInput} required />
                                             <InputError message={errors.required_hours} />
                                         </div>
                                         <div className="grid gap-2">
@@ -357,18 +451,18 @@ export default function InternFormPage({ mode, intern, educationCenters, documen
                                             {isReadOnly ? (
                                                 <Input
                                                     id="status"
-                                                    value={INTERN_STATUS_META[currentStatus].label}
+                                                    value={INTERN_STATUS_META[computedStatus].label}
+                                                    className={UI_PRESETS.simpleSearchInput}
                                                     readOnly
                                                     disabled
                                                 />
                                             ) : (
-                                                <Select value={data.status} onValueChange={(value) => setData('status', value as 'active' | 'finished' | 'abandoned')} required>
+                                                <Select value={data.status} onValueChange={(value) => setData('status', value as 'active' | 'abandoned')} required>
                                                     <SelectTrigger id="status" className={UI_PRESETS.selectTrigger}>
                                                         <SelectValue placeholder="Estado" />
                                                     </SelectTrigger>
                                                     <SelectContent>
-                                                        <SelectItem className={UI_PRESETS.selectItem} value="active">Activo</SelectItem>
-                                                        <SelectItem className={UI_PRESETS.selectItem} value="finished">Finalizado</SelectItem>
+                                                        <SelectItem className={UI_PRESETS.selectItem} value="active">Automatico (segun fechas)</SelectItem>
                                                         <SelectItem className={UI_PRESETS.selectItem} value="abandoned">Abandonado</SelectItem>
                                                     </SelectContent>
                                                 </Select>
@@ -377,7 +471,7 @@ export default function InternFormPage({ mode, intern, educationCenters, documen
                                         </div>
                                         <div className="grid gap-2 md:col-span-2">
                                             <FieldLabel htmlFor="abandonment_reason">Motivo abandono (opcional)</FieldLabel>
-                                            <Input id="abandonment_reason" value={data.abandonment_reason} onChange={(e) => setData('abandonment_reason', e.target.value)} />
+                                            <Input id="abandonment_reason" value={data.abandonment_reason} onChange={(e) => setData('abandonment_reason', e.target.value)} className={UI_PRESETS.simpleSearchInput} />
                                             <InputError message={errors.abandonment_reason} />
                                         </div>
                                         <div className="grid gap-2">
@@ -387,6 +481,7 @@ export default function InternFormPage({ mode, intern, educationCenters, documen
                                                 type="date"
                                                 value={data.abandonment_date}
                                                 onChange={(e) => setData('abandonment_date', e.target.value)}
+                                                className={UI_PRESETS.simpleSearchInput}
                                                 required={isAbandoned}
                                             />
                                             <InputError message={errors.abandonment_date} />
@@ -475,7 +570,9 @@ export default function InternFormPage({ mode, intern, educationCenters, documen
                                     </Button>
                                 ) : (
                                     <>
-                                        <Button disabled={processing}>{processing ? 'Guardando...' : 'Guardar'}</Button>
+                                        <Button disabled={processing || !hasEducationCenters}>
+                                            {processing ? 'Guardando...' : 'Guardar'}
+                                        </Button>
                                         <Button type="button" variant="secondary" asChild>
                                             <Link href={interns.index().url}>Cancelar</Link>
                                         </Button>
@@ -485,7 +582,6 @@ export default function InternFormPage({ mode, intern, educationCenters, documen
                         </form>
                     </div>
                 </div>
-            </div>
         </AppLayout>
     );
 }

@@ -1,4 +1,4 @@
-export type InternStatus = 'active' | 'finished' | 'abandoned';
+export type InternStatus = 'active' | 'upcoming_active' | 'finished' | 'abandoned';
 
 type InternStatusMeta = {
     label: string;
@@ -8,6 +8,12 @@ type InternStatusMeta = {
 };
 
 export const INTERN_STATUS_META: Record<InternStatus, InternStatusMeta> = {
+    upcoming_active: {
+        label: 'Activo proximamente',
+        badgeClass: 'bg-violet-100 text-violet-700 ring-1 ring-violet-300',
+        cardClass: 'from-violet-600 to-violet-500 text-white',
+        cardSubtextClass: 'text-violet-100',
+    },
     active: {
         label: 'Activo',
         badgeClass: 'bg-emerald-100 text-emerald-700 ring-1 ring-emerald-300',

@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Intern extends Model
@@ -14,6 +15,7 @@ class Intern extends Model
 
     protected $fillable = [
         'education_center_id',
+        'training_program_id',
         'first_name',
         'last_name',
         'dni_nie',
@@ -54,5 +56,15 @@ class Intern extends Model
     {
         return $this->belongsTo(EducationCenter::class);
     }
-}
 
+    public function trainingProgram(): BelongsTo
+    {
+        return $this->belongsTo(TrainingProgram::class);
+    }
+
+    public function practiceTasks(): BelongsToMany
+    {
+        return $this->belongsToMany(PracticeTask::class, 'practice_task_intern')
+            ->withPivot('assigned_at');
+    }
+}

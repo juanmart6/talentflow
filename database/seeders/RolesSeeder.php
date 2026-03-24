@@ -25,6 +25,12 @@ class RolesSeeder extends Seeder
             'interns.create',
             'interns.update',
             'interns.delete',
+
+            //Prácticas y tareas:
+            'practice-tasks.view',
+            'practice-tasks.create',
+            'practice-tasks.update',
+            'practice-tasks.delete',
         ];
 
         foreach ($permissions as $permission) {
@@ -52,6 +58,10 @@ class RolesSeeder extends Seeder
                     'interns.view',
                     'interns.create',
                     'interns.update',
+                    'practice-tasks.view',
+                    'practice-tasks.create',
+                    'practice-tasks.update',
+                    'practice-tasks.delete',
                 ]);
             }
 
@@ -59,6 +69,7 @@ class RolesSeeder extends Seeder
                 $roleModel->syncPermissions([
                     'education-centers.view',
                     'interns.view',
+                    'practice-tasks.view',
                 ]);
             }
         }

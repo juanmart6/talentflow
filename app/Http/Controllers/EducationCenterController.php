@@ -8,6 +8,7 @@ use App\Http\Requests\EducationCenters\UpdateEducationCenterRequest;
 use App\Models\CollaborationAgreement;
 use App\Models\EducationCenter;
 use App\Models\Intern;
+use App\Models\TrainingProgram;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -121,6 +122,7 @@ class EducationCenterController extends Controller
         return Inertia::render('education-centers/form', [
             'mode' => 'create',
             'center' => null,
+            'trainingPrograms' => $this->trainingProgramOptions(),
             'agreementHistory' => [],
         ]);
     }
@@ -143,6 +145,7 @@ class EducationCenterController extends Controller
                     'contact_phone' => $validated['contact_phone'],
                     'contact_email' => $validated['contact_email'],
                 ]);
+                $center->trainingPrograms()->sync($validated['training_program_ids']);
 
                 $agreementPdfPath = $request->file('agreement_pdf')
                     ->store('education-centers/agreements', 'public');
@@ -170,6 +173,8 @@ class EducationCenterController extends Controller
     // Visualización de un centro educativo:
     public function show(EducationCenter $educationCenter): Response
     {
+        $educationCenter->load('trainingPrograms:id,name');
+
         $latestAgreement = $educationCenter
             ->collaborationAgreements()
             ->latest('signed_at')
@@ -178,17 +183,19 @@ class EducationCenterController extends Controller
         $internsHistory = $educationCenter
             ->interns()
             ->withTrashed()
+            ->with('trainingProgram:id,name')
             ->orderByDesc('internship_start_date')
             ->orderByDesc('id')
             ->get()
-            ->map(fn ($intern) : array => [
+            ->map(fn (Intern $intern) : array => [
                     'id' => $intern->id,
                     'first_name' => $intern->first_name,
                     'last_name' => $intern->last_name,
                     'dni_nie' => $intern->dni_nie,
                     'email' => $intern->email,
                     'phone' => $intern->phone,
-                    'status' => $intern->status,
+                    'training_program_name' => $intern->trainingProgram?->name ?? $intern->training_cycle,
+                    'status' => $this->resolveInternStatusForHistory($intern),
                     'internship_start_date' => $intern->internship_start_date?->toDateString(),
                     'internship_end_date' => $intern->internship_end_date?->toDateString(),
                     'deleted_at' => $intern->deleted_at?->toDateTimeString(),
@@ -208,11 +215,17 @@ class EducationCenterController extends Controller
                 'contact_position' => $educationCenter->contact_position,
                 'contact_phone' => $educationCenter->contact_phone,
                 'contact_email' => $educationCenter->contact_email,
+                'training_program_ids' => $educationCenter->trainingPrograms
+                    ->pluck('id')
+                    ->map(fn ($id) => (int) $id)
+                    ->values()
+                    ->all(),
                 'agreement_signed_at' => $latestAgreement?->signed_at?->toDateString(),
                 'agreement_expires_at' => $latestAgreement?->expires_at?->toDateString(),
                 'agreement_agreed_slots' => $latestAgreement?->agreed_slots,
                 'agreement_pdf_path' => $latestAgreement?->pdf_path ? Storage::url($latestAgreement->pdf_path) : null,
             ],
+            'trainingPrograms' => $this->trainingProgramOptions(),
             'agreementHistory' => $this->agreementHistory($educationCenter),
             'internsHistory' => $internsHistory,
         ]);
@@ -221,6 +234,8 @@ class EducationCenterController extends Controller
     // Edición de un centro educativo:
     public function edit(EducationCenter $educationCenter): Response
     {
+        $educationCenter->load('trainingPrograms:id,name');
+
         $latestAgreement = $educationCenter
             ->collaborationAgreements()
             ->latest('signed_at')
@@ -239,11 +254,17 @@ class EducationCenterController extends Controller
                 'contact_position' => $educationCenter->contact_position,
                 'contact_phone' => $educationCenter->contact_phone,
                 'contact_email' => $educationCenter->contact_email,
+                'training_program_ids' => $educationCenter->trainingPrograms
+                    ->pluck('id')
+                    ->map(fn ($id) => (int) $id)
+                    ->values()
+                    ->all(),
                 'agreement_signed_at' => $latestAgreement?->signed_at?->toDateString(),
                 'agreement_expires_at' => $latestAgreement?->expires_at?->toDateString(),
                 'agreement_agreed_slots' => $latestAgreement?->agreed_slots,
                 'agreement_pdf_path' => $latestAgreement?->pdf_path ? Storage::url($latestAgreement->pdf_path) : null,
             ],
+            'trainingPrograms' => $this->trainingProgramOptions(),
             'agreementHistory' => $this->agreementHistory($educationCenter),
         ]);
     }
@@ -266,6 +287,7 @@ class EducationCenterController extends Controller
                     'contact_phone' => $validated['contact_phone'],
                     'contact_email' => $validated['contact_email'],
                 ]);
+                $educationCenter->trainingPrograms()->sync($validated['training_program_ids']);
 
                 $agreement = CollaborationAgreement::query()
                     ->where('education_center_id', $educationCenter->id)
@@ -302,7 +324,7 @@ class EducationCenterController extends Controller
             report($exception);
             return redirect()
                 ->route('education-centers.index')
-                ->with('error', 'No se pudo actualizar el centro educativo. Intenta de nuevo más tarde.');
+                ->with('error', 'No se pudo actualizar el centro educativo. Intenta de nuevo mÃ¡s tarde.');
         }
 
         return redirect()
@@ -320,17 +342,21 @@ class EducationCenterController extends Controller
 
         return EducationCenter::query()
             ->when($search !== '', function ($query) use ($search) {
-                $query->whereRaw('LOWER(name) LIKE ?', ['%'.mb_strtolower($search).'%']);
+                $normalizedSearch = '%'.$this->normalizeSearchTerm($search).'%';
+                $query->whereRaw($this->normalizedSqlField('name').' LIKE ?', [$normalizedSearch]);
             })
             ->when($agreementStatus !== '', function ($query) use ($agreementStatus, $today, $renewalLimit) {
                 $query->whereHas('latestCollaborationAgreement', function ($subQuery) use ($agreementStatus, $today, $renewalLimit) {
                     if ($agreementStatus === 'expired') {
                         $subQuery->where('expires_at', '<', $today);
+                    } elseif ($agreementStatus === 'not_started') {
+                        $subQuery->where('signed_at', '>', $today);
                     } elseif ($agreementStatus === 'renewal_soon') {
-                        $subQuery->where('expires_at', '>=', $today)
+                        $subQuery->where('signed_at', '<=', $today)
+                            ->where('expires_at', '>=', $today)
                             ->where('expires_at', '<=', $renewalLimit);
                     } elseif ($agreementStatus === 'valid') {
-                        $subQuery->where('expires_at', '>=', $today)
+                        $subQuery->where('signed_at', '<=', $today)
                             ->where('expires_at', '>', $renewalLimit);
                     }
                 });
@@ -340,12 +366,17 @@ class EducationCenterController extends Controller
     // Determina el estado de un centro educativo basado en su acuerdo de colaboración más reciente:
     private function resolveCenterStatus(?CollaborationAgreement $agreement): string
     {
+        $signedAt = $agreement?->signed_at;
         $expiresAt = $agreement?->expires_at;
         $today = now()->startOfDay();
         $renewalLimit = now()->addDays(30)->startOfDay();
 
         if ($expiresAt === null || $expiresAt < $today) {
             return 'expired';
+        }
+
+        if ($signedAt !== null && $signedAt > $today) {
+            return 'not_started';
         }
 
         if ($expiresAt <= $renewalLimit) {
@@ -360,6 +391,7 @@ class EducationCenterController extends Controller
     {
         return match ($status) {
             'valid' => 'Vigente',
+            'not_started' => 'Aun no vigente',
             'renewal_soon' => 'Renovación próxima',
             'expired' => 'Caducado',
             default => $status,
@@ -427,5 +459,83 @@ class EducationCenterController extends Controller
             ->whereNull('deleted_at')
             ->where('status', 'active')
             ->exists();
+    }
+
+    private function resolveInternStatusForHistory(Intern $intern): string
+    {
+        if ($intern->status === 'abandoned') {
+            return 'abandoned';
+        }
+
+        $startDate = $intern->internship_start_date?->toDateString();
+        $endDate = $intern->internship_end_date?->toDateString();
+
+        if ($startDate === null || $endDate === null) {
+            return $intern->status;
+        }
+
+        return $this->resolveAutomaticInternStatus($startDate, $endDate);
+    }
+
+    private function resolveAutomaticInternStatus(string $startDate, string $endDate): string
+    {
+        $today = now()->toDateString();
+
+        if ($today < $startDate) {
+            return 'upcoming_active';
+        }
+
+        if ($today > $endDate) {
+            return 'finished';
+        }
+
+        return 'active';
+    }
+
+    private function normalizeSearchTerm(string $value): string
+    {
+        $normalized = mb_strtolower(trim($value));
+
+        return strtr($normalized, [
+            'á' => 'a',
+            'à' => 'a',
+            'ä' => 'a',
+            'â' => 'a',
+            'é' => 'e',
+            'è' => 'e',
+            'ë' => 'e',
+            'ê' => 'e',
+            'í' => 'i',
+            'ì' => 'i',
+            'ï' => 'i',
+            'î' => 'i',
+            'ó' => 'o',
+            'ò' => 'o',
+            'ö' => 'o',
+            'ô' => 'o',
+            'ú' => 'u',
+            'ù' => 'u',
+            'ü' => 'u',
+            'û' => 'u',
+            'ñ' => 'n',
+        ]);
+    }
+
+    private function normalizedSqlField(string $field): string
+    {
+        return "LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE($field, 'á', 'a'), 'à', 'a'), 'ä', 'a'), 'â', 'a'), 'é', 'e'), 'è', 'e'), 'ë', 'e'), 'ê', 'e'), 'í', 'i'), 'ì', 'i'), 'ï', 'i'), 'î', 'i'), 'ó', 'o'), 'ò', 'o'), 'ö', 'o'), 'ô', 'o'), 'ú', 'u'), 'ù', 'u'), 'ü', 'u'), 'û', 'u'), 'ñ', 'n'))";
+    }
+
+    private function trainingProgramOptions(): array
+    {
+        return TrainingProgram::query()
+            ->orderBy('name')
+            ->get(['id', 'name'])
+            ->map(fn (TrainingProgram $program): array => [
+                'id' => $program->id,
+                'name' => $program->name,
+            ])
+            ->values()
+            ->all();
     }
 }

@@ -7,6 +7,8 @@ use App\Http\Requests\Interns\StoreInternRequest;
 use App\Http\Requests\Interns\UpdateInternRequest;
 use App\Models\EducationCenter;
 use App\Models\Intern;
+use App\Models\TrainingProgram;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -27,25 +29,30 @@ class InternController extends Controller
         $status = trim((string) $request->string('status')->toString());
         $search = trim((string) $request->string('search')->toString());
         $educationCenterId = $request->integer('education_center_id');
+        $trainingProgramId = $request->integer('training_program_id');
         $date_from = $request->string('date_from')->toString();
         $date_to = $request->string('date_to')->toString();
         $baseQuery = $this->filteredBaseQuery($request);
 
-        $statusCountsRaw = (clone $baseQuery)
-            ->selectRaw('status, COUNT(*) as total')
-            ->groupBy('status')
-            ->pluck('total', 'status');
+        $statusSnapshot = (clone $baseQuery)
+            ->get(['status', 'internship_start_date', 'internship_end_date']);
 
         $statusCounts = [
-            'active' => (int) ($statusCountsRaw['active'] ?? 0),
-            'finished' => (int) ($statusCountsRaw['finished'] ?? 0),
-            'abandoned' => (int) ($statusCountsRaw['abandoned'] ?? 0),
+            'upcoming_active' => 0,
+            'active' => 0,
+            'finished' => 0,
+            'abandoned' => 0,
         ];
+
+        foreach ($statusSnapshot as $internStatusItem) {
+            $resolvedStatus = $this->resolveInternStatus($internStatusItem);
+            $statusCounts[$resolvedStatus] = ($statusCounts[$resolvedStatus] ?? 0) + 1;
+        }
 
         $internsQuery = $this->applyStatusFilter(clone $baseQuery, $status);
 
         $interns = $internsQuery
-            ->with('educationCenter')
+            ->with(['educationCenter', 'trainingProgram'])
             ->orderBy('last_name')
             ->orderBy('first_name')
             ->paginate(10)
@@ -57,7 +64,7 @@ class InternController extends Controller
                     'dni_nie' => $intern->dni_nie,
                     'email' => $intern->email,
                     'phone' => $intern->phone,
-                    'status' => $intern->status,
+                    'status' => $this->resolveInternStatus($intern),
                     'internship_start_date' => $intern->internship_start_date
                         ? Carbon::parse($intern->internship_start_date)->toDateString()
                         : null,
@@ -68,6 +75,10 @@ class InternController extends Controller
                     'education_center' => $intern->educationCenter ? [
                         'id' => $intern->educationCenter->id,
                         'name' => $intern->educationCenter->name,
+                    ] : null,
+                    'training_program' => $intern->trainingProgram ? [
+                        'id' => $intern->trainingProgram->id,
+                        'name' => $intern->trainingProgram->name,
                     ] : null,
                 ];
             })
@@ -80,10 +91,14 @@ class InternController extends Controller
                 'search' => $search,
                 'status' => $status,
                 'education_center_id' => $educationCenterId,
+                'training_program_id' => $trainingProgramId,
                 'date_from' => $date_from,
                 'date_to' => $date_to,
             ],
             'educationCenters' => EducationCenter::query()
+                ->orderBy('name')
+                ->get(['id', 'name']),
+            'trainingPrograms' => TrainingProgram::query()
                 ->orderBy('name')
                 ->get(['id', 'name']),
         ]);
@@ -109,7 +124,7 @@ class InternController extends Controller
                 'Fecha fin' => $intern->internship_end_date
                     ? Carbon::parse($intern->internship_end_date)->toDateString()
                     : '-',
-                'Estado' => $this->internStatusLabel($intern->status),
+                'Estado' => $this->internStatusLabel($this->resolveInternStatus($intern)),
             ]);
 
         return Excel::download(
@@ -123,22 +138,24 @@ class InternController extends Controller
     {
         $search = trim((string) $request->string('search')->toString());
         $educationCenterId = $request->integer('education_center_id');
+        $trainingProgramId = $request->integer('training_program_id');
         $date_from = $request->string('date_from')->toString();
         $date_to = $request->string('date_to')->toString();
 
         return Intern::query()
             ->when($search !== '', function ($query) use ($search) {
-                $normalizedSearch = '%'.mb_strtolower($search).'%';
+                $normalizedSearch = '%'.$this->normalizeSearchTerm($search).'%';
 
                 $query->where(function ($subQuery) use ($normalizedSearch) {
                     $subQuery
-                        ->whereRaw('LOWER(first_name) LIKE ?', [$normalizedSearch])
-                        ->orWhereRaw('LOWER(last_name) LIKE ?', [$normalizedSearch])
-                        ->orWhereRaw('LOWER(dni_nie) LIKE ?', [$normalizedSearch])
-                        ->orWhereRaw('LOWER(email) LIKE ?', [$normalizedSearch]);
+                        ->whereRaw($this->normalizedSqlField('first_name').' LIKE ?', [$normalizedSearch])
+                        ->orWhereRaw($this->normalizedSqlField('last_name').' LIKE ?', [$normalizedSearch])
+                        ->orWhereRaw($this->normalizedSqlField('dni_nie').' LIKE ?', [$normalizedSearch])
+                        ->orWhereRaw($this->normalizedSqlField('email').' LIKE ?', [$normalizedSearch]);
                 });
             })
             ->when($educationCenterId, fn ($query) => $query->where('education_center_id', $educationCenterId))
+            ->when($trainingProgramId, fn ($query) => $query->where('training_program_id', $trainingProgramId))
             ->when($date_from !== '' && $date_to !== '', function ($query) use ($date_from, $date_to) {
                 $query
                     ->whereDate('internship_start_date', '<=', $date_to)
@@ -152,16 +169,91 @@ class InternController extends Controller
             });
     }
 
+    private function normalizeSearchTerm(string $value): string
+    {
+        $normalized = mb_strtolower(trim($value));
+
+        return strtr($normalized, [
+            'á' => 'a',
+            'à' => 'a',
+            'ä' => 'a',
+            'â' => 'a',
+            'Á' => 'a',
+            'À' => 'a',
+            'Ä' => 'a',
+            'Â' => 'a',
+            'é' => 'e',
+            'è' => 'e',
+            'ë' => 'e',
+            'ê' => 'e',
+            'É' => 'e',
+            'È' => 'e',
+            'Ë' => 'e',
+            'Ê' => 'e',
+            'í' => 'i',
+            'ì' => 'i',
+            'ï' => 'i',
+            'î' => 'i',
+            'Í' => 'i',
+            'Ì' => 'i',
+            'Ï' => 'i',
+            'Î' => 'i',
+            'ó' => 'o',
+            'ò' => 'o',
+            'ö' => 'o',
+            'ô' => 'o',
+            'Ó' => 'o',
+            'Ò' => 'o',
+            'Ö' => 'o',
+            'Ô' => 'o',
+            'ú' => 'u',
+            'ù' => 'u',
+            'ü' => 'u',
+            'û' => 'u',
+            'Ú' => 'u',
+            'Ù' => 'u',
+            'Ü' => 'u',
+            'Û' => 'u',
+            'ñ' => 'n',
+            'Ñ' => 'n',
+        ]);
+    }
+
+    private function normalizedSqlField(string $field): string
+    {
+        return "LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE($field, 'á', 'a'), 'à', 'a'), 'ä', 'a'), 'â', 'a'), 'é', 'e'), 'è', 'e'), 'ë', 'e'), 'ê', 'e'), 'í', 'i'), 'ì', 'i'), 'ï', 'i'), 'î', 'i'), 'ó', 'o'), 'ò', 'o'), 'ö', 'o'), 'ô', 'o'), 'ú', 'u'), 'ù', 'u'), 'ü', 'u'), 'û', 'u'), 'ñ', 'n'))";
+    }
+
     // Aplica filtro de estado a una consulta de becarios:
     private function applyStatusFilter($query, string $status)
     {
-        return $query->when($status !== '', fn ($query) => $query->where('status', $status));
+        if ($status === '' || $status === 'all') {
+            return $query;
+        }
+
+        $today = now()->toDateString();
+
+        return match ($status) {
+            'abandoned' => $query->where('status', 'abandoned'),
+            'upcoming_active' => $query
+                ->where('status', '!=', 'abandoned')
+                ->whereDate('internship_start_date', '>', $today),
+            'finished' => $query
+                ->where('status', '!=', 'abandoned')
+                ->whereDate('internship_end_date', '<', $today),
+            'active' => $query
+                ->where('status', '!=', 'abandoned')
+                ->whereDate('internship_start_date', '<=', $today)
+                ->whereDate('internship_end_date', '>=', $today),
+            default => $query,
+        };
     }
 
     // Traduce el estado del becario a una etiqueta legible:
     private function internStatusLabel(string $status): string
     {
         return match ($status) {
+            'upcoming_active' => 'Activo proximamente',
             'active' => 'Activo',
             'finished' => 'Finalizado',
             'abandoned' => 'Abandonado',
@@ -176,9 +268,7 @@ class InternController extends Controller
             'mode' => 'create',
             'intern' => null,
             'documentHistory' => $this->emptyDocumentHistory(),
-            'educationCenters' => EducationCenter::query()
-                ->orderBy('name')
-                ->get(['id', 'name']),
+            'educationCenters' => $this->educationCenterOptions(),
         ]);
     }
 
@@ -195,12 +285,26 @@ class InternController extends Controller
         if (($internPayload['status'] ?? null) !== 'abandoned') {
             $internPayload['abandonment_reason'] = null;
             $internPayload['abandonment_date'] = null;
+            $internPayload['status'] = $this->resolveAutomaticStatus(
+                (string) $internPayload['internship_start_date'],
+                (string) $internPayload['internship_end_date'],
+            );
         }
 
         try {
             $intern = Intern::create($internPayload);
 
             $this->syncUploadedDocuments($request, $intern);
+        } catch (QueryException $exception) {
+            report($exception);
+
+            $errorMessage = str_contains($exception->getMessage(), 'abandonment_date')
+                ? 'Falta aplicar una migración en la base de datos (columna abandonment_date). Ejecuta php artisan migrate y vuelve a intentarlo.'
+                : 'No se pudo crear el becario. Intenta de nuevo más tarde.';
+
+            return redirect()
+                ->route('interns.index')
+                ->with('error', $errorMessage);
         } catch (Throwable $exception) {
             report($exception);
             return redirect()
@@ -220,9 +324,7 @@ class InternController extends Controller
             'mode' => 'edit',
             'intern' => $intern,
             'documentHistory' => $this->documentHistory($intern),
-            'educationCenters' => EducationCenter::query()
-                ->orderBy('name')
-                ->get(['id', 'name']),
+            'educationCenters' => $this->educationCenterOptions(),
         ]);
     }
 
@@ -239,12 +341,26 @@ class InternController extends Controller
         if (($internPayload['status'] ?? null) !== 'abandoned') {
             $internPayload['abandonment_reason'] = null;
             $internPayload['abandonment_date'] = null;
+            $internPayload['status'] = $this->resolveAutomaticStatus(
+                (string) $internPayload['internship_start_date'],
+                (string) $internPayload['internship_end_date'],
+            );
         }
 
         try {
             $intern->update($internPayload);
 
             $this->syncUploadedDocuments($request, $intern);
+        } catch (QueryException $exception) {
+            report($exception);
+
+            $errorMessage = str_contains($exception->getMessage(), 'abandonment_date')
+                ? 'Falta aplicar una migración en la base de datos (columna abandonment_date). Ejecuta php artisan migrate y vuelve a intentarlo.'
+                : 'No se pudo actualizar el becario. Intenta de nuevo más tarde.';
+
+            return redirect()
+                ->route('interns.index')
+                ->with('error', $errorMessage);
         } catch (Throwable $exception) {
             report($exception);
             return redirect()
@@ -281,9 +397,7 @@ class InternController extends Controller
             'mode' => 'show',
             'intern' => $intern,
             'documentHistory' => $this->documentHistory($intern),
-            'educationCenters' => EducationCenter::query()
-                ->orderBy('name')
-                ->get(['id', 'name']),
+            'educationCenters' => $this->educationCenterOptions(),
         ]);
     }
 
@@ -409,6 +523,27 @@ class InternController extends Controller
         return $history;
     }
 
+    private function educationCenterOptions(): array
+    {
+        return EducationCenter::query()
+            ->with(['trainingPrograms:id,name'])
+            ->orderBy('name')
+            ->get(['id', 'name'])
+            ->map(fn (EducationCenter $center): array => [
+                'id' => $center->id,
+                'name' => $center->name,
+                'training_programs' => $center->trainingPrograms
+                    ->map(fn ($program): array => [
+                        'id' => $program->id,
+                        'name' => $program->name,
+                    ])
+                    ->values()
+                    ->all(),
+            ])
+            ->values()
+            ->all();
+    }
+
     // Define las categorías de documentos para los becarios, incluyendo el campo de solicitud, la columna de ruta en la base de datos y la carpeta de almacenamiento:
     private function documentDefinitions(): array
     {
@@ -430,4 +565,32 @@ class InternController extends Controller
             ],
         ];
     }
+
+    private function resolveInternStatus(Intern $intern): string
+    {
+        if ($intern->status === 'abandoned') {
+            return 'abandoned';
+        }
+
+        return $this->resolveAutomaticStatus(
+            (string) $intern->internship_start_date?->toDateString(),
+            (string) $intern->internship_end_date?->toDateString(),
+        );
+    }
+
+    private function resolveAutomaticStatus(string $startDate, string $endDate): string
+    {
+        $today = now()->toDateString();
+
+        if ($startDate !== '' && $today < $startDate) {
+            return 'upcoming_active';
+        }
+
+        if ($endDate !== '' && $today > $endDate) {
+            return 'finished';
+        }
+
+        return 'active';
+    }
 }
+

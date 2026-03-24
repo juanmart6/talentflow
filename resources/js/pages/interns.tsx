@@ -23,6 +23,7 @@ import { UI_PRESETS, stripedRowClass } from '@/lib/ui-presets';
 import { normalizePaginationLabel } from '@/lib/utils';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import AppLayout from '@/layouts/app-layout';
+import educationCentersRoutes from '@/routes/education-centers';
 import interns from '@/routes/interns';
 import type { BreadcrumbItem } from '@/types';
 
@@ -39,11 +40,15 @@ type InternRow = {
     dni_nie: string;
     email: string;
     phone: string;
-    status: 'active' | 'finished' | 'abandoned';
+    status: 'active' | 'upcoming_active' | 'finished' | 'abandoned';
     internship_start_date: string | null;
     internship_end_date: string | null;
     required_hours: number;
     education_center: {
+        id: number;
+        name: string;
+    } | null;
+    training_program: {
         id: number;
         name: string;
     } | null;
@@ -62,10 +67,17 @@ type EducationCenterOption = {
     name: string;
 };
 
+type TrainingProgramOption = {
+    id: number;
+    name: string;
+};
+
 type Props = {
     interns: InternsPagination;
     educationCenters: EducationCenterOption[];
+    trainingPrograms: TrainingProgramOption[];
     statusCounts: {
+        upcoming_active: number;
         active: number;
         finished: number;
         abandoned: number;
@@ -74,6 +86,7 @@ type Props = {
         search: string;
         status: string;
         education_center_id: number | null;
+        training_program_id: number | null;
         date_from: string;
         date_to: string;
     };
@@ -111,11 +124,14 @@ function getInitials(intern: InternRow): string {
 }
 
 // Contiene toda la lógica de la vista:
-export default function InternsPage({ interns: internPagination, filters, educationCenters }: Props) {
+export default function InternsPage({ interns: internPagination, filters, educationCenters, trainingPrograms }: Props) {
     const [search, setSearch] = useState(filters.search ?? '');
     const [status, setStatus] = useState(filters.status || 'all');
     const [educationCenterId, setEducationCenterId] = useState(
         filters.education_center_id ? String(filters.education_center_id) : 'all',
+    );
+    const [trainingProgramId, setTrainingProgramId] = useState(
+        filters.training_program_id ? String(filters.training_program_id) : 'all',
     );
     
     const [dateFrom, setDateFrom] = useState(filters.date_from ?? '');
@@ -123,7 +139,7 @@ export default function InternsPage({ interns: internPagination, filters, educat
     const [internToDelete, setInternToDelete] = useState<InternRow | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
     const hasActiveFilters =
-        search.trim() !== '' || status !== 'all' || educationCenterId !== 'all' || dateFrom !== '' || dateTo !== '';
+        search.trim() !== '' || status !== 'all' || educationCenterId !== 'all' || trainingProgramId !== 'all' || dateFrom !== '' || dateTo !== '';
 
     const hasRows = internPagination.data.length > 0;
 
@@ -143,12 +159,14 @@ export default function InternsPage({ interns: internPagination, filters, educat
         const normalizedFilter = (filters.search ?? '').trim();
         const currentStatus = filters.status || 'all';
         const currentEducationCenterId = filters.education_center_id ? String(filters.education_center_id) : 'all';
+        const currentTrainingProgramId = filters.training_program_id ? String(filters.training_program_id) : 'all';
         const currentDateFrom = filters.date_from ?? '';
         const currentDateTo = filters.date_to ?? '';
         if (
             normalizedSearch === normalizedFilter &&
             status === currentStatus &&
             educationCenterId === currentEducationCenterId &&
+            trainingProgramId === currentTrainingProgramId &&
             dateFrom === currentDateFrom &&
             dateTo === currentDateTo
         ) {
@@ -167,6 +185,7 @@ export default function InternsPage({ interns: internPagination, filters, educat
                     search: normalizedSearch || undefined,
                     status: status === 'all' ? undefined : status,
                     education_center_id: educationCenterId === 'all' ? undefined : educationCenterId,
+                    training_program_id: trainingProgramId === 'all' ? undefined : trainingProgramId,
                     date_from: dateFrom || undefined,
                     date_to: dateTo || undefined,
                 },
@@ -179,7 +198,7 @@ export default function InternsPage({ interns: internPagination, filters, educat
         }, 300);
 
         return () => window.clearTimeout(timeoutId);
-    }, [search, status, educationCenterId, dateFrom, dateTo, filters.search, filters.status, filters.education_center_id, filters.date_from, filters.date_to, hasInvalidDateRange]);
+    }, [search, status, educationCenterId, trainingProgramId, dateFrom, dateTo, filters.search, filters.status, filters.education_center_id, filters.training_program_id, filters.date_from, filters.date_to, hasInvalidDateRange]);
 
     // Función para confirmar eliminación de un becario, mostrando un diálogo de confirmación y manejando la petición de eliminación a través de Inertia.js. Si la eliminación es exitosa, se cierra el diálogo y se muestra un mensaje flash.
     const confirmDelete = () => {
@@ -210,6 +229,7 @@ export default function InternsPage({ interns: internPagination, filters, educat
         if (normalizedSearch) params.search = normalizedSearch;
         if (status !== 'all') params.status = status;
         if (educationCenterId !== 'all') params.education_center_id = educationCenterId;
+        if (trainingProgramId !== 'all') params.training_program_id = trainingProgramId;
         if (dateFrom) params.date_from = dateFrom;
         if (dateTo) params.date_to = dateTo;
 
@@ -222,6 +242,7 @@ export default function InternsPage({ interns: internPagination, filters, educat
         setSearch('');
         setStatus('all');
         setEducationCenterId('all');
+        setTrainingProgramId('all');
         setDateFrom('');
         setDateTo('');
 
@@ -301,22 +322,7 @@ export default function InternsPage({ interns: internPagination, filters, educat
                                 </div>
                             </div>
 
-                            <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
-                                <div className="flex flex-col gap-1">
-                                    <span className="text-xs font-medium text-muted-foreground">Estado</span>
-                                    <Select value={status} onValueChange={setStatus}>
-                                        <SelectTrigger className={`${UI_PRESETS.selectTrigger} w-full`}>
-                                            <SelectValue placeholder="Estado" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem className={UI_PRESETS.selectItem} value="all">Todos los estados</SelectItem>
-                                            <SelectItem className={UI_PRESETS.selectItem} value="active">Activo</SelectItem>
-                                            <SelectItem className={UI_PRESETS.selectItem} value="finished">Finalizado</SelectItem>
-                                            <SelectItem className={UI_PRESETS.selectItem} value="abandoned">Abandonado</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-
+                            <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-5">
                                 <div className="flex flex-col gap-1">
                                     <span className="text-xs font-medium text-muted-foreground">Centro educativo</span>
                                     <Select value={educationCenterId} onValueChange={setEducationCenterId}>
@@ -328,6 +334,23 @@ export default function InternsPage({ interns: internPagination, filters, educat
                                             {educationCenters.map((center) => (
                                                 <SelectItem className={UI_PRESETS.selectItem} key={center.id} value={String(center.id)}>
                                                     {center.name}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+
+                                <div className="flex flex-col gap-1">
+                                    <span className="text-xs font-medium text-muted-foreground">Ciclo formativo</span>
+                                    <Select value={trainingProgramId} onValueChange={setTrainingProgramId}>
+                                        <SelectTrigger className={`${UI_PRESETS.selectTrigger} w-full`}>
+                                            <SelectValue placeholder="Ciclo formativo" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem className={UI_PRESETS.selectItem} value="all">Todos los ciclos</SelectItem>
+                                            {trainingPrograms.map((program) => (
+                                                <SelectItem className={UI_PRESETS.selectItem} key={program.id} value={String(program.id)}>
+                                                    {program.name}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>
@@ -353,6 +376,22 @@ export default function InternsPage({ interns: internPagination, filters, educat
                                         className={`${UI_PRESETS.simpleSearchInput} h-9 text-sm`}
                                     />
                                 </div>
+
+                                <div className="flex flex-col gap-1">
+                                    <span className="text-xs font-medium text-muted-foreground">Estado</span>
+                                            <Select value={status} onValueChange={setStatus}>
+                                                <SelectTrigger className={`${UI_PRESETS.selectTrigger} w-full`}>
+                                                    <SelectValue placeholder="Estado" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem className={UI_PRESETS.selectItem} value="all">Todos los estados</SelectItem>
+                                                    <SelectItem className={UI_PRESETS.selectItem} value="upcoming_active">Activo proximamente</SelectItem>
+                                                    <SelectItem className={UI_PRESETS.selectItem} value="active">Activo</SelectItem>
+                                                    <SelectItem className={UI_PRESETS.selectItem} value="finished">Finalizado</SelectItem>
+                                                    <SelectItem className={UI_PRESETS.selectItem} value="abandoned">Abandonado</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
                             </div>
 
                             {hasInvalidDateRange ? (
@@ -368,8 +407,8 @@ export default function InternsPage({ interns: internPagination, filters, educat
                             <thead className={UI_PRESETS.tableHead}>
                                 <tr>
                                     <th className="w-40 px-4 py-3 text-center font-semibold">Becario</th>
-                                    <th className="w-40 px-4 py-3 text-center font-semibold">DNI/NIE</th>
                                     <th className="w-40 px-4 py-3 text-center font-semibold">Centro</th>
+                                    <th className="w-40 px-4 py-3 text-center font-semibold">Ciclo formativo</th>
                                     <th className="w-40 px-4 py-3 text-center font-semibold">Prácticas</th>
                                     <th className="w-40 px-4 py-3 text-center font-semibold">Estado</th>
                                     <th className="w-40 px-4 py-3 text-center font-semibold">Acciones</th>
@@ -387,17 +426,27 @@ export default function InternsPage({ interns: internPagination, filters, educat
                                                         </AvatarFallback>
                                                     </Avatar>
                                                     <div className="text-left">
-                                                        <p className="font-semibold">
+                                                        <Link
+                                                            href={interns.show(intern.id).url}
+                                                            className="font-semibold text-primary underline-offset-2 hover:underline"
+                                                        >
                                                             {intern.first_name} {intern.last_name}
-                                                        </p>
+                                                        </Link>
                                                     </div>
                                                 </div>
                                             </td>
-                                            <td className={`${UI_PRESETS.tableCellCentered} w-40 font-mono text-xs font-semibold md:text-sm`}>
-                                                {intern.dni_nie}
+                                            <td className={`${UI_PRESETS.tableCellCentered} w-40 font-medium`}>
+                                                {intern.education_center ? (
+                                                    <Link
+                                                        href={educationCentersRoutes.show(intern.education_center.id).url}
+                                                        className="text-primary underline-offset-2 hover:underline"
+                                                    >
+                                                        {intern.education_center.name}
+                                                    </Link>
+                                                ) : '-'}
                                             </td>
                                             <td className={`${UI_PRESETS.tableCellCentered} w-40 font-medium`}>
-                                                {intern.education_center?.name ?? '-'}
+                                                {intern.training_program?.name ?? '-'}
                                             </td>
                                             <td className={`${UI_PRESETS.tableCellCentered} w-40`}>
                                                 <p className="text-xs font-semibold text-muted-foreground">Inicio</p>
@@ -511,4 +560,3 @@ export default function InternsPage({ interns: internPagination, filters, educat
         </AppLayout>
     );
 }
-

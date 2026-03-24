@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
@@ -36,5 +37,15 @@ class EducationCenter extends Model
     public function interns(): HasMany
     {
         return $this->hasMany('App\\Models\\Intern');
+    }
+
+    public function trainingPrograms(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            TrainingProgram::class,
+            'education_center_training_program',
+            'education_center_id',
+            'training_program_id',
+        )->withTimestamps();
     }
 }

@@ -96,6 +96,40 @@ function formatSpanishDate(date: string | null): string {
 }
 
 // Contiene toda la lógica de la vista:
+function daysFromToday(date: string | null): number | null {
+    if (!date) {
+        return null;
+    }
+
+    const today = new Date();
+    const target = new Date(date);
+    const utcToday = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
+    const utcTarget = Date.UTC(target.getFullYear(), target.getMonth(), target.getDate());
+
+    return Math.floor((utcTarget - utcToday) / (1000 * 60 * 60 * 24));
+}
+
+function centerStatusDetail(center: CenterRow): string {
+    const expiresInDays = daysFromToday(center.latest_agreement?.expires_at ?? null);
+    const startsInDays = daysFromToday(center.latest_agreement?.signed_at ?? null);
+
+    if (center.status === 'not_started' && startsInDays !== null) {
+        return startsInDays <= 0 ? 'Comienza hoy' : `Comienza en ${startsInDays} días`;
+    }
+
+    if (center.status === 'expired' && expiresInDays !== null) {
+        const elapsed = Math.abs(expiresInDays);
+
+        return elapsed === 0 ? 'Caducado hoy' : `Caducado hace ${elapsed} días`;
+    }
+
+    if ((center.status === 'renewal_soon' || center.status === 'valid') && expiresInDays !== null) {
+        return expiresInDays <= 0 ? 'Vence hoy' : `Vence en ${expiresInDays} días`;
+    }
+
+    return '-';
+}
+
 export default function EducationCenters({ centers, filters }: Props) {
     const page = usePage<{ flash?: { success?: string; error?: string } }>();
     const lastFlashRef = useRef<string | null>(null);
@@ -326,53 +360,53 @@ export default function EducationCenters({ centers, filters }: Props) {
                     </form>
 
                     <div className={UI_PRESETS.tableContainer}>
-                        <table className="w-full min-w-[980px] text-sm">
+                        <table className="w-full min-w-[920px] table-fixed text-sm">
+                            <colgroup>
+                                <col className="w-[30%]" />
+                                <col className="w-[25%]" />
+                                <col className="w-[20%]" />
+                                <col className="w-[25%]" />
+                            </colgroup>
                             <thead className={UI_PRESETS.tableHead}>
                                 <tr>
-                                    <th className="w-40 px-4 py-3 text-center font-semibold">Centro</th>
-                                    <th className="w-40 px-4 py-3 text-center font-semibold">Contacto</th>
-                                    <th className="w-40 px-4 py-3 text-center font-semibold">Convenio</th>
-                                    <th className="w-40 px-4 py-3 text-center font-semibold">Estado</th>
-                                    <th className="w-40 px-4 py-3 text-center font-semibold">Acciones</th>
+                                    <th className="px-4 py-3 text-center font-semibold">Centro</th>
+                                    <th className="px-4 py-3 text-center font-semibold">Convenio</th>
+                                    <th className="px-4 py-3 text-center font-semibold">Estado</th>
+                                    <th className="px-4 py-3 text-center font-semibold">Acciones</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {hasRows ? (
                                     centers.data.map((center, index) => (
-                                        <tr key={center.id} className={`border-t align-middle ${stripedRowClass(index)}`}>
-                                            <td className={`${UI_PRESETS.tableCellCentered} w-40`}>
-                                                <div
-                                                    className="cursor-pointer"
+                                        <tr key={center.id} className={`h-24 border-t align-middle ${stripedRowClass(index)}`}>
+                                            <td className={`${UI_PRESETS.tableCellCentered} align-middle`}>
+                                                <button
+                                                    type="button"
+                                                    className="inline-flex cursor-pointer items-center gap-1.5 font-semibold"
                                                     onClick={() =>
                                                         copyToClipboard(
                                                             [center.name, center.institutional_email, center.phone].filter(Boolean).join('\n'),
                                                             'Datos del centro',
                                                         )
                                                     }
-                                                    title="Haz clic para copiar los datos del centro"
+                                                    title="Copiar datos del centro"
+                                                    aria-label="Copiar datos del centro"
                                                 >
-                                                    <p className="inline-flex items-center gap-1.5 font-semibold">
-                                                        {center.name}
-                                                        <Copy className="size-3.5 text-muted-foreground" />
-                                                    </p>
-                                                    <p className="text-sm font-medium text-muted-foreground">
-                                                        {center.institutional_email}
-                                                    </p>
-                                                    <p className="text-muted-foreground">{center.phone}</p>
-                                                </div>
+                                                    <span>{center.name}</span>
+                                                    <Copy className="size-3 text-muted-foreground" />
+                                                </button>
+                                                <p className="mt-1 text-xs font-medium text-muted-foreground">
+                                                    {center.institutional_email}
+                                                </p>
+                                                <p className="text-[11px] text-muted-foreground">
+                                                    {center.phone}
+                                                </p>
                                             </td>
-                                            <td className={`${UI_PRESETS.tableCellCentered} w-40`}>
-                                                <p className="font-semibold">{center.contact_name}</p>
-                                                <p className="text-muted-foreground">{center.contact_position}</p>
-                                            </td>
-                                            <td className={`${UI_PRESETS.tableCellCentered} w-40`}>
+                                            <td className={`${UI_PRESETS.tableCellCentered} align-middle`}>
                                                 {center.latest_agreement ? (
                                                     <>
-                                                        <p className="text-xs font-semibold text-muted-foreground">
-                                                            Firma: {formatSpanishDate(center.latest_agreement.signed_at)}
-                                                        </p>
-                                                        <p className="text-xs font-semibold text-muted-foreground">
-                                                            Vence: {formatSpanishDate(center.latest_agreement.expires_at)}
+                                                        <p className="text-sm font-semibold">
+                                                            Vence {formatSpanishDate(center.latest_agreement.expires_at)}
                                                         </p>
                                                         <p className="text-xs font-semibold text-muted-foreground">
                                                             Plazas: {center.latest_agreement.agreed_slots ?? '-'}
@@ -382,12 +416,15 @@ export default function EducationCenters({ centers, filters }: Props) {
                                                     <p className="text-muted-foreground">Sin convenio registrado</p>
                                                 )}
                                             </td>
-                                            <td className={`${UI_PRESETS.tableCellCentered} w-40`}>
+                                            <td className={`${UI_PRESETS.tableCellCentered} align-middle`}>
                                                 <span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold uppercase ${CENTER_STATUS_META[center.status].badgeClass}`}>
                                                     {CENTER_STATUS_META[center.status].label}
                                                 </span>
+                                                <p className="mt-1 text-[11px] text-muted-foreground">
+                                                    {centerStatusDetail(center)}
+                                                </p>
                                             </td>
-                                            <td className={`${UI_PRESETS.tableCellCentered} w-40`}>
+                                            <td className={`${UI_PRESETS.tableCellCentered} align-middle`}>
                                                 <div className="flex justify-center gap-2">
                                                     {center.address && (
                                                         <Button
@@ -446,7 +483,7 @@ export default function EducationCenters({ centers, filters }: Props) {
                                     ))
                                 ) : (
                                     <tr>
-                                        <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
+                                        <td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">
                                             No hay centros para mostrar con el filtro actual.
                                         </td>
                                     </tr>
@@ -506,4 +543,3 @@ export default function EducationCenters({ centers, filters }: Props) {
         </AppLayout>
     );
 }
-

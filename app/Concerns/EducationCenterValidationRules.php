@@ -12,6 +12,8 @@ trait EducationCenterValidationRules
             'name' => ['required', 'string', 'max:255'],
             'address' => ['required', 'string', 'max:500'],
             'phone' => ['required', 'string', 'max:50'],
+            'training_program_ids' => ['required', 'array', 'min:1'],
+            'training_program_ids.*' => ['integer', Rule::exists('training_programs', 'id')],
             'institutional_email' => [
                 'required',
                 'email:rfc',
@@ -41,6 +43,9 @@ trait EducationCenterValidationRules
     {
         return [
             'institutional_email.unique' => 'Ya existe un centro con ese email.',
+            'training_program_ids.required' => 'Selecciona al menos un grado formativo.',
+            'training_program_ids.min' => 'Selecciona al menos un grado formativo.',
+            'training_program_ids.*.exists' => 'Uno de los grados seleccionados no es valido.',
             'agreement_expires_at.after_or_equal' => 'La fecha de vencimiento debe ser igual o posterior a la fecha de firma.',
             'agreement_agreed_slots.min' => 'Las plazas acordadas deben ser al menos 1.',
             'agreement_pdf.mimes' => 'El documento del convenio debe ser un archivo PDF.',

@@ -1,4 +1,4 @@
-export type CenterStatus = 'valid' | 'renewal_soon' | 'expired';
+export type CenterStatus = 'valid' | 'not_started' | 'renewal_soon' | 'expired';
 
 type CenterStatusMeta = {
     label: string;
@@ -9,12 +9,17 @@ type CenterStatusMeta = {
 export const CENTER_STATUS_META: Record<CenterStatus, CenterStatusMeta> = {
     valid: {
         label: 'Vigente',
-        filterLabel: 'Convenio Vigente',
+        filterLabel: 'Convenio vigente',
         badgeClass: 'bg-emerald-100 text-emerald-700 ring-1 ring-emerald-300',
     },
+    not_started: {
+        label: 'Aun no vigente',
+        filterLabel: 'Aun no vigente',
+        badgeClass: 'bg-violet-100 text-violet-700 ring-1 ring-violet-300',
+    },
     renewal_soon: {
-        label: 'Renovación próxima',
-        filterLabel: 'Renovación próxima',
+        label: 'Renovacion proxima',
+        filterLabel: 'Renovacion proxima',
         badgeClass: 'bg-amber-100 text-amber-700 ring-1 ring-amber-300',
     },
     expired: {
@@ -25,8 +30,9 @@ export const CENTER_STATUS_META: Record<CenterStatus, CenterStatusMeta> = {
 };
 
 export const CENTER_STATUS_OPTIONS = [
-    { value: 'all', label: 'Todos los centros'},
+    { value: 'all', label: 'Todos los centros' },
     { value: 'valid', label: CENTER_STATUS_META.valid.filterLabel },
+    { value: 'not_started', label: CENTER_STATUS_META.not_started.filterLabel },
     { value: 'renewal_soon', label: CENTER_STATUS_META.renewal_soon.filterLabel },
     { value: 'expired', label: CENTER_STATUS_META.expired.filterLabel },
 ] as const;

@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\EducationCenterController;
 use App\Http\Controllers\InternController;
+use App\Http\Controllers\PracticeTaskController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use Laravel\Fortify\Features;
@@ -92,9 +93,33 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         // Rutas para el módulo de prácticas y tareas:
 
-    Route::inertia('practice-tasks', 'practice-tasks')
+    Route::get('practice-tasks', [PracticeTaskController::class, 'index'])
+        ->middleware('permission:practice-tasks.view')
         ->name('practice-tasks.index');
+
+    Route::get('practice-tasks/create', [PracticeTaskController::class, 'create'])
+        ->middleware('permission:practice-tasks.create')
+        ->name('practice-tasks.create');
+    
+    Route::post('practice-tasks', [PracticeTaskController::class, 'store'])
+        ->middleware('permission:practice-tasks.create')
+        ->name('practice-tasks.store');
+
+    Route::get('practice-tasks/{practice_task}/edit', [PracticeTaskController::class, 'edit'])
+        ->middleware('permission:practice-tasks.update')
+        ->name('practice-tasks.edit');
+
+    Route::match(['put', 'patch'], 'practice-tasks/{practice_task}', [PracticeTaskController::class, 'update'])
+        ->middleware('permission:practice-tasks.update')
+        ->name('practice-tasks.update');
+
+    Route::patch('practice-tasks/{practice_task}/status', [PracticeTaskController::class, 'updateStatus'])
+        ->middleware('permission:practice-tasks.update')
+        ->name('practice-tasks.update-status');
+
+    Route::delete('practice-tasks/{practice_task}', [PracticeTaskController::class, 'destroy'])
+        ->middleware('permission:practice-tasks.delete')
+        ->name('practice-tasks.destroy');
 });
 
 require __DIR__.'/settings.php';
-

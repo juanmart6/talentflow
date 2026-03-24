@@ -1,12 +1,13 @@
-import { Form, Head, Link, usePage } from '@inertiajs/react';
+﻿import { Form, Head, Link, usePage } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
-import { FieldLabel, SectionIntro } from '@/components/form-ui';
+import { FieldLabel, FormPageHeader, SectionIntro } from '@/components/form-ui';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { UI_PRESETS, stripedRowClass } from '@/lib/ui-presets';
 import AppLayout from '@/layouts/app-layout';
 import educationCenters from '@/routes/education-centers';
+import interns from '@/routes/interns';
 import { toast } from 'sonner';
 import type { BreadcrumbItem } from '@/types';
 
@@ -21,6 +22,7 @@ type CenterFormData = {
     contact_position?: string;
     contact_phone?: string;
     contact_email?: string;
+    training_program_ids?: number[];
     agreement_signed_at?: string | null;
     agreement_expires_at?: string | null;
     agreement_agreed_slots?: number | null;
@@ -34,7 +36,8 @@ type InternHistoryItem = {
     dni_nie: string;
     email: string;
     phone: string;
-    status: 'active' | 'finished' | 'abandoned' | string;
+    training_program_name?: string | null;
+    status: 'active' | 'upcoming_active' | 'finished' | 'abandoned' | string;
     internship_start_date: string | null;
     internship_end_date: string | null;
     deleted_at: string | null;
@@ -54,6 +57,7 @@ type AgreementHistoryItem = {
 type Props = {
     mode: 'create' | 'edit' | 'show';
     center: CenterFormData | null;
+    trainingPrograms: Array<{ id: number; name: string }>;
     agreementHistory?: AgreementHistoryItem[];
     internsHistory?: InternHistoryItem[];
 };
@@ -67,10 +71,20 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 function internStatusLabel(status: string): string {
     if (status === 'active') return 'Activo';
+    if (status === 'upcoming_active') return 'Activo proximamente';
     if (status === 'finished') return 'Finalizado';
     if (status === 'abandoned') return 'Abandonado';
 
     return status;
+}
+
+function internStatusBadgeClass(status: string): string {
+    if (status === 'active') return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-200';
+    if (status === 'upcoming_active') return 'bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-200';
+    if (status === 'finished') return 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-200';
+    if (status === 'abandoned') return 'bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-200';
+
+    return 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-200';
 }
 
 function formatSpanishDate(date: string | null): string {
@@ -127,7 +141,7 @@ function FileUploadField({ id, name, label, accept, error, required, selectedFil
     );
 }
 
-export default function EducationCenterForm({ mode, center, agreementHistory = [], internsHistory = [] }: Props) {
+export default function EducationCenterForm({ mode, center, trainingPrograms, agreementHistory = [], internsHistory = [] }: Props) {
     const isCreate = mode === 'create';
     const isReadOnly = mode === 'show';
     const page = usePage<{ flash?: { success?: string; error?: string } }>();
@@ -161,36 +175,30 @@ export default function EducationCenterForm({ mode, center, agreementHistory = [
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={isCreate ? 'Nuevo Centro Educativo' : isReadOnly ? 'Ver Centro Educativo' : 'Editar Centro Educativo'} />
 
-            <div className="flex h-full flex-1 flex-col gap-6 overflow-x-auto rounded-xl p-6">
-                <div className="w-full max-w-5xl mx-auto">
-                    <div className="flex flex-col gap-6">
-                        {isCreate && (
-                            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                                <div className="flex flex-col gap-3">
-                                    <h1 className="text-2xl font-bold">Nuevo Centro Educativo</h1>
-                                    <p className="text-sm text-muted-foreground">
-                                        Completa la información del centro, contacto y convenio principal.
-                                    </p>
-                                </div>
-
-                                <Button variant="secondary" asChild>
-                                    <Link href={educationCenters.index().url}>Volver al listado</Link>
-                                </Button>
-                            </div>
+            <div className={UI_PRESETS.pageContent}>
+                <div className={UI_PRESETS.pageSection}>
+                    <FormPageHeader
+                        title={isCreate ? 'Nuevo Centro Educativo' : isReadOnly ? 'Ver Centro Educativo' : 'Editar Centro Educativo'}
+                        description="Completa la información del centro, contacto y convenio principal."
+                        action={(
+                            <Button variant="secondary" asChild>
+                                <Link href={educationCenters.index().url}>Volver al listado</Link>
+                            </Button>
                         )}
+                    />
 
-                        <Form
-                            {...formRoute}
-                            options={{ preserveScroll: true }}
-                            className="space-y-6"
-                            encType="multipart/form-data"
-                        >
-                            {({ processing, errors }) => (
-                                <>
-                                    <fieldset
-                                        disabled={isReadOnly}
-                                        className={`space-y-6 ${isReadOnly ? UI_PRESETS.readOnlyFieldset : ''}`}
-                                    >
+                    <Form
+                        {...formRoute}
+                        options={{ preserveScroll: true }}
+                        className="space-y-2"
+                        encType="multipart/form-data"
+                    >
+                        {({ processing, errors }) => (
+                            <>
+                                <fieldset
+                                    disabled={isReadOnly}
+                                    className={`space-y-2 ${isReadOnly ? UI_PRESETS.readOnlyFieldset : ''}`}
+                                >
                                         <section className={UI_PRESETS.sectionCard}>
                                             <SectionIntro
                                                 title="Datos del centro"
@@ -200,19 +208,19 @@ export default function EducationCenterForm({ mode, center, agreementHistory = [
                                             <div className="grid gap-4 md:grid-cols-2">
                                                 <div className="grid gap-2 md:col-span-2">
                                                     <FieldLabel htmlFor="name">Nombre</FieldLabel>
-                                                    <Input id="name" name="name" defaultValue={center?.name ?? ''} required />
+                                                    <Input id="name" name="name" defaultValue={center?.name ?? ''} className={UI_PRESETS.simpleSearchInput} required />
                                                     <InputError message={errors.name} />
                                                 </div>
 
                                                 <div className="grid gap-2 md:col-span-2">
                                                     <FieldLabel htmlFor="address">Dirección</FieldLabel>
-                                                    <Input id="address" name="address" defaultValue={center?.address ?? ''} required />
+                                                    <Input id="address" name="address" defaultValue={center?.address ?? ''} className={UI_PRESETS.simpleSearchInput} required />
                                                     <InputError message={errors.address} />
                                                 </div>
 
                                                 <div className="grid gap-2">
                                                     <FieldLabel htmlFor="phone">Teléfono</FieldLabel>
-                                                    <Input id="phone" name="phone" defaultValue={center?.phone ?? ''} required />
+                                                    <Input id="phone" name="phone" defaultValue={center?.phone ?? ''} className={UI_PRESETS.simpleSearchInput} required />
                                                     <InputError message={errors.phone} />
                                                 </div>
 
@@ -223,6 +231,7 @@ export default function EducationCenterForm({ mode, center, agreementHistory = [
                                                         type="email"
                                                         name="institutional_email"
                                                         defaultValue={center?.institutional_email ?? ''}
+                                                        className={UI_PRESETS.simpleSearchInput}
                                                         required
                                                     />
                                                     <InputError message={errors.institutional_email} />
@@ -230,8 +239,43 @@ export default function EducationCenterForm({ mode, center, agreementHistory = [
 
                                                 <div className="grid gap-2 md:col-span-2">
                                                     <FieldLabel htmlFor="website">Web (opcional)</FieldLabel>
-                                                    <Input id="website" name="website" defaultValue={center?.website ?? ''} />
+                                                    <Input id="website" name="website" defaultValue={center?.website ?? ''} className={UI_PRESETS.simpleSearchInput} />
                                                     <InputError message={errors.website} />
+                                                </div>
+
+                                                <div className="grid gap-2 md:col-span-2">
+                                                    <FieldLabel htmlFor="training-programs-group">Grados formativos</FieldLabel>
+                                                    <div
+                                                        id="training-programs-group"
+                                                        className={`grid gap-2 rounded-xl border border-slate-200 p-3 dark:border-slate-700 md:grid-cols-2 ${
+                                                            isReadOnly
+                                                                ? 'bg-slate-100/90 dark:bg-slate-900/45'
+                                                                : 'bg-white dark:bg-slate-950'
+                                                        }`}
+                                                    >
+                                                        {trainingPrograms.map((program) => (
+                                                            <label
+                                                                key={program.id}
+                                                                htmlFor={`training_program_${program.id}`}
+                                                                className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm ${
+                                                                    isReadOnly
+                                                                        ? 'border-slate-200 bg-slate-100/90 dark:border-slate-700 dark:bg-slate-900/45'
+                                                                        : 'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-950'
+                                                                }`}
+                                                            >
+                                                                <input
+                                                                    id={`training_program_${program.id}`}
+                                                                    type="checkbox"
+                                                                    name="training_program_ids[]"
+                                                                    value={program.id}
+                                                                    defaultChecked={center?.training_program_ids?.includes(program.id) ?? false}
+                                                                    className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary/30 disabled:cursor-default disabled:opacity-100"
+                                                                />
+                                                                <span>{program.name}</span>
+                                                            </label>
+                                                        ))}
+                                                    </div>
+                                                    <InputError message={errors.training_program_ids ?? errors['training_program_ids.0']} />
                                                 </div>
                                             </div>
                                         </section>
@@ -249,6 +293,7 @@ export default function EducationCenterForm({ mode, center, agreementHistory = [
                                                         id="contact_name"
                                                         name="contact_name"
                                                         defaultValue={center?.contact_name ?? ''}
+                                                        className={UI_PRESETS.simpleSearchInput}
                                                         required
                                                     />
                                                     <InputError message={errors.contact_name} />
@@ -260,6 +305,7 @@ export default function EducationCenterForm({ mode, center, agreementHistory = [
                                                         id="contact_position"
                                                         name="contact_position"
                                                         defaultValue={center?.contact_position ?? ''}
+                                                        className={UI_PRESETS.simpleSearchInput}
                                                         required
                                                     />
                                                     <InputError message={errors.contact_position} />
@@ -271,6 +317,7 @@ export default function EducationCenterForm({ mode, center, agreementHistory = [
                                                         id="contact_phone"
                                                         name="contact_phone"
                                                         defaultValue={center?.contact_phone ?? ''}
+                                                        className={UI_PRESETS.simpleSearchInput}
                                                         required
                                                     />
                                                     <InputError message={errors.contact_phone} />
@@ -283,6 +330,7 @@ export default function EducationCenterForm({ mode, center, agreementHistory = [
                                                         type="email"
                                                         name="contact_email"
                                                         defaultValue={center?.contact_email ?? ''}
+                                                        className={UI_PRESETS.simpleSearchInput}
                                                         required
                                                     />
                                                     <InputError message={errors.contact_email} />
@@ -305,6 +353,7 @@ export default function EducationCenterForm({ mode, center, agreementHistory = [
                                                             type="date"
                                                             name="agreement_signed_at"
                                                             defaultValue={center?.agreement_signed_at ?? ''}
+                                                            className={UI_PRESETS.simpleSearchInput}
                                                             required
                                                         />
                                                         <InputError message={errors.agreement_signed_at} />
@@ -317,6 +366,7 @@ export default function EducationCenterForm({ mode, center, agreementHistory = [
                                                             type="date"
                                                             name="agreement_expires_at"
                                                             defaultValue={center?.agreement_expires_at ?? ''}
+                                                            className={UI_PRESETS.simpleSearchInput}
                                                             required
                                                         />
                                                         <InputError message={errors.agreement_expires_at} />
@@ -330,6 +380,7 @@ export default function EducationCenterForm({ mode, center, agreementHistory = [
                                                             min={1}
                                                             name="agreement_agreed_slots"
                                                             defaultValue={center?.agreement_agreed_slots ?? 1}
+                                                            className={UI_PRESETS.simpleSearchInput}
                                                             required
                                                         />
                                                         <InputError message={errors.agreement_agreed_slots} />
@@ -405,36 +456,46 @@ export default function EducationCenterForm({ mode, center, agreementHistory = [
                                                 </p>
                                             ) : (
                                                 <div className="relative w-full overflow-x-auto rounded-lg border border-sidebar-border/70 dark:border-sidebar-border">
-                                                    <table className="w-full min-w-[980px] text-sm">
+                                                    <table className="w-full min-w-[920px] table-fixed text-sm">
+                                                        <colgroup>
+                                                            <col className="w-1/4" />
+                                                            <col className="w-1/4" />
+                                                            <col className="w-1/4" />
+                                                            <col className="w-1/4" />
+                                                        </colgroup>
                                                         <thead className={UI_PRESETS.tableHead}>
                                                             <tr>
                                                                 <th className="px-4 py-3 text-center font-semibold">Becario</th>
-                                                                <th className="px-4 py-3 text-center font-semibold">Contacto</th>
+                                                                <th className="px-4 py-3 text-center font-semibold">Ciclo formativo</th>
                                                                 <th className="px-4 py-3 text-center font-semibold">Período</th>
                                                                 <th className="px-4 py-3 text-center font-semibold">Estado</th>
                                                             </tr>
                                                         </thead>
                                                         <tbody>
                                                             {internsHistory.map((intern, index) => (
-                                                                <tr key={intern.id} className={`border-t align-middle ${stripedRowClass(index)}`}>
-                                                                    <td className="px-4 py-3 text-center">
-                                                                        <p className="font-semibold">
+                                                                <tr key={intern.id} className={`h-20 border-t align-middle ${stripedRowClass(index)}`}>
+                                                                    <td className="px-4 py-3 text-center align-middle">
+                                                                        <Link
+                                                                            href={interns.show(intern.id).url}
+                                                                            className="font-semibold leading-tight text-primary underline-offset-2 hover:underline"
+                                                                        >
                                                                             {intern.first_name} {intern.last_name}
-                                                                        </p>
-                                                                        <p className="text-muted-foreground">{intern.dni_nie}</p>
+                                                                        </Link>
+                                                                        <p className="mt-1 text-xs text-muted-foreground">{intern.dni_nie}</p>
                                                                     </td>
-                                                                    <td className="px-4 py-3 text-center">
-                                                                        <p className="font-medium">{intern.email}</p>
-                                                                        <p className="text-muted-foreground">{intern.phone}</p>
+                                                                    <td className="px-4 py-3 text-center align-middle">
+                                                                        <p className="font-medium leading-tight">{intern.training_program_name ?? '-'}</p>
                                                                     </td>
-                                                                    <td className="px-4 py-3 text-center">
-                                                                        <p className="text-xs font-semibold text-muted-foreground">Inicio: {intern.internship_start_date ?? '-'}</p>
-                                                                        <p className="text-xs font-semibold text-muted-foreground">Fin: {intern.internship_end_date ?? '-'}</p>
+                                                                    <td className="px-4 py-3 text-center align-middle">
+                                                                        <p className="text-xs font-semibold text-muted-foreground">Inicio: {formatSpanishDate(intern.internship_start_date)}</p>
+                                                                        <p className="mt-1 text-xs font-semibold text-muted-foreground">Fin: {formatSpanishDate(intern.internship_end_date)}</p>
                                                                     </td>
-                                                                    <td className="px-4 py-3 text-center">
-                                                                        <p className="font-semibold">{internStatusLabel(intern.status)}</p>
+                                                                    <td className="px-4 py-3 text-center align-middle">
+                                                                        <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${internStatusBadgeClass(intern.status)}`}>
+                                                                            {internStatusLabel(intern.status)}
+                                                                        </span>
                                                                         {intern.deleted_at && (
-                                                                            <p className="text-xs text-muted-foreground">Eliminado del sistema</p>
+                                                                            <p className="mt-1 text-xs text-muted-foreground">Eliminado del sistema</p>
                                                                         )}
                                                                     </td>
                                                                 </tr>
@@ -465,7 +526,6 @@ export default function EducationCenterForm({ mode, center, agreementHistory = [
                                 </>
                             )}
                         </Form>
-                    </div>
                 </div>
             </div>
         </AppLayout>

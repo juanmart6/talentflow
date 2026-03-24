@@ -17,49 +17,63 @@ class InternFactory extends Factory
      */
     public function definition(): array
     {
-        $startDate = $this->faker->dateTimeBetween('-8 months', '-2 months');
+        $faker = fake('es_ES');
+        $startDate = $faker->dateTimeBetween('-8 months', '-2 months');
         $endDate = (clone $startDate)->modify('+4 months');
-        $status = $this->faker->randomElement(['active', 'finished', 'abandoned']);
+        $status = $faker->boolean(12) ? 'abandoned' : 'active';
 
         $abandonmentReason = null;
         $abandonmentDate = null;
         if ($status === 'abandoned') {
-            $abandonmentReason = $this->faker->randomElement([
+            $abandonmentReason = $faker->randomElement([
                 'Motivos personales',
                 'Cambio de ciclo formativo',
                 'Incompatibilidad horaria',
                 'Baja medica prolongada',
             ]);
-            $abandonmentDate = $this->faker->dateTimeBetween($startDate, $endDate);
+            $abandonmentDate = $faker->dateTimeBetween($startDate, $endDate);
         }
 
         return [
             'education_center_id' => EducationCenter::factory(),
-            'first_name' => $this->faker->firstName(),
-            'last_name' => $this->faker->lastName(),
-            'dni_nie' => $this->faker->boolean(80)
+            'training_program_id' => null,
+            'first_name' => $faker->firstName(),
+            'last_name' => $faker->lastName(),
+            'dni_nie' => $faker->boolean(80)
                 ? $this->generateValidDni()
                 : $this->generateValidNie(),
-            'email' => $this->faker->unique()->safeEmail(),
-            'phone' => $this->faker->numerify('6########'),
-            'address_line' => $this->faker->streetAddress(),
-            'postal_code' => $this->faker->postcode(),
-            'city' => $this->faker->city(),
-            'province' => $this->faker->state(),
-            'country' => 'Espana',
-            'training_cycle' => $this->faker->randomElement([
-                'Desarrollo de Aplicaciones Web',
-                'Desarrollo de Aplicaciones Multiplataforma',
-                'Administracion de Sistemas Informaticos en Red',
-                'Marketing y Publicidad',
-                'Gestion Administrativa',
+            'email' => $faker->unique()->safeEmail(),
+            'phone' => $faker->numerify('6########'),
+            'address_line' => $faker->streetAddress(),
+            'postal_code' => $faker->numerify('#####'),
+            'city' => $faker->city(),
+            'province' => $faker->randomElement([
+                'Madrid',
+                'Barcelona',
+                'Valencia',
+                'Sevilla',
+                'Malaga',
+                'Alicante',
+                'Murcia',
+                'Vizcaya',
+                'Zaragoza',
+                'A Coruna',
             ]),
-            'academic_year' => $this->faker->randomElement(['2024-2025', '2025-2026', '2026-2027']),
-            'academic_tutor_name' => $this->faker->name(),
-            'academic_tutor_email' => $this->faker->safeEmail(),
+            'country' => 'Espana',
+            'training_cycle' => $faker->randomElement([
+                'Desarrollo de Aplicaciones Web (DAW)',
+                'Desarrollo de Aplicaciones Moviles (DAM)',
+                'Administracion de Sistemas Informaticos (ASIR)',
+                'Educacion Infantil',
+                'Higiene Bucodental',
+                'Administracion y Finanzas',
+            ]),
+            'academic_year' => $faker->randomElement(['2024-2025', '2025-2026', '2026-2027']),
+            'academic_tutor_name' => $faker->name(),
+            'academic_tutor_email' => $faker->safeEmail(),
             'internship_start_date' => $startDate,
             'internship_end_date' => $endDate,
-            'required_hours' => $this->faker->randomElement([240, 300, 320, 360, 400]),
+            'required_hours' => $faker->randomElement([240, 300, 320, 360, 400]),
             'status' => $status,
             'abandonment_reason' => $abandonmentReason,
             'abandonment_date' => $abandonmentDate,
@@ -68,7 +82,7 @@ class InternFactory extends Factory
 
     private function generateValidDni(): string
     {
-        $number = $this->faker->numberBetween(10000000, 99999999);
+        $number = fake('es_ES')->numberBetween(10000000, 99999999);
         $letters = 'TRWAGMYFPDXBNJZSQVHLCKE';
         $letter = $letters[$number % 23];
 
@@ -77,8 +91,9 @@ class InternFactory extends Factory
 
     private function generateValidNie(): string
     {
-        $prefix = $this->faker->randomElement(['X', 'Y', 'Z']);
-        $number = $this->faker->numberBetween(1000000, 9999999);
+        $faker = fake('es_ES');
+        $prefix = $faker->randomElement(['X', 'Y', 'Z']);
+        $number = $faker->numberBetween(1000000, 9999999);
 
         $prefixMap = ['X' => '0', 'Y' => '1', 'Z' => '2'];
         $dniNumber = (int) ($prefixMap[$prefix].sprintf('%07d', $number));
