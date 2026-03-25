@@ -14,6 +14,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use Throwable;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -163,7 +164,7 @@ class EducationCenterController extends Controller
             report($exception);
             return redirect()
                 ->route('education-centers.index')
-                ->with('error', 'No se pudo crear el centro educativo. Inténtalo de nuevo más tarde.');
+                ->with('error', 'No se pudo crear el centro educativo. Intentalo de nuevo mas tarde.');
         }
 
         return redirect()
@@ -328,7 +329,7 @@ class EducationCenterController extends Controller
             report($exception);
             return redirect()
                 ->route('education-centers.index')
-                ->with('error', 'No se pudo actualizar el centro educativo. Intenta de nuevo mÃ¡s tarde.');
+                ->with('error', 'No se pudo actualizar el centro educativo. Intenta de nuevo más tarde.');
         }
 
         return redirect()
@@ -396,7 +397,7 @@ class EducationCenterController extends Controller
         return match ($status) {
             'valid' => 'Vigente',
             'not_started' => 'Aun no vigente',
-            'renewal_soon' => 'Renovación próxima',
+            'renewal_soon' => 'Renovacion proxima',
             'expired' => 'Caducado',
             default => $status,
         };
@@ -442,7 +443,7 @@ class EducationCenterController extends Controller
         if ($agreementsCount <= 1) {
             return redirect()
                 ->back()
-                ->with('error', 'No se puede eliminar el único convenio del centro.');
+                ->with('error', 'No se puede eliminar el unico convenio del centro.');
         }
 
         try {
@@ -535,48 +536,20 @@ class EducationCenterController extends Controller
 
     private function normalizeSearchTerm(string $value): string
     {
-        $normalized = mb_strtolower(trim($value));
-
-        return strtr($normalized, [
-            'á' => 'a',
-            'à' => 'a',
-            'ä' => 'a',
-            'â' => 'a',
-            'é' => 'e',
-            'è' => 'e',
-            'ë' => 'e',
-            'ê' => 'e',
-            'í' => 'i',
-            'ì' => 'i',
-            'ï' => 'i',
-            'î' => 'i',
-            'ó' => 'o',
-            'ò' => 'o',
-            'ö' => 'o',
-            'ô' => 'o',
-            'ú' => 'u',
-            'ù' => 'u',
-            'ü' => 'u',
-            'û' => 'u',
-            'ñ' => 'n',
-        ]);
+        return Str::ascii(mb_strtolower(trim($value)));
     }
 
     private function normalizedSqlField(string $field): string
     {
-        return "LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE($field, 'á', 'a'), 'à', 'a'), 'ä', 'a'), 'â', 'a'), 'é', 'e'), 'è', 'e'), 'ë', 'e'), 'ê', 'e'), 'í', 'i'), 'ì', 'i'), 'ï', 'i'), 'î', 'i'), 'ó', 'o'), 'ò', 'o'), 'ö', 'o'), 'ô', 'o'), 'ú', 'u'), 'ù', 'u'), 'ü', 'u'), 'û', 'u'), 'ñ', 'n'))";
+        // Postgres: normaliza acentos sin depender de extension unaccent.
+        return "LOWER(TRANSLATE($field,"
+            ."CHR(225)||CHR(224)||CHR(228)||CHR(226)||"
+            ."CHR(233)||CHR(232)||CHR(235)||CHR(234)||"
+            ."CHR(237)||CHR(236)||CHR(239)||CHR(238)||"
+            ."CHR(243)||CHR(242)||CHR(246)||CHR(244)||"
+            ."CHR(250)||CHR(249)||CHR(252)||CHR(251)||"
+            ."CHR(241),"
+            ."'aaaaeeeeiiiioooouuuun'))";
     }
 
-    private function trainingProgramOptions(): array
-    {
-        return TrainingProgram::query()
-            ->orderBy('name')
-            ->get(['id', 'name'])
-            ->map(fn (TrainingProgram $program): array => [
-                'id' => $program->id,
-                'name' => $program->name,
-            ])
-            ->values()
-            ->all();
-    }
 }

@@ -12,6 +12,7 @@ use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Str;
 use Illuminate\Support\Facades\URL;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -171,58 +172,23 @@ class InternController extends Controller
 
     private function normalizeSearchTerm(string $value): string
     {
-        $normalized = mb_strtolower(trim($value));
-
-        return strtr($normalized, [
-            'á' => 'a',
-            'à' => 'a',
-            'ä' => 'a',
-            'â' => 'a',
-            'Á' => 'a',
-            'À' => 'a',
-            'Ä' => 'a',
-            'Â' => 'a',
-            'é' => 'e',
-            'è' => 'e',
-            'ë' => 'e',
-            'ê' => 'e',
-            'É' => 'e',
-            'È' => 'e',
-            'Ë' => 'e',
-            'Ê' => 'e',
-            'í' => 'i',
-            'ì' => 'i',
-            'ï' => 'i',
-            'î' => 'i',
-            'Í' => 'i',
-            'Ì' => 'i',
-            'Ï' => 'i',
-            'Î' => 'i',
-            'ó' => 'o',
-            'ò' => 'o',
-            'ö' => 'o',
-            'ô' => 'o',
-            'Ó' => 'o',
-            'Ò' => 'o',
-            'Ö' => 'o',
-            'Ô' => 'o',
-            'ú' => 'u',
-            'ù' => 'u',
-            'ü' => 'u',
-            'û' => 'u',
-            'Ú' => 'u',
-            'Ù' => 'u',
-            'Ü' => 'u',
-            'Û' => 'u',
-            'ñ' => 'n',
-            'Ñ' => 'n',
-        ]);
+        return Str::ascii(mb_strtolower(trim($value)));
     }
+
 
     private function normalizedSqlField(string $field): string
     {
-        return "LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE($field, 'á', 'a'), 'à', 'a'), 'ä', 'a'), 'â', 'a'), 'é', 'e'), 'è', 'e'), 'ë', 'e'), 'ê', 'e'), 'í', 'i'), 'ì', 'i'), 'ï', 'i'), 'î', 'i'), 'ó', 'o'), 'ò', 'o'), 'ö', 'o'), 'ô', 'o'), 'ú', 'u'), 'ù', 'u'), 'ü', 'u'), 'û', 'u'), 'ñ', 'n'))";
+        // Postgres: normaliza acentos sin depender de extension unaccent.
+        return "LOWER(TRANSLATE($field,"
+            ."CHR(225)||CHR(224)||CHR(228)||CHR(226)||"
+            ."CHR(233)||CHR(232)||CHR(235)||CHR(234)||"
+            ."CHR(237)||CHR(236)||CHR(239)||CHR(238)||"
+            ."CHR(243)||CHR(242)||CHR(246)||CHR(244)||"
+            ."CHR(250)||CHR(249)||CHR(252)||CHR(251)||"
+            ."CHR(241),"
+            ."'aaaaeeeeiiiioooouuuun'))";
     }
+
 
     // Aplica filtro de estado a una consulta de becarios:
     private function applyStatusFilter($query, string $status)
@@ -299,7 +265,7 @@ class InternController extends Controller
             report($exception);
 
             $errorMessage = str_contains($exception->getMessage(), 'abandonment_date')
-                ? 'Falta aplicar una migración en la base de datos (columna abandonment_date). Ejecuta php artisan migrate y vuelve a intentarlo.'
+                ? 'Falta aplicar una migracion en la base de datos (columna abandonment_date). Ejecuta php artisan migrate y vuelve a intentarlo.'
                 : 'No se pudo crear el becario. Intenta de nuevo más tarde.';
 
             return redirect()
@@ -593,4 +559,3 @@ class InternController extends Controller
         return 'active';
     }
 }
-

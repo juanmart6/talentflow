@@ -3,6 +3,7 @@
 use App\Http\Controllers\EducationCenterController;
 use App\Http\Controllers\InternController;
 use App\Http\Controllers\PracticeTaskController;
+use App\Http\Controllers\UserManagementController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use Laravel\Fortify\Features;
@@ -136,6 +137,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::delete('practice-tasks/{practice_task}', [PracticeTaskController::class, 'destroy'])
         ->middleware('permission:practice-tasks.delete')
         ->name('practice-tasks.destroy');
+
+    Route::get('autenticacion-usuarios', [UserManagementController::class, 'index'])
+        ->middleware('permission:users.manage')
+        ->name('users.index');
+
+    Route::patch('autenticacion-usuarios/{user}/role', [UserManagementController::class, 'updateRole'])
+        ->middleware('permission:users.manage')
+        ->name('users.update-role');
 });
 
 require __DIR__.'/settings.php';

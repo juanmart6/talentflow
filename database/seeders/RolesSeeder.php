@@ -31,6 +31,9 @@ class RolesSeeder extends Seeder
             'practice-tasks.create',
             'practice-tasks.update',
             'practice-tasks.delete',
+
+            // Usuarios y roles:
+            'users.manage',
         ];
 
         foreach ($permissions as $permission) {
