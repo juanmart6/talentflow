@@ -1,5 +1,6 @@
-﻿import { Form, Head, Link, usePage } from '@inertiajs/react';
+﻿import { Form, Head, Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
+import { Building2, FileText, GraduationCap, Handshake, Trash2 } from 'lucide-react';
 import { FieldLabel, FormPageHeader, SectionIntro } from '@/components/form-ui';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
@@ -22,6 +23,7 @@ type CenterFormData = {
     contact_position?: string;
     contact_phone?: string;
     contact_email?: string;
+    general_notes?: string | null;
     training_program_ids?: number[];
     agreement_signed_at?: string | null;
     agreement_expires_at?: string | null;
@@ -61,6 +63,8 @@ type Props = {
     agreementHistory?: AgreementHistoryItem[];
     internsHistory?: InternHistoryItem[];
 };
+
+type CenterFormTab = 'center' | 'agreement' | 'general' | 'history';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -147,6 +151,8 @@ export default function EducationCenterForm({ mode, center, trainingPrograms, ag
     const page = usePage<{ flash?: { success?: string; error?: string } }>();
     const lastFlashRef = useRef<string | null>(null);
     const [selectedAgreementFileName, setSelectedAgreementFileName] = useState<string | null>(null);
+    const [deletingAgreementId, setDeletingAgreementId] = useState<number | null>(null);
+    const [activeTab, setActiveTab] = useState<CenterFormTab>('center');
     const formRoute = isCreate
         ? educationCenters.store.form()
         : educationCenters.update.form(center?.id ?? 0);
@@ -170,6 +176,23 @@ export default function EducationCenterForm({ mode, center, trainingPrograms, ag
             toast.error(errorMessage);
         }
     }, [page.props.flash?.success, page.props.flash?.error]);
+
+    const handleDeleteAgreement = (agreementId: number) => {
+        if (!center?.id) {
+            return;
+        }
+
+        if (!window.confirm('¿Seguro que quieres eliminar este convenio?')) {
+            return;
+        }
+
+        setDeletingAgreementId(agreementId);
+
+        router.delete(`/education-centers/${center.id}/agreements/${agreementId}`, {
+            preserveScroll: true,
+            onFinish: () => setDeletingAgreementId(null),
+        });
+    };
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -195,11 +218,78 @@ export default function EducationCenterForm({ mode, center, trainingPrograms, ag
                     >
                         {({ processing, errors }) => (
                             <>
+                                <section className={UI_PRESETS.sectionCard}>
+                                    <div className="-mx-4 -mt-4 border-b border-sidebar-border/70 px-4 pt-4 dark:border-sidebar-border">
+                                        <div className="flex flex-wrap items-end gap-1.5">
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="sm"
+                                                className={`h-9 min-w-[118px] justify-center rounded-b-none border border-b-0 px-3 cursor-pointer ${
+                                                    activeTab === 'center'
+                                                        ? 'border-[#2563eb]/45 bg-white text-[#1d4ed8] shadow-sm hover:bg-white dark:bg-slate-950 dark:text-sky-300 dark:hover:bg-slate-950'
+                                                        : 'border-transparent text-muted-foreground hover:border-[#2563eb]/30 hover:bg-[#2563eb]/8 hover:text-[#1d4ed8] dark:hover:border-[#2563eb]/40 dark:hover:bg-[#2563eb]/15 dark:hover:text-sky-300'
+                                                }`}
+                                                onClick={() => setActiveTab('center')}
+                                            >
+                                                <Building2 className="mr-1.5 size-4 shrink-0" />
+                                                Centro
+                                            </Button>
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="sm"
+                                                className={`h-9 min-w-[118px] justify-center rounded-b-none border border-b-0 px-3 cursor-pointer ${
+                                                    activeTab === 'agreement'
+                                                        ? 'border-[#2563eb]/45 bg-white text-[#1d4ed8] shadow-sm hover:bg-white dark:bg-slate-950 dark:text-sky-300 dark:hover:bg-slate-950'
+                                                        : 'border-transparent text-muted-foreground hover:border-[#2563eb]/30 hover:bg-[#2563eb]/8 hover:text-[#1d4ed8] dark:hover:border-[#2563eb]/40 dark:hover:bg-[#2563eb]/15 dark:hover:text-sky-300'
+                                                }`}
+                                                onClick={() => setActiveTab('agreement')}
+                                            >
+                                                <Handshake className="mr-1.5 size-4 shrink-0" />
+                                                Convenio
+                                            </Button>
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="sm"
+                                                className={`h-9 min-w-[118px] justify-center rounded-b-none border border-b-0 px-3 cursor-pointer ${
+                                                    activeTab === 'general'
+                                                        ? 'border-[#2563eb]/45 bg-white text-[#1d4ed8] shadow-sm hover:bg-white dark:bg-slate-950 dark:text-sky-300 dark:hover:bg-slate-950'
+                                                        : 'border-transparent text-muted-foreground hover:border-[#2563eb]/30 hover:bg-[#2563eb]/8 hover:text-[#1d4ed8] dark:hover:border-[#2563eb]/40 dark:hover:bg-[#2563eb]/15 dark:hover:text-sky-300'
+                                                }`}
+                                                onClick={() => setActiveTab('general')}
+                                            >
+                                                <FileText className="mr-1.5 size-4 shrink-0" />
+                                                Notas
+                                            </Button>
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => isReadOnly && setActiveTab('history')}
+                                                disabled={!isReadOnly}
+                                                className={`h-9 min-w-[118px] justify-center rounded-b-none border border-b-0 px-3 ${
+                                                    !isReadOnly
+                                                        ? 'cursor-not-allowed border-transparent text-muted-foreground/60'
+                                                        : activeTab === 'history'
+                                                            ? 'cursor-pointer border-[#2563eb]/45 bg-white text-[#1d4ed8] shadow-sm hover:bg-white dark:bg-slate-950 dark:text-sky-300 dark:hover:bg-slate-950'
+                                                            : 'cursor-pointer border-transparent text-muted-foreground hover:border-[#2563eb]/30 hover:bg-[#2563eb]/8 hover:text-[#1d4ed8] dark:hover:border-[#2563eb]/40 dark:hover:bg-[#2563eb]/15 dark:hover:text-sky-300'
+                                                }`}
+                                            >
+                                                <GraduationCap className="mr-1.5 size-4 shrink-0" />
+                                                Alumnos
+                                            </Button>
+                                        </div>
+                                    </div>
+
                                 <fieldset
                                     disabled={isReadOnly}
-                                    className={`space-y-2 ${isReadOnly ? UI_PRESETS.readOnlyFieldset : ''}`}
+                                    className={`space-y-4 ${isReadOnly ? UI_PRESETS.readOnlyFieldset : ''}`}
                                 >
-                                        <section className={UI_PRESETS.sectionCard}>
+
+                                        {activeTab === 'center' && (
+                                        <section className="space-y-4 pt-4">
                                             <SectionIntro
                                                 title="Datos del centro"
                                                 description="Información principal del centro educativo y sus canales de contacto."
@@ -279,8 +369,10 @@ export default function EducationCenterForm({ mode, center, trainingPrograms, ag
                                                 </div>
                                             </div>
                                         </section>
+                                        )}
 
-                                        <section className={UI_PRESETS.sectionCard}>
+                                        {activeTab === 'center' && (
+                                        <section className="space-y-4">
                                             <SectionIntro
                                                 title="Persona de contacto"
                                                 description="Responsable de coordinación entre el centro y la organización."
@@ -337,8 +429,10 @@ export default function EducationCenterForm({ mode, center, trainingPrograms, ag
                                                 </div>
                                             </div>
                                         </section>
+                                        )}
 
-                                        <section className={UI_PRESETS.sectionCard}>
+                                        {activeTab === 'agreement' && (
+                                        <section className="space-y-4 pt-4">
                                             <SectionIntro
                                                 title="Convenio de colaboración"
                                                 description="Fechas, plazas acordadas y documento principal del convenio."
@@ -410,10 +504,35 @@ export default function EducationCenterForm({ mode, center, trainingPrograms, ag
                                                         {agreementHistory.map((agreement) => (
                                                             <article
                                                                 key={agreement.id}
-                                                                className="rounded-lg border border-sidebar-border/70 bg-slate-50/60 p-3 dark:border-sidebar-border dark:bg-slate-900/30"
+                                                                className={`rounded-lg border p-3 ${
+                                                                    isReadOnly
+                                                                        ? 'border-slate-200 bg-slate-100/90 dark:border-slate-700 dark:bg-slate-900/45'
+                                                                        : 'border-sidebar-border/70 bg-slate-50/60 dark:border-sidebar-border dark:bg-slate-900/30'
+                                                                }`}
                                                             >
-                                                                <div className="flex flex-wrap items-center gap-2">
-                                                                    <span className="font-medium">{agreement.filename}</span>
+                                                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span className="font-medium">{agreement.filename}</span>
+                                                                        {agreement.is_current && (
+                                                                            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase text-emerald-700 dark:bg-emerald-900/35 dark:text-emerald-200">
+                                                                                Vigente
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                    {!isReadOnly && (
+                                                                        <Button
+                                                                            type="button"
+                                                                            variant="outline"
+                                                                            size="icon"
+                                                                            className={`${UI_PRESETS.iconActionButtonDanger} disabled:cursor-not-allowed`}
+                                                                            disabled={deletingAgreementId === agreement.id}
+                                                                            onClick={() => handleDeleteAgreement(agreement.id)}
+                                                                            aria-label="Eliminar convenio"
+                                                                            title="Eliminar convenio"
+                                                                        >
+                                                                            {deletingAgreementId === agreement.id ? '...' : <Trash2 />}
+                                                                        </Button>
+                                                                    )}
                                                                 </div>
 
                                                                 <div className="mt-2 grid gap-1 text-sm text-muted-foreground">
@@ -441,9 +560,33 @@ export default function EducationCenterForm({ mode, center, trainingPrograms, ag
                                                 </div>
                                             )}
                                         </section>
-                                    </fieldset>
+                                        )}
 
-                                    {isReadOnly && (
+                                        {activeTab === 'general' && (
+                                        <section className="space-y-4 pt-4">
+                                        <SectionIntro
+                                            title="Información general"
+                                            description="Notas internas y contexto adicional del centro educativo."
+                                        />
+
+                                        <div className="grid gap-2">
+                                            <FieldLabel htmlFor="general_notes">Notas</FieldLabel>
+                                            <textarea
+                                                id="general_notes"
+                                                name="general_notes"
+                                                defaultValue={center?.general_notes ?? ''}
+                                                className={`min-h-[140px] w-full resize-y rounded-md border border-slate-300 px-3 py-2.5 text-sm leading-relaxed shadow-xs transition-colors focus:border-[#2563eb] focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20 dark:border-slate-600 ${isReadOnly ? 'bg-slate-100/90 dark:bg-slate-900/45' : 'bg-white dark:bg-slate-950'}`}
+                                                placeholder="Añade información relevante del centro..."
+                                                readOnly={isReadOnly}
+                                            />
+                                            <InputError message={errors.general_notes} />
+                                        </div>
+                                        </section>
+                                        )}
+                                    </fieldset>
+                                </section>
+
+                                    {isReadOnly && activeTab === 'history' && (
                                         <section className={UI_PRESETS.sectionCard}>
                                             <div className="flex items-center justify-between gap-2">
                                                 <h2 className="text-lg font-bold">Histórico de becarios por centro</h2>
@@ -491,7 +634,7 @@ export default function EducationCenterForm({ mode, center, trainingPrograms, ag
                                                                         <p className="mt-1 text-xs font-semibold text-muted-foreground">Fin: {formatSpanishDate(intern.internship_end_date)}</p>
                                                                     </td>
                                                                     <td className="px-4 py-3 text-center align-middle">
-                                                                        <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${internStatusBadgeClass(intern.status)}`}>
+                                                                        <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold uppercase ${internStatusBadgeClass(intern.status)}`}>
                                                                             {internStatusLabel(intern.status)}
                                                                         </span>
                                                                         {intern.deleted_at && (
@@ -514,7 +657,7 @@ export default function EducationCenterForm({ mode, center, trainingPrograms, ag
                                             </Button>
                                         ) : (
                                             <>
-                                                <Button disabled={processing}>
+                                                <Button className="cursor-pointer disabled:cursor-not-allowed" disabled={processing}>
                                                     {processing ? 'Guardando...' : 'Guardar'}
                                                 </Button>
                                                 <Button type="button" variant="secondary" asChild>
@@ -531,4 +674,6 @@ export default function EducationCenterForm({ mode, center, trainingPrograms, ag
         </AppLayout>
     );
 }
+
+
 

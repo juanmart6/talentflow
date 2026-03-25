@@ -43,6 +43,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->middleware('permission:education-centers.update')
         ->name('education-centers.update');
 
+    Route::delete('education-centers/{education_center}/agreements/{agreement}', [EducationCenterController::class, 'destroyAgreement'])
+        ->middleware('permission:education-centers.update')
+        ->name('education-centers.agreements.destroy');
+
     Route::delete('education-centers/{education_center}', [EducationCenterController::class, 'destroy'])
         ->middleware('permission:education-centers.delete')
         ->name('education-centers.destroy');
@@ -116,6 +120,18 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::patch('practice-tasks/{practice_task}/status', [PracticeTaskController::class, 'updateStatus'])
         ->middleware('permission:practice-tasks.update')
         ->name('practice-tasks.update-status');
+
+    Route::post('practice-tasks/{practice_task}/messages', [PracticeTaskController::class, 'storeMessage'])
+        ->middleware('permission:practice-tasks.update')
+        ->name('practice-tasks.messages.store');
+
+    Route::post('practice-tasks/{practice_task}/attachments', [PracticeTaskController::class, 'storeTaskAttachment'])
+        ->middleware('permission:practice-tasks.update')
+        ->name('practice-tasks.attachments.store');
+
+    Route::delete('practice-tasks/{practice_task}/attachments/{practice_task_attachment}', [PracticeTaskController::class, 'destroyTaskAttachment'])
+        ->middleware('permission:practice-tasks.update')
+        ->name('practice-tasks.attachments.destroy');
 
     Route::delete('practice-tasks/{practice_task}', [PracticeTaskController::class, 'destroy'])
         ->middleware('permission:practice-tasks.delete')

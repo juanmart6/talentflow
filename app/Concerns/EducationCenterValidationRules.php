@@ -26,6 +26,7 @@ trait EducationCenterValidationRules
             'contact_position' => ['required', 'string', 'max:255'],
             'contact_phone' => ['required', 'string', 'max:50'],
             'contact_email' => ['required', 'email:rfc', 'max:255'],
+            'general_notes' => ['nullable', 'string', 'max:5000'],
 
             'agreement_signed_at' => ['required', 'date'],
             'agreement_expires_at' => ['required', 'date', 'after_or_equal:agreement_signed_at'],

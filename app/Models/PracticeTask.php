@@ -5,6 +5,8 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class PracticeTask extends Model
@@ -14,12 +16,10 @@ class PracticeTask extends Model
     protected $fillable = [
         'title',
         'description',
-        'practice_type',
         'status',
         'assignment_mode',
         'training_program_id',
         'due_at',
-        'attachments',
         'created_by_user_id',
     ];
 
@@ -27,7 +27,6 @@ class PracticeTask extends Model
     {
         return [
             'due_at' => 'date',
-            'attachments' => 'array',
             'deleted_at' => 'datetime',
         ];
     }
@@ -46,5 +45,25 @@ class PracticeTask extends Model
     {
         return $this->belongsToMany(Intern::class, 'practice_task_intern')
             ->withPivot('assigned_at');
+    }
+
+    public function messages(): HasMany
+    {
+        return $this->hasMany(PracticeTaskMessage::class);
+    }
+
+    public function taskAttachments(): HasMany
+    {
+        return $this->hasMany(PracticeTaskAttachment::class);
+    }
+
+    public function statusLogs(): HasMany
+    {
+        return $this->hasMany(PracticeTaskStatusLog::class);
+    }
+
+    public function latestStatusLog(): HasOne
+    {
+        return $this->hasOne(PracticeTaskStatusLog::class)->latestOfMany('changed_at');
     }
 }

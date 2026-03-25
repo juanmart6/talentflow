@@ -1,5 +1,6 @@
 ﻿import { Head, Link, useForm, usePage } from '@inertiajs/react';
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { Briefcase, FileText, Paperclip, User } from 'lucide-react';
 import { FieldLabel, FormPageHeader, SectionIntro } from '@/components/form-ui';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
@@ -46,6 +47,7 @@ type InternFormData = {
     status?: InternStatus;
     abandonment_reason?: string | null;
     abandonment_date?: string | null;
+    general_notes?: string | null;
     collaboration_agreement_path?: string | null;
     insurance_policy_path?: string | null;
     dni_scan_path?: string | null;
@@ -71,6 +73,8 @@ type Props = {
     educationCenters: EducationCenterOption[];
     documentHistory: DocumentHistory;
 };
+
+type InternFormTab = 'personal' | 'academic' | 'documents' | 'general';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -144,6 +148,7 @@ export default function InternFormPage({ mode, intern, educationCenters, documen
         insurance_policy: false,
         dni_scan: false,
     });
+    const [activeTab, setActiveTab] = useState<InternFormTab>('personal');
 
     const { data, setData, post, transform, processing, errors } = useForm({
         education_center_id: intern?.education_center_id ? String(intern.education_center_id) : '',
@@ -167,6 +172,7 @@ export default function InternFormPage({ mode, intern, educationCenters, documen
         status: intern?.status === 'abandoned' ? 'abandoned' : 'active',
         abandonment_reason: intern?.abandonment_reason ?? '',
         abandonment_date: toDateInput(intern?.abandonment_date),
+        general_notes: intern?.general_notes ?? '',
         collaboration_agreement_document: null as File | null,
         insurance_policy_document: null as File | null,
         dni_scan_document: null as File | null,
@@ -283,11 +289,75 @@ export default function InternFormPage({ mode, intern, educationCenters, documen
                     />
 
                     <form onSubmit={submit} className="space-y-2">
+                            <section className={UI_PRESETS.sectionCard}>
+                                <div className="-mx-4 -mt-4 border-b border-sidebar-border/70 px-4 pt-4 dark:border-sidebar-border">
+                                    <div className="flex flex-wrap items-end gap-1.5">
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            className={`h-9 min-w-[118px] justify-center rounded-b-none border border-b-0 px-3 cursor-pointer ${
+                                                activeTab === 'personal'
+                                                    ? 'border-[#2563eb]/45 bg-white text-[#1d4ed8] shadow-sm hover:bg-white dark:bg-slate-950 dark:text-sky-300 dark:hover:bg-slate-950'
+                                                    : 'border-transparent text-muted-foreground hover:border-[#2563eb]/30 hover:bg-[#2563eb]/8 hover:text-[#1d4ed8] dark:hover:border-[#2563eb]/40 dark:hover:bg-[#2563eb]/15 dark:hover:text-sky-300'
+                                            }`}
+                                            onClick={() => setActiveTab('personal')}
+                                        >
+                                            <User className="mr-1.5 size-4 shrink-0" />
+                                            Personales
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            className={`h-9 min-w-[118px] justify-center rounded-b-none border border-b-0 px-3 cursor-pointer ${
+                                                activeTab === 'academic'
+                                                    ? 'border-[#2563eb]/45 bg-white text-[#1d4ed8] shadow-sm hover:bg-white dark:bg-slate-950 dark:text-sky-300 dark:hover:bg-slate-950'
+                                                    : 'border-transparent text-muted-foreground hover:border-[#2563eb]/30 hover:bg-[#2563eb]/8 hover:text-[#1d4ed8] dark:hover:border-[#2563eb]/40 dark:hover:bg-[#2563eb]/15 dark:hover:text-sky-300'
+                                            }`}
+                                            onClick={() => setActiveTab('academic')}
+                                        >
+                                            <Briefcase className="mr-1.5 size-4 shrink-0" />
+                                            Prácticas
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            className={`h-9 min-w-[118px] justify-center rounded-b-none border border-b-0 px-3 cursor-pointer ${
+                                                activeTab === 'documents'
+                                                    ? 'border-[#2563eb]/45 bg-white text-[#1d4ed8] shadow-sm hover:bg-white dark:bg-slate-950 dark:text-sky-300 dark:hover:bg-slate-950'
+                                                    : 'border-transparent text-muted-foreground hover:border-[#2563eb]/30 hover:bg-[#2563eb]/8 hover:text-[#1d4ed8] dark:hover:border-[#2563eb]/40 dark:hover:bg-[#2563eb]/15 dark:hover:text-sky-300'
+                                            }`}
+                                            onClick={() => setActiveTab('documents')}
+                                        >
+                                            <Paperclip className="mr-1.5 size-4 shrink-0" />
+                                            Adjuntos
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            className={`h-9 min-w-[118px] justify-center rounded-b-none border border-b-0 px-3 cursor-pointer ${
+                                                activeTab === 'general'
+                                                    ? 'border-[#2563eb]/45 bg-white text-[#1d4ed8] shadow-sm hover:bg-white dark:bg-slate-950 dark:text-sky-300 dark:hover:bg-slate-950'
+                                                    : 'border-transparent text-muted-foreground hover:border-[#2563eb]/30 hover:bg-[#2563eb]/8 hover:text-[#1d4ed8] dark:hover:border-[#2563eb]/40 dark:hover:bg-[#2563eb]/15 dark:hover:text-sky-300'
+                                            }`}
+                                            onClick={() => setActiveTab('general')}
+                                        >
+                                            <FileText className="mr-1.5 size-4 shrink-0" />
+                                            Notas
+                                        </Button>
+                                    </div>
+                                </div>
+
                             <fieldset
                                 disabled={isReadOnly}
-                                className={`space-y-2 ${isReadOnly ? UI_PRESETS.readOnlyFieldset : ''}`}
+                                className={`space-y-4 ${isReadOnly ? UI_PRESETS.readOnlyFieldset : ''}`}
                             >
-                                <section className={UI_PRESETS.sectionCard}>
+
+                                {activeTab === 'personal' && (
+                                <section className="space-y-4 pt-4">
                                     <SectionIntro
                                         title="Datos personales"
                                         description="Identificación y datos de contacto del becario."
@@ -346,8 +416,10 @@ export default function InternFormPage({ mode, intern, educationCenters, documen
                                         </div>
                                     </div>
                                 </section>
+                                )}
 
-                                <section className={UI_PRESETS.sectionCard}>
+                                {activeTab === 'academic' && (
+                                <section className="space-y-4 pt-4">
                                     <SectionIntro
                                         title="Datos académicos y prácticas"
                                         description="Centro, tutor, período y situación de prácticas."
@@ -488,8 +560,10 @@ export default function InternFormPage({ mode, intern, educationCenters, documen
                                         </div>
                                     </div>
                                 </section>
+                                )}
 
-                                <section className={UI_PRESETS.sectionCard}>
+                                {activeTab === 'documents' && (
+                                <section className="space-y-4 pt-4">
                                     <SectionIntro
                                         title="Documentación adjunta"
                                         description="Cada nueva subida queda como principal y el histórico se conserva para consulta."
@@ -513,7 +587,14 @@ export default function InternFormPage({ mode, intern, educationCenters, documen
                                                 const visibleDocuments = showFullHistory ? documents : currentDocument ? [currentDocument] : [];
 
                                                 return (
-                                                    <article key={documentType} className="rounded-lg border border-sidebar-border/70 bg-slate-50/60 p-3 dark:border-sidebar-border dark:bg-slate-900/30">
+                                                    <article
+                                                        key={documentType}
+                                                        className={`rounded-lg border p-3 ${
+                                                            isReadOnly
+                                                                ? 'border-slate-200 bg-slate-100/90 dark:border-slate-700 dark:bg-slate-900/45'
+                                                                : 'border-sidebar-border/70 bg-slate-50/60 dark:border-sidebar-border dark:bg-slate-900/30'
+                                                        }`}
+                                                    >
                                                         <div className="flex items-center justify-between gap-2">
                                                             <p className="text-sm font-semibold">{documentTypeLabel(documentType)}</p>
                                                             {isReadOnly && hasHistory && (
@@ -536,7 +617,14 @@ export default function InternFormPage({ mode, intern, educationCenters, documen
                                                         <ul className="mt-3 space-y-2 text-sm">
                                                             {visibleDocuments.length > 0 ? (
                                                                 visibleDocuments.map((item) => (
-                                                                    <li key={`${documentType}-${item.filename}`} className="rounded-md border border-sidebar-border/60 bg-white p-2 dark:border-sidebar-border dark:bg-slate-950/40">
+                                                                    <li
+                                                                        key={`${documentType}-${item.filename}`}
+                                                                        className={`rounded-md border p-2 ${
+                                                                            isReadOnly
+                                                                                ? 'border-slate-200 bg-slate-100/90 dark:border-slate-700 dark:bg-slate-900/45'
+                                                                                : 'border-sidebar-border/60 bg-white dark:border-sidebar-border dark:bg-slate-950/40'
+                                                                        }`}
+                                                                    >
                                                                         <div className="flex flex-wrap items-center gap-2">
                                                                             <span className="max-w-[180px] truncate font-medium" title={item.filename}>{item.filename}</span>
                                                                         </div>
@@ -561,7 +649,32 @@ export default function InternFormPage({ mode, intern, educationCenters, documen
                                         </div>
                                     )}
                                 </section>
+                                )}
+
+                                {activeTab === 'general' && (
+                                <section className="space-y-4 pt-4">
+                                    <SectionIntro
+                                        title="Información general"
+                                        description="Notas internas y contexto adicional del becario."
+                                    />
+
+                                    <div className="grid gap-2">
+                                        <FieldLabel htmlFor="general_notes">Notas</FieldLabel>
+                                        <textarea
+                                            id="general_notes"
+                                            name="general_notes"
+                                            value={data.general_notes ?? ''}
+                                            onChange={(event) => setData('general_notes', event.target.value)}
+                                            className={`min-h-[140px] w-full resize-y rounded-md border border-slate-300 px-3 py-2.5 text-sm leading-relaxed shadow-xs transition-colors focus:border-[#2563eb] focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20 dark:border-slate-600 ${isReadOnly ? 'bg-slate-100/90 dark:bg-slate-900/45' : 'bg-white dark:bg-slate-950'}`}
+                                            placeholder="Añade información relevante del becario..."
+                                            readOnly={isReadOnly}
+                                        />
+                                        <InputError message={errors.general_notes} />
+                                    </div>
+                                </section>
+                                )}
                             </fieldset>
+                            </section>
 
                             <div className="flex flex-col gap-2 border-t border-sidebar-border/70 pt-4 md:flex-row md:items-center md:justify-end dark:border-sidebar-border">
                                 {isReadOnly ? (
@@ -570,7 +683,7 @@ export default function InternFormPage({ mode, intern, educationCenters, documen
                                     </Button>
                                 ) : (
                                     <>
-                                        <Button disabled={processing || !hasEducationCenters}>
+                                        <Button className="cursor-pointer disabled:cursor-not-allowed" disabled={processing || !hasEducationCenters}>
                                             {processing ? 'Guardando...' : 'Guardar'}
                                         </Button>
                                         <Button type="button" variant="secondary" asChild>

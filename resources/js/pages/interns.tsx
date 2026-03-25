@@ -425,10 +425,11 @@ export default function InternsPage({ interns: internPagination, filters, educat
                                                             {getInitials(intern)}
                                                         </AvatarFallback>
                                                     </Avatar>
-                                                    <div className="text-left">
+                                                    <div className="min-w-0 text-left">
                                                         <Link
                                                             href={interns.show(intern.id).url}
-                                                            className="font-semibold text-primary underline-offset-2 hover:underline"
+                                                            className="block max-w-[8.5rem] truncate font-semibold text-primary underline-offset-2 hover:underline"
+                                                            title={`${intern.first_name} ${intern.last_name}`}
                                                         >
                                                             {intern.first_name} {intern.last_name}
                                                         </Link>

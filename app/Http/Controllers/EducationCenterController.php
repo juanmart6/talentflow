@@ -144,6 +144,7 @@ class EducationCenterController extends Controller
                     'contact_position' => $validated['contact_position'],
                     'contact_phone' => $validated['contact_phone'],
                     'contact_email' => $validated['contact_email'],
+                    'general_notes' => $validated['general_notes'] ?? null,
                 ]);
                 $center->trainingPrograms()->sync($validated['training_program_ids']);
 
@@ -215,6 +216,7 @@ class EducationCenterController extends Controller
                 'contact_position' => $educationCenter->contact_position,
                 'contact_phone' => $educationCenter->contact_phone,
                 'contact_email' => $educationCenter->contact_email,
+                'general_notes' => $educationCenter->general_notes,
                 'training_program_ids' => $educationCenter->trainingPrograms
                     ->pluck('id')
                     ->map(fn ($id) => (int) $id)
@@ -254,6 +256,7 @@ class EducationCenterController extends Controller
                 'contact_position' => $educationCenter->contact_position,
                 'contact_phone' => $educationCenter->contact_phone,
                 'contact_email' => $educationCenter->contact_email,
+                'general_notes' => $educationCenter->general_notes,
                 'training_program_ids' => $educationCenter->trainingPrograms
                     ->pluck('id')
                     ->map(fn ($id) => (int) $id)
@@ -286,6 +289,7 @@ class EducationCenterController extends Controller
                     'contact_position' => $validated['contact_position'],
                     'contact_phone' => $validated['contact_phone'],
                     'contact_email' => $validated['contact_email'],
+                    'general_notes' => $validated['general_notes'] ?? null,
                 ]);
                 $educationCenter->trainingPrograms()->sync($validated['training_program_ids']);
 
@@ -425,6 +429,43 @@ class EducationCenterController extends Controller
     }
 
     // Eliminación de un centro educativo:
+    public function destroyAgreement(EducationCenter $educationCenter, CollaborationAgreement $agreement): RedirectResponse
+    {
+        if ((int) $agreement->education_center_id !== (int) $educationCenter->id) {
+            return redirect()
+                ->back()
+                ->with('error', 'El convenio no pertenece al centro educativo seleccionado.');
+        }
+
+        $agreementsCount = $educationCenter->collaborationAgreements()->count();
+
+        if ($agreementsCount <= 1) {
+            return redirect()
+                ->back()
+                ->with('error', 'No se puede eliminar el único convenio del centro.');
+        }
+
+        try {
+            DB::transaction(function () use ($agreement): void {
+                if ($agreement->pdf_path && Storage::disk('public')->exists($agreement->pdf_path)) {
+                    Storage::disk('public')->delete($agreement->pdf_path);
+                }
+
+                $agreement->delete();
+            });
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return redirect()
+                ->back()
+                ->with('error', 'No se pudo eliminar el convenio. Intenta de nuevo más tarde.');
+        }
+
+        return redirect()
+            ->back()
+            ->with('success', 'Convenio eliminado correctamente.');
+    }
+
     public function destroy(EducationCenter $educationCenter): RedirectResponse
     {
         if ($this->hasActiveInterns($educationCenter->id)) {

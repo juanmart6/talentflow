@@ -1,6 +1,6 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { CirclePlus, Copy, Eye, FileSpreadsheet, FilterX, MapPin, Pencil, Search, Trash2 } from 'lucide-react';
+import { CirclePlus, Copy, Eye, FileSpreadsheet, FilterX, Mail, MapPin, Pencil, Phone, Search, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -395,11 +395,13 @@ export default function EducationCenters({ centers, filters }: Props) {
                                                     <span>{center.name}</span>
                                                     <Copy className="size-3 text-muted-foreground" />
                                                 </button>
-                                                <p className="mt-1 text-xs font-medium text-muted-foreground">
-                                                    {center.institutional_email}
+                                                <p className="mt-1 flex items-center justify-center gap-1.5 text-xs font-medium text-muted-foreground">
+                                                    <Mail className="size-3" aria-hidden="true" />
+                                                    <span>{center.institutional_email}</span>
                                                 </p>
-                                                <p className="text-[11px] text-muted-foreground">
-                                                    {center.phone}
+                                                <p className="mt-0.5 flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground">
+                                                    <Phone className="size-3" aria-hidden="true" />
+                                                    <span>{center.phone}</span>
                                                 </p>
                                             </td>
                                             <td className={`${UI_PRESETS.tableCellCentered} align-middle`}>

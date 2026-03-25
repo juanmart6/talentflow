@@ -22,6 +22,7 @@ class EducationCenter extends Model
         'contact_position',
         'contact_phone',
         'contact_email',
+        'general_notes',
     ];
 
     public function collaborationAgreements(): HasMany

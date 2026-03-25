@@ -36,6 +36,7 @@ class Intern extends Model
         'status',
         'abandonment_reason',
         'abandonment_date',
+        'general_notes',
         'collaboration_agreement_path',
         'insurance_policy_path',
         'dni_scan_path',

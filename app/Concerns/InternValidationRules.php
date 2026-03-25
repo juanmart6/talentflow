@@ -74,6 +74,7 @@ trait InternValidationRules
             'status' => ['required', Rule::in(['active', 'abandoned'])],
             'abandonment_reason' => ['nullable', 'string', 'max:1000'],
             'abandonment_date' => ['required_if:status,abandoned', 'nullable', 'date', 'after_or_equal:internship_start_date'],
+            'general_notes' => ['nullable', 'string', 'max:5000'],
 
             'collaboration_agreement_document' => ['nullable', 'file', 'mimes:pdf,jpeg,jpg,png', 'max:5120'],
             'insurance_policy_document' => ['nullable', 'file', 'mimes:pdf,jpeg,jpg,png', 'max:5120'],
