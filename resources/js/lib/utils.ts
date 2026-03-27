@@ -10,3 +10,11 @@ export function cn(...inputs: ClassValue[]) {
 export function toUrl(url: NonNullable<InertiaLinkProps['href']>): string {
     return typeof url === 'string' ? url : url.url;
 }
+
+export function normalizePaginationLabel(label: string): string {
+    return label
+        .replace(/<[^>]*>/g, '')
+        .replace(/&laquo;/g, '<<')
+        .replace(/&raquo;/g, '>>')
+        .trim();
+}
