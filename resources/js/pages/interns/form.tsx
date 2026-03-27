@@ -76,13 +76,6 @@ type Props = {
 
 type InternFormTab = 'personal' | 'academic' | 'documents' | 'general';
 
-const breadcrumbs: BreadcrumbItem[] = [
-    {
-        title: 'Gestión de Becarios',
-        href: interns.index().url,
-    },
-];
-
 function toDateInput(value?: string | null): string {
     if (!value) {
         return '';
@@ -140,6 +133,20 @@ function FileUploadField({ id, label, accept, file, error, onChange }: FileUploa
 export default function InternFormPage({ mode, intern, educationCenters, documentHistory }: Props) {
     const isCreate = mode === 'create';
     const isReadOnly = mode === 'show';
+    const breadcrumbs: BreadcrumbItem[] = [
+        {
+            title: 'Gestión de Becarios',
+            href: interns.index().url,
+        },
+        {
+            title: isCreate ? 'Nuevo Becario' : isReadOnly ? 'Ver Becario' : 'Editar Becario',
+            href: isCreate
+                ? interns.create().url
+                : intern?.id
+                    ? interns.edit(intern.id).url
+                    : interns.index().url,
+        },
+    ];
     const hasEducationCenters = educationCenters.length > 0;
     const page = usePage<{ flash?: { success?: string; error?: string } }>();
     const lastFlashRef = useRef<string | null>(null);
@@ -281,11 +288,7 @@ export default function InternFormPage({ mode, intern, educationCenters, documen
                     <FormPageHeader
                         title={isCreate ? 'Nuevo Becario' : isReadOnly ? 'Ver Becario' : 'Editar Becario'}
                         description="Completa datos personales, académicos y período de prácticas."
-                        action={(
-                            <Button variant="secondary" asChild>
-                                <Link href={interns.index().url}>Volver al listado</Link>
-                            </Button>
-                        )}
+                        backHref={interns.index().url}
                     />
 
                     <form onSubmit={submit} className="space-y-2">

@@ -126,11 +126,11 @@ export default function PracticeTasksFormPage({ interns, trainingPrograms, messa
     const [deletingAttachmentId, setDeletingAttachmentId] = useState<number | null>(null);
     const breadcrumbs: BreadcrumbItem[] = [
         {
-            title: 'Prácticas y tareas',
+            title: 'Prácticas y Tareas',
             href: practiceTasks.index().url,
         },
         {
-            title: isEditing ? 'Editar tarea' : 'Nueva tarea',
+            title: isEditing ? 'Editar Tarea' : 'Nueva Tarea',
             href: isEditing && task ? practiceTasks.edit(task.id).url : practiceTasks.create().url,
         },
     ];
@@ -253,22 +253,18 @@ export default function PracticeTasksFormPage({ interns, trainingPrograms, messa
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title={isEditing ? 'Editar tarea' : 'Nueva tarea'} />
+            <Head title={isEditing ? 'Editar Tarea' : 'Nueva Tarea'} />
 
             <div className={UI_PRESETS.pageContent}>
                 <div className={UI_PRESETS.pageSection}>
                     <FormPageHeader
-                        title={isEditing ? 'Editar tarea' : 'Nueva tarea'}
+                        title={isEditing ? 'Editar Tarea' : 'Nueva Tarea'}
                         description={
                             isEditing
                                 ? 'Actualiza la información de la tarea y sus becarios asignados.'
                                 : 'Completa la información de la tarea y asigna uno o varios becarios.'
                         }
-                        action={(
-                            <Button variant="secondary" asChild>
-                                <Link href={practiceTasks.index().url}>Volver al listado</Link>
-                            </Button>
-                        )}
+                        backHref={practiceTasks.index().url}
                     />
 
                     <form onSubmit={handleSubmit} className="space-y-4">

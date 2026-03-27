@@ -1,16 +1,18 @@
 ﻿import { Form, Head, Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
-import { Building2, FileText, GraduationCap, Handshake, Trash2 } from 'lucide-react';
 import { FieldLabel, FormPageHeader, SectionIntro } from '@/components/form-ui';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { UI_PRESETS, stripedRowClass } from '@/lib/ui-presets';
+import { UI_PRESETS } from '@/lib/ui-presets';
 import AppLayout from '@/layouts/app-layout';
 import educationCenters from '@/routes/education-centers';
-import interns from '@/routes/interns';
 import { toast } from 'sonner';
 import type { BreadcrumbItem } from '@/types';
+
+import CenterFormTabs from '@/components/education-centers/center-form-tabs';
+import CenterInternsHistory from '@/components/education-centers/center-interns-history';
+import CenterAgreementSection from '@/components/education-centers/center-agreement-section';
 
 type CenterFormData = {
     id?: number;
@@ -65,90 +67,26 @@ type Props = {
 };
 
 type CenterFormTab = 'center' | 'agreement' | 'general' | 'history';
-
-const breadcrumbs: BreadcrumbItem[] = [
-    {
-        title: 'Centros Educativos',
-        href: educationCenters.index().url,
-    },
-];
-
-function internStatusLabel(status: string): string {
-    if (status === 'active') return 'Activo';
-    if (status === 'upcoming_active') return 'Activo proximamente';
-    if (status === 'finished') return 'Finalizado';
-    if (status === 'abandoned') return 'Abandonado';
-
-    return status;
-}
-
-function internStatusBadgeClass(status: string): string {
-    if (status === 'active') return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-200';
-    if (status === 'upcoming_active') return 'bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-200';
-    if (status === 'finished') return 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-200';
-    if (status === 'abandoned') return 'bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-200';
-
-    return 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-200';
-}
-
-function formatSpanishDate(date: string | null): string {
-    if (!date) {
-        return '-';
-    }
-
-    const [year, month, day] = date.slice(0, 10).split('-');
-
-    if (!year || !month || !day) {
-        return date;
-    }
-
-    return `${day}/${month}/${year}`;
-}
-
-type FileUploadFieldProps = {
-    id: string;
-    name: string;
-    label: string;
-    accept: string;
-    error?: string;
-    required?: boolean;
-    selectedFileName?: string | null;
-    onChange?: (fileName: string | null) => void;
-};
-
-function FileUploadField({ id, name, label, accept, error, required, selectedFileName, onChange }: FileUploadFieldProps) {
-    return (
-        <div className="grid gap-2">
-            <FieldLabel htmlFor={id}>{label}</FieldLabel>
-            <div className="flex min-h-9 items-center gap-3 text-sm">
-                <label
-                    htmlFor={id}
-                    className="inline-flex h-9 cursor-pointer items-center rounded-md border border-[#2563eb]/35 bg-white px-3 text-sm font-medium text-[#1d4ed8] shadow-xs transition-colors hover:border-[#2563eb]/60 hover:bg-[#2563eb]/10 dark:border-[#2563eb]/45 dark:bg-slate-950 dark:text-sky-300 dark:hover:bg-[#2563eb]/20"
-                >
-                    Seleccionar archivo
-                </label>
-                <span className="truncate text-muted-foreground">
-                    {selectedFileName ?? 'Ningún archivo seleccionado'}
-                </span>
-                <Input
-                    id={id}
-                    type="file"
-                    name={name}
-                    accept={accept}
-                    required={required}
-                    className="sr-only"
-                    onChange={(event) => onChange?.(event.target.files?.[0]?.name ?? null)}
-                />
-            </div>
-            <InputError message={error} />
-        </div>
-    );
-}
+type CenterValidationErrors = Record<string, string>;
 
 export default function EducationCenterForm({ mode, center, trainingPrograms, agreementHistory = [], internsHistory = [] }: Props) {
     const isCreate = mode === 'create';
     const isReadOnly = mode === 'show';
-    const page = usePage<{ flash?: { success?: string; error?: string } }>();
+    const breadcrumbs: BreadcrumbItem[] = [
+        {
+            title: 'Centros Educativos',
+            href: educationCenters.index().url,
+        },
+        {
+            title: isCreate ? 'Nuevo Centro' : isReadOnly ? 'Ver Centro' : 'Editar Centro',
+            href: isCreate
+                ? educationCenters.create().url
+                : center?.id
+                    ? educationCenters.edit(center.id).url
+                    : educationCenters.index().url,
+        },
+    ];
+    const page = usePage<{ flash?: { success?: string; error?: string }; errors?: CenterValidationErrors }>();
     const lastFlashRef = useRef<string | null>(null);
     const [selectedAgreementFileName, setSelectedAgreementFileName] = useState<string | null>(null);
     const [deletingAgreementId, setDeletingAgreementId] = useState<number | null>(null);
@@ -177,6 +115,36 @@ export default function EducationCenterForm({ mode, center, trainingPrograms, ag
         }
     }, [page.props.flash?.success, page.props.flash?.error]);
 
+    useEffect(() => {
+        if (isReadOnly) {
+            return;
+        }
+
+        const errors = page.props.errors ?? {};
+        const errorKeys = Object.keys(errors);
+
+        if (errorKeys.length === 0) {
+            return;
+        }
+
+        if (
+            errorKeys.some((key) =>
+                key.startsWith('agreement_')
+                || key === 'agreement_pdf'
+            )
+        ) {
+            setActiveTab('agreement');
+            return;
+        }
+
+        if (errorKeys.some((key) => key === 'general_notes')) {
+            setActiveTab('general');
+            return;
+        }
+
+        setActiveTab('center');
+    }, [isReadOnly, page.props.errors]);
+
     const handleDeleteAgreement = (agreementId: number) => {
         if (!center?.id) {
             return;
@@ -203,84 +171,25 @@ export default function EducationCenterForm({ mode, center, trainingPrograms, ag
                     <FormPageHeader
                         title={isCreate ? 'Nuevo Centro Educativo' : isReadOnly ? 'Ver Centro Educativo' : 'Editar Centro Educativo'}
                         description="Completa la información del centro, contacto y convenio principal."
-                        action={(
-                            <Button variant="secondary" asChild>
-                                <Link href={educationCenters.index().url}>Volver al listado</Link>
-                            </Button>
-                        )}
+                        backHref={educationCenters.index().url}
                     />
 
                     <Form
                         {...formRoute}
-                        options={{ preserveScroll: true }}
+                        options={{ preserveScroll: true, preserveState: true }}
                         className="space-y-2"
                         encType="multipart/form-data"
+                        noValidate
                     >
                         {({ processing, errors }) => (
                             <>
                                 <section className={UI_PRESETS.sectionCard}>
                                     <div className="-mx-4 -mt-4 border-b border-sidebar-border/70 px-4 pt-4 dark:border-sidebar-border">
-                                        <div className="flex flex-wrap items-end gap-1.5">
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="sm"
-                                                className={`h-9 min-w-[118px] justify-center rounded-b-none border border-b-0 px-3 cursor-pointer ${
-                                                    activeTab === 'center'
-                                                        ? 'border-[#2563eb]/45 bg-white text-[#1d4ed8] shadow-sm hover:bg-white dark:bg-slate-950 dark:text-sky-300 dark:hover:bg-slate-950'
-                                                        : 'border-transparent text-muted-foreground hover:border-[#2563eb]/30 hover:bg-[#2563eb]/8 hover:text-[#1d4ed8] dark:hover:border-[#2563eb]/40 dark:hover:bg-[#2563eb]/15 dark:hover:text-sky-300'
-                                                }`}
-                                                onClick={() => setActiveTab('center')}
-                                            >
-                                                <Building2 className="mr-1.5 size-4 shrink-0" />
-                                                Centro
-                                            </Button>
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="sm"
-                                                className={`h-9 min-w-[118px] justify-center rounded-b-none border border-b-0 px-3 cursor-pointer ${
-                                                    activeTab === 'agreement'
-                                                        ? 'border-[#2563eb]/45 bg-white text-[#1d4ed8] shadow-sm hover:bg-white dark:bg-slate-950 dark:text-sky-300 dark:hover:bg-slate-950'
-                                                        : 'border-transparent text-muted-foreground hover:border-[#2563eb]/30 hover:bg-[#2563eb]/8 hover:text-[#1d4ed8] dark:hover:border-[#2563eb]/40 dark:hover:bg-[#2563eb]/15 dark:hover:text-sky-300'
-                                                }`}
-                                                onClick={() => setActiveTab('agreement')}
-                                            >
-                                                <Handshake className="mr-1.5 size-4 shrink-0" />
-                                                Convenio
-                                            </Button>
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="sm"
-                                                className={`h-9 min-w-[118px] justify-center rounded-b-none border border-b-0 px-3 cursor-pointer ${
-                                                    activeTab === 'general'
-                                                        ? 'border-[#2563eb]/45 bg-white text-[#1d4ed8] shadow-sm hover:bg-white dark:bg-slate-950 dark:text-sky-300 dark:hover:bg-slate-950'
-                                                        : 'border-transparent text-muted-foreground hover:border-[#2563eb]/30 hover:bg-[#2563eb]/8 hover:text-[#1d4ed8] dark:hover:border-[#2563eb]/40 dark:hover:bg-[#2563eb]/15 dark:hover:text-sky-300'
-                                                }`}
-                                                onClick={() => setActiveTab('general')}
-                                            >
-                                                <FileText className="mr-1.5 size-4 shrink-0" />
-                                                Notas
-                                            </Button>
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() => isReadOnly && setActiveTab('history')}
-                                                disabled={!isReadOnly}
-                                                className={`h-9 min-w-[118px] justify-center rounded-b-none border border-b-0 px-3 ${
-                                                    !isReadOnly
-                                                        ? 'cursor-not-allowed border-transparent text-muted-foreground/60'
-                                                        : activeTab === 'history'
-                                                            ? 'cursor-pointer border-[#2563eb]/45 bg-white text-[#1d4ed8] shadow-sm hover:bg-white dark:bg-slate-950 dark:text-sky-300 dark:hover:bg-slate-950'
-                                                            : 'cursor-pointer border-transparent text-muted-foreground hover:border-[#2563eb]/30 hover:bg-[#2563eb]/8 hover:text-[#1d4ed8] dark:hover:border-[#2563eb]/40 dark:hover:bg-[#2563eb]/15 dark:hover:text-sky-300'
-                                                }`}
-                                            >
-                                                <GraduationCap className="mr-1.5 size-4 shrink-0" />
-                                                Alumnos
-                                            </Button>
-                                        </div>
+                                        <CenterFormTabs
+                                            activeTab={activeTab}
+                                            onTabChange={setActiveTab}
+                                            isReadOnly={isReadOnly}
+                                        />
                                     </div>
 
                                 <fieldset
@@ -288,7 +197,7 @@ export default function EducationCenterForm({ mode, center, trainingPrograms, ag
                                     className={`space-y-4 ${isReadOnly ? UI_PRESETS.readOnlyFieldset : ''}`}
                                 >
 
-                                        {activeTab === 'center' && (
+                                        <div className={activeTab === 'center' ? '' : 'hidden'} aria-hidden={activeTab !== 'center'}>
                                         <section className="space-y-4 pt-4">
                                             <SectionIntro
                                                 title="Datos del centro"
@@ -369,9 +278,9 @@ export default function EducationCenterForm({ mode, center, trainingPrograms, ag
                                                 </div>
                                             </div>
                                         </section>
-                                        )}
+                                        </div>
 
-                                        {activeTab === 'center' && (
+                                        <div className={activeTab === 'center' ? '' : 'hidden'} aria-hidden={activeTab !== 'center'}>
                                         <section className="space-y-4">
                                             <SectionIntro
                                                 title="Persona de contacto"
@@ -429,140 +338,23 @@ export default function EducationCenterForm({ mode, center, trainingPrograms, ag
                                                 </div>
                                             </div>
                                         </section>
-                                        )}
+                                        </div>
 
-                                        {activeTab === 'agreement' && (
-                                        <section className="space-y-4 pt-4">
-                                            <SectionIntro
-                                                title="Convenio de colaboración"
-                                                description="Fechas, plazas acordadas y documento principal del convenio."
+                                        <div className={activeTab === 'agreement' ? '' : 'hidden'} aria-hidden={activeTab !== 'agreement'}>
+                                            <CenterAgreementSection
+                                                isCreate={isCreate}
+                                                isReadOnly={isReadOnly}
+                                                center={center}
+                                                agreementHistory={agreementHistory}
+                                                selectedAgreementFileName={selectedAgreementFileName}
+                                                setSelectedAgreementFileName={setSelectedAgreementFileName}
+                                                deletingAgreementId={deletingAgreementId}
+                                                handleDeleteAgreement={handleDeleteAgreement}
+                                                errors={errors as Record<string, string | undefined>}
                                             />
+                                        </div>
 
-                                            {!isReadOnly && (
-                                                <div className="grid gap-4 md:grid-cols-2">
-                                                    <div className="grid gap-2">
-                                                        <FieldLabel htmlFor="agreement_signed_at">Fecha de firma</FieldLabel>
-                                                        <Input
-                                                            id="agreement_signed_at"
-                                                            type="date"
-                                                            name="agreement_signed_at"
-                                                            defaultValue={center?.agreement_signed_at ?? ''}
-                                                            className={UI_PRESETS.simpleSearchInput}
-                                                            required
-                                                        />
-                                                        <InputError message={errors.agreement_signed_at} />
-                                                    </div>
-
-                                                    <div className="grid gap-2">
-                                                        <FieldLabel htmlFor="agreement_expires_at">Fecha de vencimiento</FieldLabel>
-                                                        <Input
-                                                            id="agreement_expires_at"
-                                                            type="date"
-                                                            name="agreement_expires_at"
-                                                            defaultValue={center?.agreement_expires_at ?? ''}
-                                                            className={UI_PRESETS.simpleSearchInput}
-                                                            required
-                                                        />
-                                                        <InputError message={errors.agreement_expires_at} />
-                                                    </div>
-
-                                                    <div className="grid gap-2">
-                                                        <FieldLabel htmlFor="agreement_agreed_slots">Plazas acordadas</FieldLabel>
-                                                        <Input
-                                                            id="agreement_agreed_slots"
-                                                            type="number"
-                                                            min={1}
-                                                            name="agreement_agreed_slots"
-                                                            defaultValue={center?.agreement_agreed_slots ?? 1}
-                                                            className={UI_PRESETS.simpleSearchInput}
-                                                            required
-                                                        />
-                                                        <InputError message={errors.agreement_agreed_slots} />
-                                                    </div>
-
-                                                    <FileUploadField
-                                                        id="agreement_pdf"
-                                                        name="agreement_pdf"
-                                                        label="Documento PDF"
-                                                        accept="application/pdf"
-                                                        required={isCreate}
-                                                        error={errors.agreement_pdf}
-                                                        selectedFileName={selectedAgreementFileName}
-                                                        onChange={setSelectedAgreementFileName}
-                                                    />
-                                                </div>
-                                            )}
-
-                                            {!isCreate && agreementHistory.length > 0 && (
-                                                <div className="grid gap-3">
-                                                    <div className="flex items-center justify-between gap-2">
-                                                        <p className="text-sm font-semibold">Historial de convenios</p>
-                                                        <p className="text-xs text-muted-foreground">Total: {agreementHistory.length}</p>
-                                                    </div>
-
-                                                    <div className="grid gap-3">
-                                                        {agreementHistory.map((agreement) => (
-                                                            <article
-                                                                key={agreement.id}
-                                                                className={`rounded-lg border p-3 ${
-                                                                    isReadOnly
-                                                                        ? 'border-slate-200 bg-slate-100/90 dark:border-slate-700 dark:bg-slate-900/45'
-                                                                        : 'border-sidebar-border/70 bg-slate-50/60 dark:border-sidebar-border dark:bg-slate-900/30'
-                                                                }`}
-                                                            >
-                                                                <div className="flex flex-wrap items-center justify-between gap-2">
-                                                                    <div className="flex items-center gap-2">
-                                                                        <span className="font-medium">{agreement.filename}</span>
-                                                                        {agreement.is_current && (
-                                                                            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase text-emerald-700 dark:bg-emerald-900/35 dark:text-emerald-200">
-                                                                                Vigente
-                                                                            </span>
-                                                                        )}
-                                                                    </div>
-                                                                    {!isReadOnly && (
-                                                                        <Button
-                                                                            type="button"
-                                                                            variant="outline"
-                                                                            size="icon"
-                                                                            className={`${UI_PRESETS.iconActionButtonDanger} disabled:cursor-not-allowed`}
-                                                                            disabled={deletingAgreementId === agreement.id}
-                                                                            onClick={() => handleDeleteAgreement(agreement.id)}
-                                                                            aria-label="Eliminar convenio"
-                                                                            title="Eliminar convenio"
-                                                                        >
-                                                                            {deletingAgreementId === agreement.id ? '...' : <Trash2 />}
-                                                                        </Button>
-                                                                    )}
-                                                                </div>
-
-                                                                <div className="mt-2 grid gap-1 text-sm text-muted-foreground">
-                                                                    <p>Firma: {formatSpanishDate(agreement.signed_at)}</p>
-                                                                    <p>Vence: {formatSpanishDate(agreement.expires_at)}</p>
-                                                                    <p>Plazas: {agreement.agreed_slots ?? '-'}</p>
-                                                                    <p>Subido: {formatSpanishDate(agreement.uploaded_at)}</p>
-                                                                </div>
-
-                                                                {agreement.preview_url && (
-                                                                    <div className="mt-3">
-                                                                        <a
-                                                                            href={agreement.preview_url}
-                                                                            target="_blank"
-                                                                            rel="noreferrer"
-                                                                            className="text-sm font-medium text-primary underline underline-offset-2"
-                                                                        >
-                                                                            Ver PDF
-                                                                        </a>
-                                                                    </div>
-                                                                )}
-                                                            </article>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </section>
-                                        )}
-
-                                        {activeTab === 'general' && (
+                                        <div className={activeTab === 'general' ? '' : 'hidden'} aria-hidden={activeTab !== 'general'}>
                                         <section className="space-y-4 pt-4">
                                         <SectionIntro
                                             title="Información general"
@@ -582,74 +374,13 @@ export default function EducationCenterForm({ mode, center, trainingPrograms, ag
                                             <InputError message={errors.general_notes} />
                                         </div>
                                         </section>
-                                        )}
+                                        </div>
                                     </fieldset>
                                 </section>
-
-                                    {isReadOnly && activeTab === 'history' && (
-                                        <section className={UI_PRESETS.sectionCard}>
-                                            <div className="flex items-center justify-between gap-2">
-                                                <h2 className="text-lg font-bold">Histórico de becarios por centro</h2>
-                                                <p className="text-sm text-muted-foreground">Total: {internsHistory.length}</p>
-                                            </div>
-
-                                            {internsHistory.length === 0 ? (
-                                                <p className="text-sm text-muted-foreground">
-                                                    No hay becarios registrados para este centro.
-                                                </p>
-                                            ) : (
-                                                <div className="relative w-full overflow-x-auto rounded-lg border border-sidebar-border/70 dark:border-sidebar-border">
-                                                    <table className="w-full min-w-[920px] table-fixed text-sm">
-                                                        <colgroup>
-                                                            <col className="w-1/4" />
-                                                            <col className="w-1/4" />
-                                                            <col className="w-1/4" />
-                                                            <col className="w-1/4" />
-                                                        </colgroup>
-                                                        <thead className={UI_PRESETS.tableHead}>
-                                                            <tr>
-                                                                <th className="px-4 py-3 text-center font-semibold">Becario</th>
-                                                                <th className="px-4 py-3 text-center font-semibold">Ciclo formativo</th>
-                                                                <th className="px-4 py-3 text-center font-semibold">Período</th>
-                                                                <th className="px-4 py-3 text-center font-semibold">Estado</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody>
-                                                            {internsHistory.map((intern, index) => (
-                                                                <tr key={intern.id} className={`h-20 border-t align-middle ${stripedRowClass(index)}`}>
-                                                                    <td className="px-4 py-3 text-center align-middle">
-                                                                        <Link
-                                                                            href={interns.show(intern.id).url}
-                                                                            className="font-semibold leading-tight text-primary underline-offset-2 hover:underline"
-                                                                        >
-                                                                            {intern.first_name} {intern.last_name}
-                                                                        </Link>
-                                                                        <p className="mt-1 text-xs text-muted-foreground">{intern.dni_nie}</p>
-                                                                    </td>
-                                                                    <td className="px-4 py-3 text-center align-middle">
-                                                                        <p className="font-medium leading-tight">{intern.training_program_name ?? '-'}</p>
-                                                                    </td>
-                                                                    <td className="px-4 py-3 text-center align-middle">
-                                                                        <p className="text-xs font-semibold text-muted-foreground">Inicio: {formatSpanishDate(intern.internship_start_date)}</p>
-                                                                        <p className="mt-1 text-xs font-semibold text-muted-foreground">Fin: {formatSpanishDate(intern.internship_end_date)}</p>
-                                                                    </td>
-                                                                    <td className="px-4 py-3 text-center align-middle">
-                                                                        <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold uppercase ${internStatusBadgeClass(intern.status)}`}>
-                                                                            {internStatusLabel(intern.status)}
-                                                                        </span>
-                                                                        {intern.deleted_at && (
-                                                                            <p className="mt-1 text-xs text-muted-foreground">Eliminado del sistema</p>
-                                                                        )}
-                                                                    </td>
-                                                                </tr>
-                                                            ))}
-                                                        </tbody>
-                                                    </table>
-                                                </div>
-                                            )}
-                                        </section>
-                                    )}
-
+                                
+                                {isReadOnly && activeTab === 'history' && (
+                                    <CenterInternsHistory internsHistory={internsHistory} />
+                                )}
                                     <div className="flex flex-col gap-2 border-t border-sidebar-border/70 pt-4 md:flex-row md:items-center md:justify-end dark:border-sidebar-border">
                                         {isReadOnly ? (
                                             <Button type="button" variant="secondary" asChild>
@@ -674,6 +405,3 @@ export default function EducationCenterForm({ mode, center, trainingPrograms, ag
         </AppLayout>
     );
 }
-
-
-

@@ -1,6 +1,6 @@
-﻿import { Head, Link, router } from '@inertiajs/react';
+﻿import { Head, Link, router, usePage } from '@inertiajs/react';
 import { CirclePlus, FilterX, Search, Trash2 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { UI_PRESETS } from '@/lib/ui-presets';
 import AppLayout from '@/layouts/app-layout';
 import practiceTasks from '@/routes/practice-tasks';
+import { toast } from 'sonner';
 import type { BreadcrumbItem, InternOption } from '@/types';
 
 type TaskStatus = 'pending' | 'in_progress' | 'in_review' | 'completed';
@@ -38,7 +39,7 @@ type Props = {
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
-        title: 'Prácticas y tareas',
+        title: 'Prácticas y Tareas',
         href: '/practice-tasks',
     },
 ];
@@ -123,6 +124,8 @@ function dueIndicatorMeta(dueAt: string): { dotClass: string; text: string } | n
 }
 
 export default function PracticeTasksPage({ viewMode, interns, trainingPrograms, tasks }: Props) {
+    const page = usePage<{ flash?: { success?: string; error?: string } }>();
+    const lastFlashRef = useRef<string | null>(null);
     const [search, setSearch] = useState('');
     const [internFilter, setInternFilter] = useState('all');
     const [trainingProgramFilter, setTrainingProgramFilter] = useState('all');
@@ -173,6 +176,26 @@ export default function PracticeTasksPage({ viewMode, interns, trainingPrograms,
     }, [search, internFilter, trainingProgramFilter, dateFrom, dateTo, dueStateFilter, viewMode, tasks]);
     const hasInvalidDateRange = dateFrom !== '' && dateTo !== '' && dateFrom > dateTo;
 
+    useEffect(() => {
+        const successMessage = page.props.flash?.success;
+        const errorMessage = page.props.flash?.error;
+        const flashKey = successMessage ? `success:${successMessage}` : errorMessage ? `error:${errorMessage}` : null;
+
+        if (!flashKey || lastFlashRef.current === flashKey) {
+            return;
+        }
+
+        lastFlashRef.current = flashKey;
+
+        if (successMessage) {
+            toast.success(successMessage);
+        }
+
+        if (errorMessage) {
+            toast.error(errorMessage);
+        }
+    }, [page.props.flash?.success, page.props.flash?.error]);
+
     const handleDropTask = (status: TaskStatus) => {
         if (!draggedTask || draggedTask.status === status) {
             setDropColumn(null);
@@ -215,12 +238,12 @@ export default function PracticeTasksPage({ viewMode, interns, trainingPrograms,
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Prácticas y tareas" />
+            <Head title="Prácticas y Tareas" />
 
             <div className={UI_PRESETS.pageContent}>
                 <div className="flex flex-col gap-4">
                     <div>
-                        <h1 className="text-2xl font-bold">Prácticas y tareas</h1>
+                        <h1 className="text-2xl font-bold">Prácticas y Tareas</h1>
                         <p className="text-sm text-muted-foreground">
                             Gestiona tareas y su seguimiento operativo.
                         </p>
@@ -258,8 +281,8 @@ export default function PracticeTasksPage({ viewMode, interns, trainingPrograms,
                                         variant="outline"
                                         size="icon"
                                         className={UI_PRESETS.iconActionButtonPrimary}
-                                        title="Nueva tarea"
-                                        aria-label="Nueva tarea"
+                                        title="Nueva Tarea"
+                                        aria-label="Nueva Tarea"
                                         asChild
                                     >
                                         <Link href={practiceTasks.create().url}>
@@ -492,5 +515,8 @@ export default function PracticeTasksPage({ viewMode, interns, trainingPrograms,
         </AppLayout>
     );
 }
+
+
+
 
 

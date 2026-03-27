@@ -8,6 +8,7 @@ import { Spinner } from '@/components/ui/spinner';
 import AuthLayout from '@/layouts/auth-layout';
 import { login } from '@/routes';
 import { store } from '@/routes/register';
+import { toast } from 'sonner';
 
 export default function Register() {
     return (
@@ -20,6 +21,7 @@ export default function Register() {
                 {...store.form()}
                 resetOnSuccess={['password', 'password_confirmation']}
                 disableWhileProcessing
+                onSuccess={() => toast.success('Usuario creado correctamente.')}
                 className="flex flex-col gap-6"
             >
                 {({ processing, errors }) => (

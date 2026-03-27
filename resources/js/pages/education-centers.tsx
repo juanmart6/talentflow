@@ -348,8 +348,8 @@ export default function EducationCenters({ centers, filters }: Props) {
                                     variant="outline"
                                     size="icon"
                                     className={UI_PRESETS.iconActionButtonPrimary}
-                                    title="Nuevo centro"
-                                    aria-label="Nuevo centro"
+                                    title="Nuevo Centro"
+                                    aria-label="Nuevo Centro"
                                 >
                                     <Link href={educationCenters.create().url}>
                                         <CirclePlus />
@@ -455,7 +455,7 @@ export default function EducationCenters({ centers, filters }: Props) {
                                                         className={UI_PRESETS.iconActionButton}
                                                         asChild
                                                     >
-                                                        <Link href={educationCenters.show(center.id).url} aria-label="Ver centro" title="Ver centro">
+                                                        <Link href={educationCenters.show(center.id).url} aria-label="Ver Centro" title="Ver Centro">
                                                             <Eye />
                                                         </Link>
                                                     </Button>
@@ -465,7 +465,7 @@ export default function EducationCenters({ centers, filters }: Props) {
                                                         className={UI_PRESETS.iconActionButton}
                                                         asChild
                                                     >
-                                                        <Link href={educationCenters.edit(center.id).url} aria-label="Editar centro" title="Editar centro">
+                                                        <Link href={educationCenters.edit(center.id).url} aria-label="Editar Centro" title="Editar Centro">
                                                             <Pencil />
                                                         </Link>
                                                     </Button>
@@ -473,8 +473,8 @@ export default function EducationCenters({ centers, filters }: Props) {
                                                         variant="outline"
                                                         size="icon"
                                                         className={UI_PRESETS.iconActionButtonDanger}
-                                                        aria-label="Eliminar centro"
-                                                        title="Eliminar centro"
+                                                        aria-label="Eliminar Centro"
+                                                        title="Eliminar Centro"
                                                         onClick={() => setCenterToDelete(center)}
                                                     >
                                                         <Trash2 />

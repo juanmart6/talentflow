@@ -1,5 +1,5 @@
-import { Head, Link, router } from '@inertiajs/react';
-import { useEffect, useMemo, useState } from 'react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { CirclePlus, Eye, FileSpreadsheet, FilterX, Pencil, Search, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -25,6 +25,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import AppLayout from '@/layouts/app-layout';
 import educationCentersRoutes from '@/routes/education-centers';
 import interns from '@/routes/interns';
+import { toast } from 'sonner';
 import type { BreadcrumbItem } from '@/types';
 
 type PaginationLink = {
@@ -87,8 +88,10 @@ type Props = {
         status: string;
         education_center_id: number | null;
         training_program_id: number | null;
-        date_from: string;
-        date_to: string;
+        start_date_from: string;
+        start_date_to: string;
+        end_date_from: string;
+        end_date_to: string;
     };
 };
 
@@ -125,6 +128,8 @@ function getInitials(intern: InternRow): string {
 
 // Contiene toda la lógica de la vista:
 export default function InternsPage({ interns: internPagination, filters, educationCenters, trainingPrograms }: Props) {
+    const page = usePage<{ flash?: { success?: string; error?: string } }>();
+    const lastFlashRef = useRef<string | null>(null);
     const [search, setSearch] = useState(filters.search ?? '');
     const [status, setStatus] = useState(filters.status || 'all');
     const [educationCenterId, setEducationCenterId] = useState(
@@ -134,12 +139,21 @@ export default function InternsPage({ interns: internPagination, filters, educat
         filters.training_program_id ? String(filters.training_program_id) : 'all',
     );
     
-    const [dateFrom, setDateFrom] = useState(filters.date_from ?? '');
-    const [dateTo, setDateTo] = useState(filters.date_to ?? '');
+    const [startDateFrom, setStartDateFrom] = useState(filters.start_date_from ?? '');
+    const [startDateTo, setStartDateTo] = useState(filters.start_date_to ?? '');
+    const [endDateFrom, setEndDateFrom] = useState(filters.end_date_from ?? '');
+    const [endDateTo, setEndDateTo] = useState(filters.end_date_to ?? '');
     const [internToDelete, setInternToDelete] = useState<InternRow | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
     const hasActiveFilters =
-        search.trim() !== '' || status !== 'all' || educationCenterId !== 'all' || trainingProgramId !== 'all' || dateFrom !== '' || dateTo !== '';
+        search.trim() !== ''
+        || status !== 'all'
+        || educationCenterId !== 'all'
+        || trainingProgramId !== 'all'
+        || startDateFrom !== ''
+        || startDateTo !== ''
+        || endDateFrom !== ''
+        || endDateTo !== '';
 
     const hasRows = internPagination.data.length > 0;
 
@@ -151,7 +165,28 @@ export default function InternsPage({ interns: internPagination, filters, educat
         return `Mostrando ${internPagination.from} - ${internPagination.to} de ${internPagination.total} becarios`;
     }, [internPagination.from, internPagination.to, internPagination.total, hasRows]);
 
-    const hasInvalidDateRange = dateFrom !== '' && dateTo !== '' && dateFrom > dateTo;
+    const hasInvalidStartDateRange = startDateFrom !== '' && startDateTo !== '' && startDateFrom > startDateTo;
+    const hasInvalidEndDateRange = endDateFrom !== '' && endDateTo !== '' && endDateFrom > endDateTo;
+    const hasInvalidDateRange = hasInvalidStartDateRange || hasInvalidEndDateRange;
+    useEffect(() => {
+        const successMessage = page.props.flash?.success;
+        const errorMessage = page.props.flash?.error;
+        const flashKey = successMessage ? `success:${successMessage}` : errorMessage ? `error:${errorMessage}` : null;
+
+        if (!flashKey || lastFlashRef.current === flashKey) {
+            return;
+        }
+
+        lastFlashRef.current = flashKey;
+
+        if (successMessage) {
+            toast.success(successMessage);
+        }
+
+        if (errorMessage) {
+            toast.error(errorMessage);
+        }
+    }, [page.props.flash?.success, page.props.flash?.error]);
 
     // Efecto para manejar la búsqueda con debounce y sincronización de filtros:
     useEffect(() => {
@@ -160,15 +195,19 @@ export default function InternsPage({ interns: internPagination, filters, educat
         const currentStatus = filters.status || 'all';
         const currentEducationCenterId = filters.education_center_id ? String(filters.education_center_id) : 'all';
         const currentTrainingProgramId = filters.training_program_id ? String(filters.training_program_id) : 'all';
-        const currentDateFrom = filters.date_from ?? '';
-        const currentDateTo = filters.date_to ?? '';
+        const currentStartDateFrom = filters.start_date_from ?? '';
+        const currentStartDateTo = filters.start_date_to ?? '';
+        const currentEndDateFrom = filters.end_date_from ?? '';
+        const currentEndDateTo = filters.end_date_to ?? '';
         if (
             normalizedSearch === normalizedFilter &&
             status === currentStatus &&
             educationCenterId === currentEducationCenterId &&
             trainingProgramId === currentTrainingProgramId &&
-            dateFrom === currentDateFrom &&
-            dateTo === currentDateTo
+            startDateFrom === currentStartDateFrom &&
+            startDateTo === currentStartDateTo &&
+            endDateFrom === currentEndDateFrom &&
+            endDateTo === currentEndDateTo
         ) {
             return;
         }
@@ -186,8 +225,10 @@ export default function InternsPage({ interns: internPagination, filters, educat
                     status: status === 'all' ? undefined : status,
                     education_center_id: educationCenterId === 'all' ? undefined : educationCenterId,
                     training_program_id: trainingProgramId === 'all' ? undefined : trainingProgramId,
-                    date_from: dateFrom || undefined,
-                    date_to: dateTo || undefined,
+                    start_date_from: startDateFrom || undefined,
+                    start_date_to: startDateTo || undefined,
+                    end_date_from: endDateFrom || undefined,
+                    end_date_to: endDateTo || undefined,
                 },
                 {
                     preserveState: true,
@@ -198,7 +239,25 @@ export default function InternsPage({ interns: internPagination, filters, educat
         }, 300);
 
         return () => window.clearTimeout(timeoutId);
-    }, [search, status, educationCenterId, trainingProgramId, dateFrom, dateTo, filters.search, filters.status, filters.education_center_id, filters.training_program_id, filters.date_from, filters.date_to, hasInvalidDateRange]);
+    }, [
+        search,
+        status,
+        educationCenterId,
+        trainingProgramId,
+        startDateFrom,
+        startDateTo,
+        endDateFrom,
+        endDateTo,
+        filters.search,
+        filters.status,
+        filters.education_center_id,
+        filters.training_program_id,
+        filters.start_date_from,
+        filters.start_date_to,
+        filters.end_date_from,
+        filters.end_date_to,
+        hasInvalidDateRange,
+    ]);
 
     // Función para confirmar eliminación de un becario, mostrando un diálogo de confirmación y manejando la petición de eliminación a través de Inertia.js. Si la eliminación es exitosa, se cierra el diálogo y se muestra un mensaje flash.
     const confirmDelete = () => {
@@ -230,8 +289,10 @@ export default function InternsPage({ interns: internPagination, filters, educat
         if (status !== 'all') params.status = status;
         if (educationCenterId !== 'all') params.education_center_id = educationCenterId;
         if (trainingProgramId !== 'all') params.training_program_id = trainingProgramId;
-        if (dateFrom) params.date_from = dateFrom;
-        if (dateTo) params.date_to = dateTo;
+        if (startDateFrom) params.start_date_from = startDateFrom;
+        if (startDateTo) params.start_date_to = startDateTo;
+        if (endDateFrom) params.end_date_from = endDateFrom;
+        if (endDateTo) params.end_date_to = endDateTo;
 
         window.location.href = interns.export({
             query: params,
@@ -243,8 +304,10 @@ export default function InternsPage({ interns: internPagination, filters, educat
         setStatus('all');
         setEducationCenterId('all');
         setTrainingProgramId('all');
-        setDateFrom('');
-        setDateTo('');
+        setStartDateFrom('');
+        setStartDateTo('');
+        setEndDateFrom('');
+        setEndDateTo('');
 
         router.get(interns.index().url, {}, {
             preserveState: true,
@@ -312,8 +375,8 @@ export default function InternsPage({ interns: internPagination, filters, educat
                                         variant="outline"
                                         size="icon"
                                         className={UI_PRESETS.iconActionButtonPrimary}
-                                        title="Nuevo becario"
-                                        aria-label="Nuevo becario"
+                                        title="Nuevo Becario"
+                                        aria-label="Nuevo Becario"
                                     >
                                         <Link href={interns.create().url}>
                                             <CirclePlus />
@@ -322,7 +385,7 @@ export default function InternsPage({ interns: internPagination, filters, educat
                                 </div>
                             </div>
 
-                            <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-5">
+                            <div className="grid gap-2 md:grid-cols-3">
                                 <div className="flex flex-col gap-1">
                                     <span className="text-xs font-medium text-muted-foreground">Centro educativo</span>
                                     <Select value={educationCenterId} onValueChange={setEducationCenterId}>
@@ -358,45 +421,72 @@ export default function InternsPage({ interns: internPagination, filters, educat
                                 </div>
 
                                 <div className="flex flex-col gap-1">
-                                    <span className="text-xs font-medium text-muted-foreground">Desde</span>
-                                    <Input
-                                        type="date"
-                                        value={dateFrom}
-                                        onChange={(event) => setDateFrom(event.target.value)}
-                                        className={`${UI_PRESETS.simpleSearchInput} h-9 text-sm`}
-                                    />
-                                </div>
-
-                                <div className="flex flex-col gap-1">
-                                    <span className="text-xs font-medium text-muted-foreground">Hasta</span>
-                                    <Input
-                                        type="date"
-                                        value={dateTo}
-                                        onChange={(event) => setDateTo(event.target.value)}
-                                        className={`${UI_PRESETS.simpleSearchInput} h-9 text-sm`}
-                                    />
-                                </div>
-
-                                <div className="flex flex-col gap-1">
                                     <span className="text-xs font-medium text-muted-foreground">Estado</span>
-                                            <Select value={status} onValueChange={setStatus}>
-                                                <SelectTrigger className={`${UI_PRESETS.selectTrigger} w-full`}>
-                                                    <SelectValue placeholder="Estado" />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem className={UI_PRESETS.selectItem} value="all">Todos los estados</SelectItem>
-                                                    <SelectItem className={UI_PRESETS.selectItem} value="upcoming_active">Activo proximamente</SelectItem>
-                                                    <SelectItem className={UI_PRESETS.selectItem} value="active">Activo</SelectItem>
-                                                    <SelectItem className={UI_PRESETS.selectItem} value="finished">Finalizado</SelectItem>
-                                                    <SelectItem className={UI_PRESETS.selectItem} value="abandoned">Abandonado</SelectItem>
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
+                                    <Select value={status} onValueChange={setStatus}>
+                                        <SelectTrigger className={`${UI_PRESETS.selectTrigger} w-full`}>
+                                            <SelectValue placeholder="Estado" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem className={UI_PRESETS.selectItem} value="all">Todos los estados</SelectItem>
+                                            <SelectItem className={UI_PRESETS.selectItem} value="upcoming_active">Activo proximamente</SelectItem>
+                                            <SelectItem className={UI_PRESETS.selectItem} value="active">Activo</SelectItem>
+                                            <SelectItem className={UI_PRESETS.selectItem} value="finished">Finalizado</SelectItem>
+                                            <SelectItem className={UI_PRESETS.selectItem} value="abandoned">Abandonado</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
                             </div>
 
-                            {hasInvalidDateRange ? (
+                            <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+                                <div className="flex flex-col gap-1">
+                                    <span className="text-xs font-medium text-muted-foreground">Inicio desde</span>
+                                    <Input
+                                        type="date"
+                                        value={startDateFrom}
+                                        onChange={(event) => setStartDateFrom(event.target.value)}
+                                        className={`${UI_PRESETS.simpleSearchInput} h-9 text-sm`}
+                                    />
+                                </div>
+
+                                <div className="flex flex-col gap-1">
+                                    <span className="text-xs font-medium text-muted-foreground">Inicio hasta</span>
+                                    <Input
+                                        type="date"
+                                        value={startDateTo}
+                                        onChange={(event) => setStartDateTo(event.target.value)}
+                                        className={`${UI_PRESETS.simpleSearchInput} h-9 text-sm`}
+                                    />
+                                </div>
+
+                                <div className="flex flex-col gap-1">
+                                    <span className="text-xs font-medium text-muted-foreground">Fin desde</span>
+                                    <Input
+                                        type="date"
+                                        value={endDateFrom}
+                                        onChange={(event) => setEndDateFrom(event.target.value)}
+                                        className={`${UI_PRESETS.simpleSearchInput} h-9 text-sm`}
+                                    />
+                                </div>
+
+                                <div className="flex flex-col gap-1">
+                                    <span className="text-xs font-medium text-muted-foreground">Fin hasta</span>
+                                    <Input
+                                        type="date"
+                                        value={endDateTo}
+                                        onChange={(event) => setEndDateTo(event.target.value)}
+                                        className={`${UI_PRESETS.simpleSearchInput} h-9 text-sm`}
+                                    />
+                                </div>
+                            </div>
+
+                            {hasInvalidStartDateRange ? (
                                 <p className="text-sm font-medium text-destructive">
-                                    La fecha &quot;Desde&quot; no puede ser posterior a la fecha &quot;Hasta&quot;.
+                                    En fechas de inicio: &quot;Inicio desde&quot; no puede ser posterior a &quot;Inicio hasta&quot;.
+                                </p>
+                            ) : null}
+                            {hasInvalidEndDateRange ? (
+                                <p className="text-sm font-medium text-destructive">
+                                    En fechas de fin: &quot;Fin desde&quot; no puede ser posterior a &quot;Fin hasta&quot;.
                                 </p>
                             ) : null}
                         </div>
@@ -468,7 +558,7 @@ export default function InternsPage({ interns: internPagination, filters, educat
                                                         className={UI_PRESETS.iconActionButton}
                                                         asChild
                                                     >
-                                                        <Link href={interns.show(intern.id).url} aria-label="Ver becario" title="Ver becario">
+                                                        <Link href={interns.show(intern.id).url} aria-label="Ver Becario" title="Ver Becario">
                                                             <Eye />
                                                         </Link>
                                                     </Button>
@@ -478,7 +568,7 @@ export default function InternsPage({ interns: internPagination, filters, educat
                                                         className={UI_PRESETS.iconActionButton}
                                                         asChild
                                                     >
-                                                        <Link href={interns.edit(intern.id).url} aria-label="Editar becario" title="Editar becario">
+                                                        <Link href={interns.edit(intern.id).url} aria-label="Editar Becario" title="Editar Becario">
                                                             <Pencil />
                                                         </Link>
                                                     </Button>
@@ -486,8 +576,8 @@ export default function InternsPage({ interns: internPagination, filters, educat
                                                         variant="outline"
                                                         size="icon"
                                                         className={UI_PRESETS.iconActionButtonDanger}
-                                                        aria-label="Eliminar becario"
-                                                        title="Eliminar becario"
+                                                        aria-label="Eliminar Becario"
+                                                        title="Eliminar Becario"
                                                         onClick={() => setInternToDelete(intern)}
                                                     >
                                                         <Trash2 />
@@ -561,3 +651,4 @@ export default function InternsPage({ interns: internPagination, filters, educat
         </AppLayout>
     );
 }
+

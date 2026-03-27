@@ -31,8 +31,10 @@ class InternController extends Controller
         $search = trim((string) $request->string('search')->toString());
         $educationCenterId = $request->integer('education_center_id');
         $trainingProgramId = $request->integer('training_program_id');
-        $date_from = $request->string('date_from')->toString();
-        $date_to = $request->string('date_to')->toString();
+        $startDateFrom = $request->string('start_date_from')->toString();
+        $startDateTo = $request->string('start_date_to')->toString();
+        $endDateFrom = $request->string('end_date_from')->toString();
+        $endDateTo = $request->string('end_date_to')->toString();
         $baseQuery = $this->filteredBaseQuery($request);
 
         $statusSnapshot = (clone $baseQuery)
@@ -93,8 +95,10 @@ class InternController extends Controller
                 'status' => $status,
                 'education_center_id' => $educationCenterId,
                 'training_program_id' => $trainingProgramId,
-                'date_from' => $date_from,
-                'date_to' => $date_to,
+                'start_date_from' => $startDateFrom,
+                'start_date_to' => $startDateTo,
+                'end_date_from' => $endDateFrom,
+                'end_date_to' => $endDateTo,
             ],
             'educationCenters' => EducationCenter::query()
                 ->orderBy('name')
@@ -140,8 +144,12 @@ class InternController extends Controller
         $search = trim((string) $request->string('search')->toString());
         $educationCenterId = $request->integer('education_center_id');
         $trainingProgramId = $request->integer('training_program_id');
-        $date_from = $request->string('date_from')->toString();
-        $date_to = $request->string('date_to')->toString();
+        $startDateFrom = $request->string('start_date_from')->toString();
+        $startDateTo = $request->string('start_date_to')->toString();
+        $endDateFrom = $request->string('end_date_from')->toString();
+        $endDateTo = $request->string('end_date_to')->toString();
+        $legacyDateFrom = $request->string('date_from')->toString();
+        $legacyDateTo = $request->string('date_to')->toString();
 
         return Intern::query()
             ->when($search !== '', function ($query) use ($search) {
@@ -157,17 +165,28 @@ class InternController extends Controller
             })
             ->when($educationCenterId, fn ($query) => $query->where('education_center_id', $educationCenterId))
             ->when($trainingProgramId, fn ($query) => $query->where('training_program_id', $trainingProgramId))
-            ->when($date_from !== '' && $date_to !== '', function ($query) use ($date_from, $date_to) {
-                $query
-                    ->whereDate('internship_start_date', '<=', $date_to)
-                    ->whereDate('internship_end_date', '>=', $date_from);
-            })
-            ->when($date_from !== '' && $date_to === '', function ($query) use ($date_from) {
-                $query->whereDate('internship_end_date', '>=', $date_from);
-            })
-            ->when($date_from === '' && $date_to !== '', function ($query) use ($date_to) {
-                $query->whereDate('internship_start_date', '<=', $date_to);
-            });
+            ->when($startDateFrom !== '', fn ($query) => $query->whereDate('internship_start_date', '>=', $startDateFrom))
+            ->when($startDateTo !== '', fn ($query) => $query->whereDate('internship_start_date', '<=', $startDateTo))
+            ->when($endDateFrom !== '', fn ($query) => $query->whereDate('internship_end_date', '>=', $endDateFrom))
+            ->when($endDateTo !== '', fn ($query) => $query->whereDate('internship_end_date', '<=', $endDateTo))
+            // Compatibilidad con enlaces/filtros legacy.
+            ->when(
+                $startDateFrom === '' && $startDateTo === '' && $endDateFrom === '' && $endDateTo === '',
+                function ($query) use ($legacyDateFrom, $legacyDateTo) {
+                    $query
+                        ->when($legacyDateFrom !== '' && $legacyDateTo !== '', function ($legacyQuery) use ($legacyDateFrom, $legacyDateTo) {
+                            $legacyQuery
+                                ->whereDate('internship_start_date', '<=', $legacyDateTo)
+                                ->whereDate('internship_end_date', '>=', $legacyDateFrom);
+                        })
+                        ->when($legacyDateFrom !== '' && $legacyDateTo === '', function ($legacyQuery) use ($legacyDateFrom) {
+                            $legacyQuery->whereDate('internship_end_date', '>=', $legacyDateFrom);
+                        })
+                        ->when($legacyDateFrom === '' && $legacyDateTo !== '', function ($legacyQuery) use ($legacyDateTo) {
+                            $legacyQuery->whereDate('internship_start_date', '<=', $legacyDateTo);
+                        });
+                }
+            );
     }
 
     private function normalizeSearchTerm(string $value): string
@@ -279,7 +298,7 @@ class InternController extends Controller
         }
 
         return redirect()
-            ->route('interns.show', $intern)
+            ->route('interns.index')
             ->with('success', 'Becario creado correctamente.');
     }
 

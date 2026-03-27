@@ -31,7 +31,7 @@ const mainNavItems: NavItem[] = [
         icon: GraduationCap,
     },
     {
-        title: 'Prácticas y tareas',
+        title: 'Prácticas y Tareas',
         href: practiceTasks.index().url,
         icon: NotebookPen,
     },

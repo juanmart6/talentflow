@@ -490,6 +490,13 @@ class EducationCenterController extends Controller
     }
 
     // Verifica si un centro educativo tiene becarios activos asociados:
+    private function trainingProgramOptions()
+    {
+        return TrainingProgram::query()
+            ->orderBy('name')
+            ->get(['id', 'name']);
+    }
+
     private function hasActiveInterns(int $educationCenterId): bool
     {
         if (! Schema::hasTable('interns')) {

@@ -1,7 +1,9 @@
-import { Head, router } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import { ShieldCheck, UserCog } from 'lucide-react';
+import { useEffect, useRef } from 'react';
 import AppLayout from '@/layouts/app-layout';
 import { UI_PRESETS, stripedRowClass } from '@/lib/ui-presets';
+import { toast } from 'sonner';
 import type { BreadcrumbItem } from '@/types';
 import {
     Select,
@@ -39,6 +41,29 @@ const roleLabels: Record<string, string> = {
 };
 
 export default function UsersIndexPage({ users, availableRoles }: Props) {
+    const page = usePage<{ flash?: { success?: string; error?: string } }>();
+    const lastFlashRef = useRef<string | null>(null);
+
+    useEffect(() => {
+        const successMessage = page.props.flash?.success;
+        const errorMessage = page.props.flash?.error;
+        const flashKey = successMessage ? `success:${successMessage}` : errorMessage ? `error:${errorMessage}` : null;
+
+        if (!flashKey || lastFlashRef.current === flashKey) {
+            return;
+        }
+
+        lastFlashRef.current = flashKey;
+
+        if (successMessage) {
+            toast.success(successMessage);
+        }
+
+        if (errorMessage) {
+            toast.error(errorMessage);
+        }
+    }, [page.props.flash?.success, page.props.flash?.error]);
+
     const handleRoleChange = (userId: number, role: string) => {
         router.patch(
             `/autenticacion-usuarios/${userId}/role`,
@@ -124,4 +149,3 @@ export default function UsersIndexPage({ users, availableRoles }: Props) {
         </AppLayout>
     );
 }
-

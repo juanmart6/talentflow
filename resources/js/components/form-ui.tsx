@@ -1,4 +1,5 @@
 import { Label } from '@/components/ui/label';
+import HeaderBackIcon from '@/components/header-back-icon';
 import { type ReactNode } from 'react';
 
 type SectionIntroProps = {
@@ -30,16 +31,27 @@ export function FieldLabel({ htmlFor, children }: FieldLabelProps) {
 
 type FormPageHeaderProps = {
     title: string;
-    description: string;
+    description: ReactNode;
+    backHref?: string;
+    backLabel?: string;
     action?: ReactNode;
 };
 
-export function FormPageHeader({ title, description, action }: FormPageHeaderProps) {
+export function FormPageHeader({ title, description, backHref, backLabel, action }: FormPageHeaderProps) {
     return (
         <div className="mb-4 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-            <div>
+            <div className="min-w-0 flex-1">
                 <h1 className="text-2xl font-bold">{title}</h1>
-                <p className="text-sm text-muted-foreground">{description}</p>
+                <div className={`text-sm text-muted-foreground ${backHref ? 'relative pr-11' : ''}`}>
+                    {description}
+                    {backHref ? (
+                        <HeaderBackIcon
+                            href={backHref}
+                            label={backLabel ?? 'Volver al listado'}
+                            className="absolute right-0 top-1/2 -translate-y-1/2"
+                        />
+                    ) : null}
+                </div>
             </div>
             {action}
         </div>
