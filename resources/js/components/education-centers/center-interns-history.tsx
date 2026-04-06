@@ -24,7 +24,7 @@ export default function CenterInternsHistory({ internsHistory }: CenterInternsHi
     return (
         <section className={UI_PRESETS.sectionCard}>
             <div className="flex items-center justify-between gap-2">
-                <h2 className="text-lg font-bold">Histórico de becarios por centro</h2>
+                <h2 className="text-lg font-bold">HistÃ³rico de becarios por centro</h2>
                 <p className="text-sm text-muted-foreground">Total: {internsHistory.length}</p>
             </div>
 
@@ -43,7 +43,7 @@ export default function CenterInternsHistory({ internsHistory }: CenterInternsHi
                             <tr>
                                 <th className="px-4 py-3 text-center font-semibold">Becario</th>
                                 <th className="px-4 py-3 text-center font-semibold">Ciclo formativo</th>
-                                <th className="px-4 py-3 text-center font-semibold">Período</th>
+                                <th className="px-4 py-3 text-center font-semibold">PerÃ­odo</th>
                                 <th className="px-4 py-3 text-center font-semibold">Estado</th>
                             </tr>
                         </thead>

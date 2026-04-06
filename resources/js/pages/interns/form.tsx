@@ -84,6 +84,19 @@ function toDateInput(value?: string | null): string {
     return value.slice(0, 10);
 }
 
+function formatDisplayDate(value?: string | null): string {
+    if (!value) {
+        return '-';
+    }
+
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+        return value;
+    }
+
+    return date.toLocaleDateString('es-ES');
+}
+
 function documentTypeLabel(documentType: keyof DocumentHistory): string {
     const labels: Record<keyof DocumentHistory, string> = {
         collaboration_agreement: 'Convenio',
@@ -213,6 +226,10 @@ export default function InternFormPage({ mode, intern, educationCenters, documen
     );
     const availableTrainingPrograms = selectedCenter?.training_programs ?? [];
     const hasTrainingPrograms = availableTrainingPrograms.length > 0;
+    const selectedTrainingProgram = useMemo(
+        () => availableTrainingPrograms.find((program) => String(program.id) === data.training_program_id) ?? null,
+        [availableTrainingPrograms, data.training_program_id],
+    );
 
     useEffect(() => {
         if (
@@ -366,58 +383,105 @@ export default function InternFormPage({ mode, intern, educationCenters, documen
                                         description="Identificación y datos de contacto del becario."
                                     />
 
-                                    <div className="grid gap-4 md:grid-cols-2">
-                                        <div className="grid gap-2">
-                                            <FieldLabel htmlFor="first_name">Nombre</FieldLabel>
-                                            <Input id="first_name" value={data.first_name} onChange={(e) => setData('first_name', e.target.value)} className={UI_PRESETS.simpleSearchInput} required />
-                                            <InputError message={errors.first_name} />
+                                    {isReadOnly ? (
+                                        <div className="overflow-hidden rounded-xl border border-slate-200/80 dark:border-slate-700/80">
+                                            <dl className="divide-y divide-slate-200/80 dark:divide-slate-700/80">
+                                                <div className="grid gap-1 px-4 py-3 md:grid-cols-[220px_1fr] md:gap-3">
+                                                    <dt className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Nombre</dt>
+                                                    <dd className="text-sm font-medium text-slate-800 dark:text-slate-100">{data.first_name || '-'}</dd>
+                                                </div>
+                                                <div className="grid gap-1 px-4 py-3 md:grid-cols-[220px_1fr] md:gap-3">
+                                                    <dt className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Apellidos</dt>
+                                                    <dd className="text-sm font-medium text-slate-800 dark:text-slate-100">{data.last_name || '-'}</dd>
+                                                </div>
+                                                <div className="grid gap-1 px-4 py-3 md:grid-cols-[220px_1fr] md:gap-3">
+                                                    <dt className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">DNI/NIE</dt>
+                                                    <dd className="text-sm font-medium text-slate-800 dark:text-slate-100">{data.dni_nie || '-'}</dd>
+                                                </div>
+                                                <div className="grid gap-1 px-4 py-3 md:grid-cols-[220px_1fr] md:gap-3">
+                                                    <dt className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Email</dt>
+                                                    <dd className="text-sm font-medium text-slate-800 dark:text-slate-100">{data.email || '-'}</dd>
+                                                </div>
+                                                <div className="grid gap-1 px-4 py-3 md:grid-cols-[220px_1fr] md:gap-3">
+                                                    <dt className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Teléfono</dt>
+                                                    <dd className="text-sm font-medium text-slate-800 dark:text-slate-100">{data.phone || '-'}</dd>
+                                                </div>
+                                                <div className="grid gap-1 px-4 py-3 md:grid-cols-[220px_1fr] md:gap-3">
+                                                    <dt className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Dirección</dt>
+                                                    <dd className="text-sm font-medium text-slate-800 dark:text-slate-100">{data.address_line || '-'}</dd>
+                                                </div>
+                                                <div className="grid gap-1 px-4 py-3 md:grid-cols-[220px_1fr] md:gap-3">
+                                                    <dt className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Código postal</dt>
+                                                    <dd className="text-sm font-medium text-slate-800 dark:text-slate-100">{data.postal_code || '-'}</dd>
+                                                </div>
+                                                <div className="grid gap-1 px-4 py-3 md:grid-cols-[220px_1fr] md:gap-3">
+                                                    <dt className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Ciudad</dt>
+                                                    <dd className="text-sm font-medium text-slate-800 dark:text-slate-100">{data.city || '-'}</dd>
+                                                </div>
+                                                <div className="grid gap-1 px-4 py-3 md:grid-cols-[220px_1fr] md:gap-3">
+                                                    <dt className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Provincia</dt>
+                                                    <dd className="text-sm font-medium text-slate-800 dark:text-slate-100">{data.province || '-'}</dd>
+                                                </div>
+                                                <div className="grid gap-1 px-4 py-3 md:grid-cols-[220px_1fr] md:gap-3">
+                                                    <dt className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">País</dt>
+                                                    <dd className="text-sm font-medium text-slate-800 dark:text-slate-100">{data.country || '-'}</dd>
+                                                </div>
+                                            </dl>
                                         </div>
-                                        <div className="grid gap-2">
-                                            <FieldLabel htmlFor="last_name">Apellidos</FieldLabel>
-                                            <Input id="last_name" value={data.last_name} onChange={(e) => setData('last_name', e.target.value)} className={UI_PRESETS.simpleSearchInput} required />
-                                            <InputError message={errors.last_name} />
+                                    ) : (
+                                        <div className="grid gap-4 md:grid-cols-2">
+                                            <div className="grid gap-2">
+                                                <FieldLabel htmlFor="first_name">Nombre</FieldLabel>
+                                                <Input id="first_name" value={data.first_name} onChange={(e) => setData('first_name', e.target.value)} className={UI_PRESETS.simpleSearchInput} required />
+                                                <InputError message={errors.first_name} />
+                                            </div>
+                                            <div className="grid gap-2">
+                                                <FieldLabel htmlFor="last_name">Apellidos</FieldLabel>
+                                                <Input id="last_name" value={data.last_name} onChange={(e) => setData('last_name', e.target.value)} className={UI_PRESETS.simpleSearchInput} required />
+                                                <InputError message={errors.last_name} />
+                                            </div>
+                                            <div className="grid gap-2">
+                                                <FieldLabel htmlFor="dni_nie">DNI/NIE</FieldLabel>
+                                                <Input id="dni_nie" value={data.dni_nie} onChange={(e) => setData('dni_nie', e.target.value)} className={UI_PRESETS.simpleSearchInput} required />
+                                                <InputError message={errors.dni_nie} />
+                                            </div>
+                                            <div className="grid gap-2">
+                                                <FieldLabel htmlFor="email">Email</FieldLabel>
+                                                <Input id="email" type="email" value={data.email} onChange={(e) => setData('email', e.target.value)} className={UI_PRESETS.simpleSearchInput} required />
+                                                <InputError message={errors.email} />
+                                            </div>
+                                            <div className="grid gap-2">
+                                                <FieldLabel htmlFor="phone">Teléfono</FieldLabel>
+                                                <Input id="phone" value={data.phone} onChange={(e) => setData('phone', e.target.value)} className={UI_PRESETS.simpleSearchInput} required />
+                                                <InputError message={errors.phone} />
+                                            </div>
+                                            <div className="grid gap-2 md:col-span-2">
+                                                <FieldLabel htmlFor="address_line">Dirección</FieldLabel>
+                                                <Input id="address_line" value={data.address_line} onChange={(e) => setData('address_line', e.target.value)} className={UI_PRESETS.simpleSearchInput} required />
+                                                <InputError message={errors.address_line} />
+                                            </div>
+                                            <div className="grid gap-2">
+                                                <FieldLabel htmlFor="postal_code">Código postal</FieldLabel>
+                                                <Input id="postal_code" value={data.postal_code} onChange={(e) => setData('postal_code', e.target.value)} className={UI_PRESETS.simpleSearchInput} required />
+                                                <InputError message={errors.postal_code} />
+                                            </div>
+                                            <div className="grid gap-2">
+                                                <FieldLabel htmlFor="city">Ciudad</FieldLabel>
+                                                <Input id="city" value={data.city} onChange={(e) => setData('city', e.target.value)} className={UI_PRESETS.simpleSearchInput} required />
+                                                <InputError message={errors.city} />
+                                            </div>
+                                            <div className="grid gap-2">
+                                                <FieldLabel htmlFor="province">Provincia</FieldLabel>
+                                                <Input id="province" value={data.province} onChange={(e) => setData('province', e.target.value)} className={UI_PRESETS.simpleSearchInput} required />
+                                                <InputError message={errors.province} />
+                                            </div>
+                                            <div className="grid gap-2">
+                                                <FieldLabel htmlFor="country">País</FieldLabel>
+                                                <Input id="country" value={data.country} onChange={(e) => setData('country', e.target.value)} className={UI_PRESETS.simpleSearchInput} required />
+                                                <InputError message={errors.country} />
+                                            </div>
                                         </div>
-                                        <div className="grid gap-2">
-                                            <FieldLabel htmlFor="dni_nie">DNI/NIE</FieldLabel>
-                                            <Input id="dni_nie" value={data.dni_nie} onChange={(e) => setData('dni_nie', e.target.value)} className={UI_PRESETS.simpleSearchInput} required />
-                                            <InputError message={errors.dni_nie} />
-                                        </div>
-                                        <div className="grid gap-2">
-                                            <FieldLabel htmlFor="email">Email</FieldLabel>
-                                            <Input id="email" type="email" value={data.email} onChange={(e) => setData('email', e.target.value)} className={UI_PRESETS.simpleSearchInput} required />
-                                            <InputError message={errors.email} />
-                                        </div>
-                                        <div className="grid gap-2">
-                                            <FieldLabel htmlFor="phone">Teléfono</FieldLabel>
-                                            <Input id="phone" value={data.phone} onChange={(e) => setData('phone', e.target.value)} className={UI_PRESETS.simpleSearchInput} required />
-                                            <InputError message={errors.phone} />
-                                        </div>
-                                        <div className="grid gap-2 md:col-span-2">
-                                            <FieldLabel htmlFor="address_line">Dirección</FieldLabel>
-                                            <Input id="address_line" value={data.address_line} onChange={(e) => setData('address_line', e.target.value)} className={UI_PRESETS.simpleSearchInput} required />
-                                            <InputError message={errors.address_line} />
-                                        </div>
-                                        <div className="grid gap-2">
-                                            <FieldLabel htmlFor="postal_code">Código postal</FieldLabel>
-                                            <Input id="postal_code" value={data.postal_code} onChange={(e) => setData('postal_code', e.target.value)} className={UI_PRESETS.simpleSearchInput} required />
-                                            <InputError message={errors.postal_code} />
-                                        </div>
-                                        <div className="grid gap-2">
-                                            <FieldLabel htmlFor="city">Ciudad</FieldLabel>
-                                            <Input id="city" value={data.city} onChange={(e) => setData('city', e.target.value)} className={UI_PRESETS.simpleSearchInput} required />
-                                            <InputError message={errors.city} />
-                                        </div>
-                                        <div className="grid gap-2">
-                                            <FieldLabel htmlFor="province">Provincia</FieldLabel>
-                                            <Input id="province" value={data.province} onChange={(e) => setData('province', e.target.value)} className={UI_PRESETS.simpleSearchInput} required />
-                                            <InputError message={errors.province} />
-                                        </div>
-                                        <div className="grid gap-2">
-                                            <FieldLabel htmlFor="country">País</FieldLabel>
-                                            <Input id="country" value={data.country} onChange={(e) => setData('country', e.target.value)} className={UI_PRESETS.simpleSearchInput} required />
-                                            <InputError message={errors.country} />
-                                        </div>
-                                    </div>
+                                    )}
                                 </section>
                                 )}
 
@@ -428,6 +492,58 @@ export default function InternFormPage({ mode, intern, educationCenters, documen
                                         description="Centro, tutor, período y situación de prácticas."
                                     />
 
+                                    {isReadOnly ? (
+                                        <div className="overflow-hidden rounded-xl border border-slate-200/80 dark:border-slate-700/80">
+                                            <dl className="divide-y divide-slate-200/80 dark:divide-slate-700/80">
+                                                <div className="grid gap-1 px-4 py-3 md:grid-cols-[220px_1fr] md:gap-3">
+                                                    <dt className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Centro educativo</dt>
+                                                    <dd className="text-sm font-medium text-slate-800 dark:text-slate-100">{selectedCenter?.name || '-'}</dd>
+                                                </div>
+                                                <div className="grid gap-1 px-4 py-3 md:grid-cols-[220px_1fr] md:gap-3">
+                                                    <dt className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Ciclo formativo</dt>
+                                                    <dd className="text-sm font-medium text-slate-800 dark:text-slate-100">{selectedTrainingProgram?.name || '-'}</dd>
+                                                </div>
+                                                <div className="grid gap-1 px-4 py-3 md:grid-cols-[220px_1fr] md:gap-3">
+                                                    <dt className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Año académico</dt>
+                                                    <dd className="text-sm font-medium text-slate-800 dark:text-slate-100">{data.academic_year || '-'}</dd>
+                                                </div>
+                                                <div className="grid gap-1 px-4 py-3 md:grid-cols-[220px_1fr] md:gap-3">
+                                                    <dt className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Tutor académico</dt>
+                                                    <dd className="text-sm font-medium text-slate-800 dark:text-slate-100">{data.academic_tutor_name || '-'}</dd>
+                                                </div>
+                                                <div className="grid gap-1 px-4 py-3 md:grid-cols-[220px_1fr] md:gap-3">
+                                                    <dt className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Email tutor</dt>
+                                                    <dd className="text-sm font-medium text-slate-800 dark:text-slate-100">{data.academic_tutor_email || '-'}</dd>
+                                                </div>
+                                                <div className="grid gap-1 px-4 py-3 md:grid-cols-[220px_1fr] md:gap-3">
+                                                    <dt className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Fecha inicio</dt>
+                                                    <dd className="text-sm font-medium text-slate-800 dark:text-slate-100">{formatDisplayDate(data.internship_start_date)}</dd>
+                                                </div>
+                                                <div className="grid gap-1 px-4 py-3 md:grid-cols-[220px_1fr] md:gap-3">
+                                                    <dt className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Fecha fin</dt>
+                                                    <dd className="text-sm font-medium text-slate-800 dark:text-slate-100">{formatDisplayDate(data.internship_end_date)}</dd>
+                                                </div>
+                                                <div className="grid gap-1 px-4 py-3 md:grid-cols-[220px_1fr] md:gap-3">
+                                                    <dt className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Horas requeridas</dt>
+                                                    <dd className="text-sm font-medium text-slate-800 dark:text-slate-100">
+                                                        {Number(data.required_hours) > 0 ? `${data.required_hours} h` : '-'}
+                                                    </dd>
+                                                </div>
+                                                <div className="grid gap-1 px-4 py-3 md:grid-cols-[220px_1fr] md:gap-3">
+                                                    <dt className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Estado</dt>
+                                                    <dd className="text-sm font-medium text-slate-800 dark:text-slate-100">{INTERN_STATUS_META[computedStatus].label}</dd>
+                                                </div>
+                                                <div className="grid gap-1 px-4 py-3 md:grid-cols-[220px_1fr] md:gap-3">
+                                                    <dt className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Motivo abandono</dt>
+                                                    <dd className="text-sm font-medium text-slate-800 dark:text-slate-100">{data.abandonment_reason || '-'}</dd>
+                                                </div>
+                                                <div className="grid gap-1 px-4 py-3 md:grid-cols-[220px_1fr] md:gap-3">
+                                                    <dt className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Fecha abandono</dt>
+                                                    <dd className="text-sm font-medium text-slate-800 dark:text-slate-100">{formatDisplayDate(data.abandonment_date)}</dd>
+                                                </div>
+                                            </dl>
+                                        </div>
+                                    ) : (
                                     <div className="grid gap-4 md:grid-cols-2">
                                         <div className="grid gap-2 md:col-span-2">
                                             <FieldLabel htmlFor="education_center_id">Centro educativo</FieldLabel>
@@ -523,25 +639,15 @@ export default function InternFormPage({ mode, intern, educationCenters, documen
                                         </div>
                                         <div className="grid gap-2">
                                             <FieldLabel htmlFor="status">Estado</FieldLabel>
-                                            {isReadOnly ? (
-                                                <Input
-                                                    id="status"
-                                                    value={INTERN_STATUS_META[computedStatus].label}
-                                                    className={UI_PRESETS.simpleSearchInput}
-                                                    readOnly
-                                                    disabled
-                                                />
-                                            ) : (
-                                                <Select value={data.status} onValueChange={(value) => setData('status', value as 'active' | 'abandoned')} required>
-                                                    <SelectTrigger id="status" className={UI_PRESETS.selectTrigger}>
-                                                        <SelectValue placeholder="Estado" />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        <SelectItem className={UI_PRESETS.selectItem} value="active">Automatico (segun fechas)</SelectItem>
-                                                        <SelectItem className={UI_PRESETS.selectItem} value="abandoned">Abandonado</SelectItem>
-                                                    </SelectContent>
-                                                </Select>
-                                            )}
+                                            <Select value={data.status} onValueChange={(value) => setData('status', value as 'active' | 'abandoned')} required>
+                                                <SelectTrigger id="status" className={UI_PRESETS.selectTrigger}>
+                                                    <SelectValue placeholder="Estado" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem className={UI_PRESETS.selectItem} value="active">Automatico (segun fechas)</SelectItem>
+                                                    <SelectItem className={UI_PRESETS.selectItem} value="abandoned">Abandonado</SelectItem>
+                                                </SelectContent>
+                                            </Select>
                                             <InputError message={errors.status} />
                                         </div>
                                         <div className="grid gap-2 md:col-span-2">
@@ -562,6 +668,7 @@ export default function InternFormPage({ mode, intern, educationCenters, documen
                                             <InputError message={errors.abandonment_date} />
                                         </div>
                                     </div>
+                                    )}
                                 </section>
                                 )}
 
@@ -569,7 +676,7 @@ export default function InternFormPage({ mode, intern, educationCenters, documen
                                 <section className="space-y-4 pt-4">
                                     <SectionIntro
                                         title="Documentación adjunta"
-                                        description="Cada nueva subida queda como principal y el histórico se conserva para consulta."
+                                        description="Archivos adjuntos en relación al becario con su programa de prácticas."
                                     />
 
                                     {!isReadOnly && (
@@ -581,7 +688,7 @@ export default function InternFormPage({ mode, intern, educationCenters, documen
                                     )}
 
                                     {!isCreate && (
-                                        <div className="grid gap-4 pt-2 md:grid-cols-3">
+                                        <div className={`pt-2 ${isReadOnly ? 'space-y-4' : 'grid gap-4 md:grid-cols-3'}`}>
                                             {(Object.keys(documentHistory) as Array<keyof DocumentHistory>).map((documentType) => {
                                                 const documents = documentHistory[documentType];
                                                 const currentDocument = documents.find((item) => item.is_current) ?? documents[0] ?? null;
@@ -592,11 +699,7 @@ export default function InternFormPage({ mode, intern, educationCenters, documen
                                                 return (
                                                     <article
                                                         key={documentType}
-                                                        className={`rounded-lg border p-3 ${
-                                                            isReadOnly
-                                                                ? 'border-slate-200 bg-slate-100/90 dark:border-slate-700 dark:bg-slate-900/45'
-                                                                : 'border-sidebar-border/70 bg-slate-50/60 dark:border-sidebar-border dark:bg-slate-900/30'
-                                                        }`}
+                                                        className={`rounded-lg border p-3 ${isReadOnly ? 'border-slate-200/80 dark:border-slate-700/80' : 'border-sidebar-border/70 bg-slate-50/60 dark:border-sidebar-border dark:bg-slate-900/30'}`}
                                                     >
                                                         <div className="flex items-center justify-between gap-2">
                                                             <p className="text-sm font-semibold">{documentTypeLabel(documentType)}</p>
@@ -617,16 +720,12 @@ export default function InternFormPage({ mode, intern, educationCenters, documen
                                                                 </span>
                                                             )}
                                                         </div>
-                                                        <ul className="mt-3 space-y-2 text-sm">
+                                                        <ul className={`mt-3 text-sm ${isReadOnly ? 'divide-y divide-slate-200/80 dark:divide-slate-700/80' : 'space-y-2'}`}>
                                                             {visibleDocuments.length > 0 ? (
                                                                 visibleDocuments.map((item) => (
                                                                     <li
                                                                         key={`${documentType}-${item.filename}`}
-                                                                        className={`rounded-md border p-2 ${
-                                                                            isReadOnly
-                                                                                ? 'border-slate-200 bg-slate-100/90 dark:border-slate-700 dark:bg-slate-900/45'
-                                                                                : 'border-sidebar-border/60 bg-white dark:border-sidebar-border dark:bg-slate-950/40'
-                                                                        }`}
+                                                                        className={isReadOnly ? 'py-3 first:pt-0 last:pb-0' : 'rounded-md border border-sidebar-border/60 bg-white p-2 dark:border-sidebar-border dark:bg-slate-950/40'}
                                                                     >
                                                                         <div className="flex flex-wrap items-center gap-2">
                                                                             <span className="max-w-[180px] truncate font-medium" title={item.filename}>{item.filename}</span>
@@ -661,19 +760,29 @@ export default function InternFormPage({ mode, intern, educationCenters, documen
                                         description="Notas internas y contexto adicional del becario."
                                     />
 
-                                    <div className="grid gap-2">
-                                        <FieldLabel htmlFor="general_notes">Notas</FieldLabel>
-                                        <textarea
-                                            id="general_notes"
-                                            name="general_notes"
-                                            value={data.general_notes ?? ''}
-                                            onChange={(event) => setData('general_notes', event.target.value)}
-                                            className={`min-h-[140px] w-full resize-y rounded-md border border-slate-300 px-3 py-2.5 text-sm leading-relaxed shadow-xs transition-colors focus:border-[#2563eb] focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20 dark:border-slate-600 ${isReadOnly ? 'bg-slate-100/90 dark:bg-slate-900/45' : 'bg-white dark:bg-slate-950'}`}
-                                            placeholder="Añade información relevante del becario..."
-                                            readOnly={isReadOnly}
-                                        />
-                                        <InputError message={errors.general_notes} />
-                                    </div>
+                                    {isReadOnly ? (
+                                        <div className="overflow-hidden rounded-xl border border-slate-200/80 dark:border-slate-700/80">
+                                            <div className="grid gap-1 px-4 py-3 md:grid-cols-[220px_1fr] md:gap-3">
+                                                <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Notas</p>
+                                                <p className="text-sm font-medium whitespace-pre-line text-slate-800 dark:text-slate-100">
+                                                    {data.general_notes?.trim() ? data.general_notes : '-'}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="grid gap-2">
+                                            <FieldLabel htmlFor="general_notes">Notas</FieldLabel>
+                                            <textarea
+                                                id="general_notes"
+                                                name="general_notes"
+                                                value={data.general_notes ?? ''}
+                                                onChange={(event) => setData('general_notes', event.target.value)}
+                                                className="min-h-[140px] w-full resize-y rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm leading-relaxed shadow-xs transition-colors focus:border-[#2563eb] focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20 dark:border-slate-600 dark:bg-slate-950"
+                                                placeholder="Añade información relevante del becario..."
+                                            />
+                                            <InputError message={errors.general_notes} />
+                                        </div>
+                                    )}
                                 </section>
                                 )}
                             </fieldset>
@@ -701,4 +810,3 @@ export default function InternFormPage({ mode, intern, educationCenters, documen
         </AppLayout>
     );
 }
-

@@ -147,6 +147,25 @@ export default function CenterAgreementSection({
                 </div>
             )}
 
+            {isReadOnly && (
+                <div className="overflow-hidden rounded-xl border border-slate-200/80 dark:border-slate-700/80">
+                    <dl className="divide-y divide-slate-200/80 dark:divide-slate-700/80">
+                        <div className="grid gap-1 px-4 py-3 md:grid-cols-[220px_1fr] md:gap-3">
+                            <dt className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Fecha de firma</dt>
+                            <dd className="text-sm font-medium text-slate-800 dark:text-slate-100">{formatSpanishDate(center?.agreement_signed_at ?? null)}</dd>
+                        </div>
+                        <div className="grid gap-1 px-4 py-3 md:grid-cols-[220px_1fr] md:gap-3">
+                            <dt className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Fecha de vencimiento</dt>
+                            <dd className="text-sm font-medium text-slate-800 dark:text-slate-100">{formatSpanishDate(center?.agreement_expires_at ?? null)}</dd>
+                        </div>
+                        <div className="grid gap-1 px-4 py-3 md:grid-cols-[220px_1fr] md:gap-3">
+                            <dt className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Plazas acordadas</dt>
+                            <dd className="text-sm font-medium text-slate-800 dark:text-slate-100">{center?.agreement_agreed_slots ?? '-'}</dd>
+                        </div>
+                    </dl>
+                </div>
+            )}
+
             {!isCreate && agreementHistory.length > 0 && (
                 <div className="grid gap-3">
                     <div className="flex items-center justify-between gap-2">
@@ -158,11 +177,7 @@ export default function CenterAgreementSection({
                         {agreementHistory.map((agreement) => (
                             <article
                                 key={agreement.id}
-                                className={`rounded-lg border p-3 ${
-                                    isReadOnly
-                                        ? 'border-slate-200 bg-slate-100/90 dark:border-slate-700 dark:bg-slate-900/45'
-                                        : 'border-sidebar-border/70 bg-slate-50/60 dark:border-sidebar-border dark:bg-slate-900/30'
-                                }`}
+                                className={`rounded-lg border p-3 ${isReadOnly ? 'border-slate-200/80 dark:border-slate-700/80' : 'border-sidebar-border/70 bg-slate-50/60 dark:border-sidebar-border dark:bg-slate-900/30'}`}
                             >
                                 <div className="flex flex-wrap items-center justify-between gap-2">
                                     <div className="flex items-center gap-2">

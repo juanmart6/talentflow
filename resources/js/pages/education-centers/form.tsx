@@ -91,6 +91,7 @@ export default function EducationCenterForm({ mode, center, trainingPrograms, ag
     const [selectedAgreementFileName, setSelectedAgreementFileName] = useState<string | null>(null);
     const [deletingAgreementId, setDeletingAgreementId] = useState<number | null>(null);
     const [activeTab, setActiveTab] = useState<CenterFormTab>('center');
+    const selectedTrainingPrograms = trainingPrograms.filter((program) => center?.training_program_ids?.includes(program.id));
     const formRoute = isCreate
         ? educationCenters.store.form()
         : educationCenters.update.form(center?.id ?? 0);
@@ -204,79 +205,104 @@ export default function EducationCenterForm({ mode, center, trainingPrograms, ag
                                                 description="Información principal del centro educativo y sus canales de contacto."
                                             />
 
-                                            <div className="grid gap-4 md:grid-cols-2">
-                                                <div className="grid gap-2 md:col-span-2">
-                                                    <FieldLabel htmlFor="name">Nombre</FieldLabel>
-                                                    <Input id="name" name="name" defaultValue={center?.name ?? ''} className={UI_PRESETS.simpleSearchInput} required />
-                                                    <InputError message={errors.name} />
+                                            {isReadOnly ? (
+                                                <div className="overflow-hidden rounded-xl border border-slate-200/80 dark:border-slate-700/80">
+                                                    <dl className="divide-y divide-slate-200/80 dark:divide-slate-700/80">
+                                                        <div className="grid gap-1 px-4 py-3 md:grid-cols-[220px_1fr] md:gap-3">
+                                                            <dt className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Nombre</dt>
+                                                            <dd className="text-sm font-medium text-slate-800 dark:text-slate-100">{center?.name || '-'}</dd>
+                                                        </div>
+                                                        <div className="grid gap-1 px-4 py-3 md:grid-cols-[220px_1fr] md:gap-3">
+                                                            <dt className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Dirección</dt>
+                                                            <dd className="text-sm font-medium text-slate-800 dark:text-slate-100">{center?.address || '-'}</dd>
+                                                        </div>
+                                                        <div className="grid gap-1 px-4 py-3 md:grid-cols-[220px_1fr] md:gap-3">
+                                                            <dt className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Teléfono</dt>
+                                                            <dd className="text-sm font-medium text-slate-800 dark:text-slate-100">{center?.phone || '-'}</dd>
+                                                        </div>
+                                                        <div className="grid gap-1 px-4 py-3 md:grid-cols-[220px_1fr] md:gap-3">
+                                                            <dt className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Email institucional</dt>
+                                                            <dd className="text-sm font-medium text-slate-800 dark:text-slate-100">{center?.institutional_email || '-'}</dd>
+                                                        </div>
+                                                        <div className="grid gap-1 px-4 py-3 md:grid-cols-[220px_1fr] md:gap-3">
+                                                            <dt className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Web</dt>
+                                                            <dd className="text-sm font-medium text-slate-800 dark:text-slate-100">{center?.website || '-'}</dd>
+                                                        </div>
+                                                        <div className="grid gap-1 px-4 py-3 md:grid-cols-[220px_1fr] md:gap-3">
+                                                            <dt className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Grados formativos</dt>
+                                                            <dd className="text-sm font-medium text-slate-800 dark:text-slate-100">
+                                                                {selectedTrainingPrograms.length > 0 ? selectedTrainingPrograms.map((program) => program.name).join(', ') : '-'}
+                                                            </dd>
+                                                        </div>
+                                                    </dl>
                                                 </div>
-
-                                                <div className="grid gap-2 md:col-span-2">
-                                                    <FieldLabel htmlFor="address">Dirección</FieldLabel>
-                                                    <Input id="address" name="address" defaultValue={center?.address ?? ''} className={UI_PRESETS.simpleSearchInput} required />
-                                                    <InputError message={errors.address} />
-                                                </div>
-
-                                                <div className="grid gap-2">
-                                                    <FieldLabel htmlFor="phone">Teléfono</FieldLabel>
-                                                    <Input id="phone" name="phone" defaultValue={center?.phone ?? ''} className={UI_PRESETS.simpleSearchInput} required />
-                                                    <InputError message={errors.phone} />
-                                                </div>
-
-                                                <div className="grid gap-2">
-                                                    <FieldLabel htmlFor="institutional_email">Email institucional</FieldLabel>
-                                                    <Input
-                                                        id="institutional_email"
-                                                        type="email"
-                                                        name="institutional_email"
-                                                        defaultValue={center?.institutional_email ?? ''}
-                                                        className={UI_PRESETS.simpleSearchInput}
-                                                        required
-                                                    />
-                                                    <InputError message={errors.institutional_email} />
-                                                </div>
-
-                                                <div className="grid gap-2 md:col-span-2">
-                                                    <FieldLabel htmlFor="website">Web (opcional)</FieldLabel>
-                                                    <Input id="website" name="website" defaultValue={center?.website ?? ''} className={UI_PRESETS.simpleSearchInput} />
-                                                    <InputError message={errors.website} />
-                                                </div>
-
-                                                <div className="grid gap-2 md:col-span-2">
-                                                    <FieldLabel htmlFor="training-programs-group">Grados formativos</FieldLabel>
-                                                    <div
-                                                        id="training-programs-group"
-                                                        className={`grid gap-2 rounded-xl border border-slate-200 p-3 dark:border-slate-700 md:grid-cols-2 ${
-                                                            isReadOnly
-                                                                ? 'bg-slate-100/90 dark:bg-slate-900/45'
-                                                                : 'bg-white dark:bg-slate-950'
-                                                        }`}
-                                                    >
-                                                        {trainingPrograms.map((program) => (
-                                                            <label
-                                                                key={program.id}
-                                                                htmlFor={`training_program_${program.id}`}
-                                                                className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm ${
-                                                                    isReadOnly
-                                                                        ? 'border-slate-200 bg-slate-100/90 dark:border-slate-700 dark:bg-slate-900/45'
-                                                                        : 'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-950'
-                                                                }`}
-                                                            >
-                                                                <input
-                                                                    id={`training_program_${program.id}`}
-                                                                    type="checkbox"
-                                                                    name="training_program_ids[]"
-                                                                    value={program.id}
-                                                                    defaultChecked={center?.training_program_ids?.includes(program.id) ?? false}
-                                                                    className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary/30 disabled:cursor-default disabled:opacity-100"
-                                                                />
-                                                                <span>{program.name}</span>
-                                                            </label>
-                                                        ))}
+                                            ) : (
+                                                <div className="grid gap-4 md:grid-cols-2">
+                                                    <div className="grid gap-2 md:col-span-2">
+                                                        <FieldLabel htmlFor="name">Nombre</FieldLabel>
+                                                        <Input id="name" name="name" defaultValue={center?.name ?? ''} className={UI_PRESETS.simpleSearchInput} required />
+                                                        <InputError message={errors.name} />
                                                     </div>
-                                                    <InputError message={errors.training_program_ids ?? errors['training_program_ids.0']} />
+
+                                                    <div className="grid gap-2 md:col-span-2">
+                                                        <FieldLabel htmlFor="address">Dirección</FieldLabel>
+                                                        <Input id="address" name="address" defaultValue={center?.address ?? ''} className={UI_PRESETS.simpleSearchInput} required />
+                                                        <InputError message={errors.address} />
+                                                    </div>
+
+                                                    <div className="grid gap-2">
+                                                        <FieldLabel htmlFor="phone">Teléfono</FieldLabel>
+                                                        <Input id="phone" name="phone" defaultValue={center?.phone ?? ''} className={UI_PRESETS.simpleSearchInput} required />
+                                                        <InputError message={errors.phone} />
+                                                    </div>
+
+                                                    <div className="grid gap-2">
+                                                        <FieldLabel htmlFor="institutional_email">Email institucional</FieldLabel>
+                                                        <Input
+                                                            id="institutional_email"
+                                                            type="email"
+                                                            name="institutional_email"
+                                                            defaultValue={center?.institutional_email ?? ''}
+                                                            className={UI_PRESETS.simpleSearchInput}
+                                                            required
+                                                        />
+                                                        <InputError message={errors.institutional_email} />
+                                                    </div>
+
+                                                    <div className="grid gap-2 md:col-span-2">
+                                                        <FieldLabel htmlFor="website">Web (opcional)</FieldLabel>
+                                                        <Input id="website" name="website" defaultValue={center?.website ?? ''} className={UI_PRESETS.simpleSearchInput} />
+                                                        <InputError message={errors.website} />
+                                                    </div>
+
+                                                    <div className="grid gap-2 md:col-span-2">
+                                                        <FieldLabel htmlFor="training-programs-group">Grados formativos</FieldLabel>
+                                                        <div
+                                                            id="training-programs-group"
+                                                            className="grid gap-2 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-950 md:grid-cols-2"
+                                                        >
+                                                            {trainingPrograms.map((program) => (
+                                                                <label
+                                                                    key={program.id}
+                                                                    htmlFor={`training_program_${program.id}`}
+                                                                    className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950"
+                                                                >
+                                                                    <input
+                                                                        id={`training_program_${program.id}`}
+                                                                        type="checkbox"
+                                                                        name="training_program_ids[]"
+                                                                        value={program.id}
+                                                                        defaultChecked={center?.training_program_ids?.includes(program.id) ?? false}
+                                                                        className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary/30"
+                                                                    />
+                                                                    <span>{program.name}</span>
+                                                                </label>
+                                                            ))}
+                                                        </div>
+                                                        <InputError message={errors.training_program_ids ?? errors['training_program_ids.0']} />
+                                                    </div>
                                                 </div>
-                                            </div>
+                                            )}
                                         </section>
                                         </div>
 
@@ -287,56 +313,79 @@ export default function EducationCenterForm({ mode, center, trainingPrograms, ag
                                                 description="Responsable de coordinación entre el centro y la organización."
                                             />
 
-                                            <div className="grid gap-4 md:grid-cols-2">
-                                                <div className="grid gap-2">
-                                                    <FieldLabel htmlFor="contact_name">Nombre</FieldLabel>
-                                                    <Input
-                                                        id="contact_name"
-                                                        name="contact_name"
-                                                        defaultValue={center?.contact_name ?? ''}
-                                                        className={UI_PRESETS.simpleSearchInput}
-                                                        required
-                                                    />
-                                                    <InputError message={errors.contact_name} />
+                                            {isReadOnly ? (
+                                                <div className="overflow-hidden rounded-xl border border-slate-200/80 dark:border-slate-700/80">
+                                                    <dl className="divide-y divide-slate-200/80 dark:divide-slate-700/80">
+                                                        <div className="grid gap-1 px-4 py-3 md:grid-cols-[220px_1fr] md:gap-3">
+                                                            <dt className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Nombre</dt>
+                                                            <dd className="text-sm font-medium text-slate-800 dark:text-slate-100">{center?.contact_name || '-'}</dd>
+                                                        </div>
+                                                        <div className="grid gap-1 px-4 py-3 md:grid-cols-[220px_1fr] md:gap-3">
+                                                            <dt className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Cargo</dt>
+                                                            <dd className="text-sm font-medium text-slate-800 dark:text-slate-100">{center?.contact_position || '-'}</dd>
+                                                        </div>
+                                                        <div className="grid gap-1 px-4 py-3 md:grid-cols-[220px_1fr] md:gap-3">
+                                                            <dt className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Teléfono</dt>
+                                                            <dd className="text-sm font-medium text-slate-800 dark:text-slate-100">{center?.contact_phone || '-'}</dd>
+                                                        </div>
+                                                        <div className="grid gap-1 px-4 py-3 md:grid-cols-[220px_1fr] md:gap-3">
+                                                            <dt className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Email</dt>
+                                                            <dd className="text-sm font-medium text-slate-800 dark:text-slate-100">{center?.contact_email || '-'}</dd>
+                                                        </div>
+                                                    </dl>
                                                 </div>
+                                            ) : (
+                                                <div className="grid gap-4 md:grid-cols-2">
+                                                    <div className="grid gap-2">
+                                                        <FieldLabel htmlFor="contact_name">Nombre</FieldLabel>
+                                                        <Input
+                                                            id="contact_name"
+                                                            name="contact_name"
+                                                            defaultValue={center?.contact_name ?? ''}
+                                                            className={UI_PRESETS.simpleSearchInput}
+                                                            required
+                                                        />
+                                                        <InputError message={errors.contact_name} />
+                                                    </div>
 
-                                                <div className="grid gap-2">
-                                                    <FieldLabel htmlFor="contact_position">Cargo</FieldLabel>
-                                                    <Input
-                                                        id="contact_position"
-                                                        name="contact_position"
-                                                        defaultValue={center?.contact_position ?? ''}
-                                                        className={UI_PRESETS.simpleSearchInput}
-                                                        required
-                                                    />
-                                                    <InputError message={errors.contact_position} />
-                                                </div>
+                                                    <div className="grid gap-2">
+                                                        <FieldLabel htmlFor="contact_position">Cargo</FieldLabel>
+                                                        <Input
+                                                            id="contact_position"
+                                                            name="contact_position"
+                                                            defaultValue={center?.contact_position ?? ''}
+                                                            className={UI_PRESETS.simpleSearchInput}
+                                                            required
+                                                        />
+                                                        <InputError message={errors.contact_position} />
+                                                    </div>
 
-                                                <div className="grid gap-2">
-                                                    <FieldLabel htmlFor="contact_phone">Teléfono</FieldLabel>
-                                                    <Input
-                                                        id="contact_phone"
-                                                        name="contact_phone"
-                                                        defaultValue={center?.contact_phone ?? ''}
-                                                        className={UI_PRESETS.simpleSearchInput}
-                                                        required
-                                                    />
-                                                    <InputError message={errors.contact_phone} />
-                                                </div>
+                                                    <div className="grid gap-2">
+                                                        <FieldLabel htmlFor="contact_phone">Teléfono</FieldLabel>
+                                                        <Input
+                                                            id="contact_phone"
+                                                            name="contact_phone"
+                                                            defaultValue={center?.contact_phone ?? ''}
+                                                            className={UI_PRESETS.simpleSearchInput}
+                                                            required
+                                                        />
+                                                        <InputError message={errors.contact_phone} />
+                                                    </div>
 
-                                                <div className="grid gap-2">
-                                                    <FieldLabel htmlFor="contact_email">Email</FieldLabel>
-                                                    <Input
-                                                        id="contact_email"
-                                                        type="email"
-                                                        name="contact_email"
-                                                        defaultValue={center?.contact_email ?? ''}
-                                                        className={UI_PRESETS.simpleSearchInput}
-                                                        required
-                                                    />
-                                                    <InputError message={errors.contact_email} />
+                                                    <div className="grid gap-2">
+                                                        <FieldLabel htmlFor="contact_email">Email</FieldLabel>
+                                                        <Input
+                                                            id="contact_email"
+                                                            type="email"
+                                                            name="contact_email"
+                                                            defaultValue={center?.contact_email ?? ''}
+                                                            className={UI_PRESETS.simpleSearchInput}
+                                                            required
+                                                        />
+                                                        <InputError message={errors.contact_email} />
+                                                    </div>
                                                 </div>
-                                            </div>
+                                            )}
                                         </section>
                                         </div>
 
@@ -361,18 +410,28 @@ export default function EducationCenterForm({ mode, center, trainingPrograms, ag
                                             description="Notas internas y contexto adicional del centro educativo."
                                         />
 
-                                        <div className="grid gap-2">
-                                            <FieldLabel htmlFor="general_notes">Notas</FieldLabel>
-                                            <textarea
-                                                id="general_notes"
-                                                name="general_notes"
-                                                defaultValue={center?.general_notes ?? ''}
-                                                className={`min-h-[140px] w-full resize-y rounded-md border border-slate-300 px-3 py-2.5 text-sm leading-relaxed shadow-xs transition-colors focus:border-[#2563eb] focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20 dark:border-slate-600 ${isReadOnly ? 'bg-slate-100/90 dark:bg-slate-900/45' : 'bg-white dark:bg-slate-950'}`}
-                                                placeholder="Añade información relevante del centro..."
-                                                readOnly={isReadOnly}
-                                            />
-                                            <InputError message={errors.general_notes} />
-                                        </div>
+                                        {isReadOnly ? (
+                                            <div className="overflow-hidden rounded-xl border border-slate-200/80 dark:border-slate-700/80">
+                                                <div className="grid gap-1 px-4 py-3 md:grid-cols-[220px_1fr] md:gap-3">
+                                                    <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Notas</p>
+                                                    <p className="text-sm font-medium whitespace-pre-line text-slate-800 dark:text-slate-100">
+                                                        {center?.general_notes?.trim() ? center.general_notes : '-'}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="grid gap-2">
+                                                <FieldLabel htmlFor="general_notes">Notas</FieldLabel>
+                                                <textarea
+                                                    id="general_notes"
+                                                    name="general_notes"
+                                                    defaultValue={center?.general_notes ?? ''}
+                                                    className="min-h-[140px] w-full resize-y rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm leading-relaxed shadow-xs transition-colors focus:border-[#2563eb] focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20 dark:border-slate-600 dark:bg-slate-950"
+                                                    placeholder="Añade información relevante del centro..."
+                                                />
+                                                <InputError message={errors.general_notes} />
+                                            </div>
+                                        )}
                                         </section>
                                         </div>
                                     </fieldset>

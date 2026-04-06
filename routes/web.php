@@ -110,6 +110,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->middleware('permission:practice-tasks.create')
         ->name('practice-tasks.store');
 
+    Route::patch('practice-tasks/reorder', [PracticeTaskController::class, 'reorder'])
+        ->middleware('permission:practice-tasks.update')
+        ->name('practice-tasks.reorder');
+
     Route::get('practice-tasks/{practice_task}/edit', [PracticeTaskController::class, 'edit'])
         ->middleware('permission:practice-tasks.update')
         ->name('practice-tasks.edit');

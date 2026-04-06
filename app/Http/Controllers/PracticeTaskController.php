@@ -13,6 +13,7 @@ use App\Models\TrainingProgram;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -68,6 +69,7 @@ class PracticeTaskController extends Controller
                     'title' => $validated['title'],
                     'description' => $validated['description'] ?? null,
                     'status' => $validated['status'] ?? 'pending',
+                    'sort_order' => $this->nextSortOrderForStatus($validated['status'] ?? 'pending'),
                     'assignment_mode' => $validated['assignment_mode'],
                     'training_program_id' => $validated['assignment_mode'] === 'training_program'
                         ? (int) $validated['training_program_id']
@@ -128,12 +130,17 @@ class PracticeTaskController extends Controller
     {
         $validated = $request->validated();
         $fromStatus = $practiceTask->status;
+        $nextStatus = $validated['status'] ?? 'pending';
+        $nextSortOrder = $nextStatus !== $fromStatus
+            ? $this->nextSortOrderForStatus($nextStatus)
+            : $practiceTask->sort_order;
 
         try {
             $practiceTask->update([
                 'title' => $validated['title'],
                 'description' => $validated['description'] ?? null,
-                'status' => $validated['status'] ?? 'pending',
+                'status' => $nextStatus,
+                'sort_order' => $nextSortOrder,
                 'due_at' => $validated['due_at'] ?? null,
             ]);
 
@@ -167,9 +174,14 @@ class PracticeTaskController extends Controller
         ]);
 
         $fromStatus = $practiceTask->status;
+        $nextStatus = $validated['status'];
+        $nextSortOrder = $nextStatus !== $fromStatus
+            ? $this->nextSortOrderForStatus($nextStatus)
+            : $practiceTask->sort_order;
 
         $practiceTask->update([
-            'status' => $validated['status'],
+            'status' => $nextStatus,
+            'sort_order' => $nextSortOrder,
         ]);
 
         $this->logTaskStatusChange(
@@ -183,6 +195,39 @@ class PracticeTaskController extends Controller
         return redirect()
             ->route('practice-tasks.index')
             ->with('success', 'Estado actualizado correctamente.');
+    }
+
+    public function reorder(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'status' => ['required', Rule::in(['pending', 'in_progress', 'in_review', 'completed'])],
+            'task_ids' => ['required', 'array', 'min:1'],
+            'task_ids.*' => ['required', 'integer', 'distinct', 'exists:practice_tasks,id'],
+        ]);
+
+        $status = $validated['status'];
+        $taskIds = array_values($validated['task_ids']);
+
+        $matchingCount = PracticeTask::query()
+            ->where('status', $status)
+            ->whereIn('id', $taskIds)
+            ->count();
+
+        if ($matchingCount !== count($taskIds)) {
+            throw ValidationException::withMessages([
+                'task_ids' => 'Las tareas a reordenar no pertenecen al estado indicado.',
+            ]);
+        }
+
+        DB::transaction(function () use ($taskIds): void {
+            foreach ($taskIds as $index => $taskId) {
+                PracticeTask::query()
+                    ->where('id', $taskId)
+                    ->update(['sort_order' => $index + 1]);
+            }
+        });
+
+        return redirect()->route('practice-tasks.index');
     }
 
     public function destroy(PracticeTask $practiceTask): RedirectResponse
@@ -298,8 +343,9 @@ class PracticeTaskController extends Controller
                     ])->with('changedByUser:id,name');
                 },
             ])
-            ->latest('id')
-            ->get(['id', 'title', 'description', 'status', 'assignment_mode', 'training_program_id', 'due_at'])
+            ->orderBy('sort_order')
+            ->orderByDesc('id')
+            ->get(['id', 'title', 'description', 'status', 'sort_order', 'assignment_mode', 'training_program_id', 'due_at'])
             ->map(function (PracticeTask $task): array {
                 $internIds = $task->interns
                     ->pluck('id')
@@ -491,6 +537,15 @@ class PracticeTaskController extends Controller
             'changed_at' => now(),
             'notes' => $notes,
         ]);
+    }
+
+    private function nextSortOrderForStatus(string $status): int
+    {
+        $maxSortOrder = PracticeTask::query()
+            ->where('status', $status)
+            ->max('sort_order');
+
+        return ((int) $maxSortOrder) + 1;
     }
 }
 

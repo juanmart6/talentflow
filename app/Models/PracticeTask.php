@@ -17,6 +17,7 @@ class PracticeTask extends Model
         'title',
         'description',
         'status',
+        'sort_order',
         'assignment_mode',
         'training_program_id',
         'due_at',
@@ -27,6 +28,7 @@ class PracticeTask extends Model
     {
         return [
             'due_at' => 'date',
+            'sort_order' => 'integer',
             'deleted_at' => 'datetime',
         ];
     }
