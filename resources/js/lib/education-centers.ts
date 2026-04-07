@@ -29,3 +29,45 @@ export function formatSpanishDate(date: string | null): string {
 
     return `${day}/${month}/${year}`;
 }
+
+export function daysFromToday(date: string | null): number | null {
+    if (!date) {
+        return null;
+    }
+
+    const today = new Date();
+    const target = new Date(date);
+    const utcToday = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
+    const utcTarget = Date.UTC(target.getFullYear(), target.getMonth(), target.getDate());
+
+    return Math.floor((utcTarget - utcToday) / (1000 * 60 * 60 * 24));
+}
+
+type CenterForStatusDetail = {
+    status: 'valid' | 'not_started' | 'renewal_soon' | 'expired' | string;
+    latest_agreement: {
+        signed_at: string | null;
+        expires_at: string | null;
+    } | null;
+};
+
+export function centerStatusDetail(center: CenterForStatusDetail): string {
+    const expiresInDays = daysFromToday(center.latest_agreement?.expires_at ?? null);
+    const startsInDays = daysFromToday(center.latest_agreement?.signed_at ?? null);
+
+    if (center.status === 'not_started' && startsInDays !== null) {
+        return startsInDays <= 0 ? 'Comienza hoy' : `Comienza en ${startsInDays} dias`;
+    }
+
+    if (center.status === 'expired' && expiresInDays !== null) {
+        const elapsed = Math.abs(expiresInDays);
+
+        return elapsed === 0 ? 'Caducado hoy' : `Caducado hace ${elapsed} dias`;
+    }
+
+    if ((center.status === 'renewal_soon' || center.status === 'valid') && expiresInDays !== null) {
+        return expiresInDays <= 0 ? 'Vence hoy' : `Vence en ${expiresInDays} dias`;
+    }
+
+    return '-';
+}

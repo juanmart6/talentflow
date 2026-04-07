@@ -434,12 +434,12 @@ export default function EducationCenterForm({ mode, center, trainingPrograms, ag
                                         )}
                                         </section>
                                         </div>
+
+                                        <div className={activeTab === 'history' ? '' : 'hidden'} aria-hidden={activeTab !== 'history'}>
+                                            {isReadOnly && <CenterInternsHistory internsHistory={internsHistory} />}
+                                        </div>
                                     </fieldset>
                                 </section>
-                                
-                                {isReadOnly && activeTab === 'history' && (
-                                    <CenterInternsHistory internsHistory={internsHistory} />
-                                )}
                                     <div className="flex flex-col gap-2 border-t border-sidebar-border/70 pt-4 md:flex-row md:items-center md:justify-end dark:border-sidebar-border">
                                         {isReadOnly ? (
                                             <Button type="button" variant="secondary" asChild>

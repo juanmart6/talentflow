@@ -30,7 +30,7 @@ export const CENTER_STATUS_META: Record<CenterStatus, CenterStatusMeta> = {
 };
 
 export const CENTER_STATUS_OPTIONS = [
-    { value: 'all', label: 'Todos los centros' },
+    { value: 'all', label: 'Todos' },
     { value: 'valid', label: CENTER_STATUS_META.valid.filterLabel },
     { value: 'not_started', label: CENTER_STATUS_META.not_started.filterLabel },
     { value: 'renewal_soon', label: CENTER_STATUS_META.renewal_soon.filterLabel },

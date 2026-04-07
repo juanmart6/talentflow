@@ -1,98 +1,30 @@
-import { Head, Link, router, usePage } from '@inertiajs/react';
+﻿import { Head, router, usePage } from '@inertiajs/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { CirclePlus, Eye, FileSpreadsheet, FilterX, Pencil, Search, Trash2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import { INTERN_STATUS_META } from '@/lib/intern-status';
-import { UI_PRESETS, stripedRowClass } from '@/lib/ui-presets';
-import { normalizePaginationLabel } from '@/lib/utils';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import AppLayout from '@/layouts/app-layout';
-import educationCentersRoutes from '@/routes/education-centers';
-import interns from '@/routes/interns';
+import { UI_PRESETS } from '@/lib/ui-presets';
 import { toast } from 'sonner';
+import AppLayout from '@/layouts/app-layout';
+import interns from '@/routes/interns';
+import InternsFiltersBar from '@/components/interns/interns-filters-bar';
+import TablePagination from '@/components/shared/table-pagination';
+import ConfirmDeleteDialog from '@/components/shared/confirm-delete-dialog';
+import InternsTable from '@/components/interns/interns-table';
 import type { BreadcrumbItem } from '@/types';
+import type {
+    InternRow,
+    InternsPagination,
+    EducationCenterOption,
+    TrainingProgramOption,
+    InternFilters,
+    InternStatusCounts
+} from '@/types/interns';
 
-type PaginationLink = {
-    url: string | null;
-    label: string;
-    active: boolean;
-};
-
-type InternRow = {
-    id: number;
-    first_name: string;
-    last_name: string;
-    dni_nie: string;
-    email: string;
-    phone: string;
-    status: 'active' | 'upcoming_active' | 'finished' | 'abandoned';
-    internship_start_date: string | null;
-    internship_end_date: string | null;
-    required_hours: number;
-    education_center: {
-        id: number;
-        name: string;
-    } | null;
-    training_program: {
-        id: number;
-        name: string;
-    } | null;
-};
-
-type InternsPagination = {
-    data: InternRow[];
-    links: PaginationLink[];
-    total: number;
-    from: number | null;
-    to: number | null;
-};
-
-type EducationCenterOption = {
-    id: number;
-    name: string;
-};
-
-type TrainingProgramOption = {
-    id: number;
-    name: string;
-};
 
 type Props = {
     interns: InternsPagination;
     educationCenters: EducationCenterOption[];
     trainingPrograms: TrainingProgramOption[];
-    statusCounts: {
-        upcoming_active: number;
-        active: number;
-        finished: number;
-        abandoned: number;
-    };
-    filters: {
-        search: string;
-        status: string;
-        education_center_id: number | null;
-        training_program_id: number | null;
-        start_date_from: string;
-        start_date_to: string;
-        end_date_from: string;
-        end_date_to: string;
-    };
+    statusCounts: InternStatusCounts;
+    filters: InternFilters;
 };
 
 // Definición de breadcrumbs para la navegación:
@@ -102,29 +34,6 @@ const breadcrumbs: BreadcrumbItem[] = [
         href: interns.index().url,
     },
 ];
-
-// Función para formatear fechas, mostrando un guion si no hay fecha disponible:
-function formatDate(date: string | null): string {
-    if (!date) {
-        return '-';
-    }
-
-    const [year, month, day] = date.slice(0, 10).split('-');
-
-    if (!year || !month || !day) {
-        return date;
-    }
-
-    return `${day}/${month}/${year}`;
-}
-
-// Función para obtener las iniciales del becario, utilizando la primera letra del nombre y apellido, o un signo de interrogación si no hay información disponible:
-function getInitials(intern: InternRow): string {
-    const firstInitial = intern.first_name?.trim()[0] ?? '';
-    const lastInitial = intern.last_name?.trim()[0] ?? '';
-
-    return (firstInitial + lastInitial).toUpperCase() || '?';
-}
 
 // Contiene toda la lógica de la vista:
 export default function InternsPage({ interns: internPagination, filters, educationCenters, trainingPrograms }: Props) {
@@ -332,323 +241,50 @@ export default function InternsPage({ interns: internPagination, filters, educat
                 </div>
 
                 <div className={UI_PRESETS.pageSection}>
-                    <form onSubmit={(event) => event.preventDefault()} className={`${UI_PRESETS.filterBar} mb-2`}>
-                        <div className="flex flex-col gap-3">
-                            <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-                                <div className="relative min-w-0 flex-1">
-                                    <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                                    <Input
-                                        value={search}
-                                        onChange={(event) => setSearch(event.target.value)}
-                                        placeholder="Buscar por nombre, DNI o email"
-                                        className={`${UI_PRESETS.simpleSearchInput} h-9 pl-9 text-sm`}
-                                    />
-                                </div>
-
-                                <div className="flex items-center gap-2 lg:ml-auto lg:shrink-0">
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="icon"
-                                        className={UI_PRESETS.iconActionButton}
-                                        onClick={handleClearFilters}
-                                        disabled={!hasActiveFilters}
-                                        title="Limpiar filtros"
-                                        aria-label="Limpiar filtros"
-                                    >
-                                        <FilterX />
-                                    </Button>
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="icon"
-                                        className={UI_PRESETS.iconActionButtonSuccess}
-                                        onClick={handleExport}
-                                        disabled={hasInvalidDateRange}
-                                        title="Exportar Excel"
-                                        aria-label="Exportar Excel"
-                                    >
-                                        <FileSpreadsheet />
-                                    </Button>
-                                    <Button
-                                        asChild
-                                        variant="outline"
-                                        size="icon"
-                                        className={UI_PRESETS.iconActionButtonPrimary}
-                                        title="Nuevo Becario"
-                                        aria-label="Nuevo Becario"
-                                    >
-                                        <Link href={interns.create().url}>
-                                            <CirclePlus />
-                                        </Link>
-                                    </Button>
-                                </div>
-                            </div>
-
-                            <div className="grid gap-2 md:grid-cols-3">
-                                <div className="flex flex-col gap-1">
-                                    <span className="text-xs font-medium text-muted-foreground">Centro educativo</span>
-                                    <Select value={educationCenterId} onValueChange={setEducationCenterId}>
-                                        <SelectTrigger className={`${UI_PRESETS.selectTrigger} w-full`}>
-                                            <SelectValue placeholder="Centro educativo" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem className={UI_PRESETS.selectItem} value="all">Todos los centros</SelectItem>
-                                            {educationCenters.map((center) => (
-                                                <SelectItem className={UI_PRESETS.selectItem} key={center.id} value={String(center.id)}>
-                                                    {center.name}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-
-                                <div className="flex flex-col gap-1">
-                                    <span className="text-xs font-medium text-muted-foreground">Ciclo formativo</span>
-                                    <Select value={trainingProgramId} onValueChange={setTrainingProgramId}>
-                                        <SelectTrigger className={`${UI_PRESETS.selectTrigger} w-full`}>
-                                            <SelectValue placeholder="Ciclo formativo" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem className={UI_PRESETS.selectItem} value="all">Todos los ciclos</SelectItem>
-                                            {trainingPrograms.map((program) => (
-                                                <SelectItem className={UI_PRESETS.selectItem} key={program.id} value={String(program.id)}>
-                                                    {program.name}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-
-                                <div className="flex flex-col gap-1">
-                                    <span className="text-xs font-medium text-muted-foreground">Estado</span>
-                                    <Select value={status} onValueChange={setStatus}>
-                                        <SelectTrigger className={`${UI_PRESETS.selectTrigger} w-full`}>
-                                            <SelectValue placeholder="Estado" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem className={UI_PRESETS.selectItem} value="all">Todos los estados</SelectItem>
-                                            <SelectItem className={UI_PRESETS.selectItem} value="upcoming_active">Activo proximamente</SelectItem>
-                                            <SelectItem className={UI_PRESETS.selectItem} value="active">Activo</SelectItem>
-                                            <SelectItem className={UI_PRESETS.selectItem} value="finished">Finalizado</SelectItem>
-                                            <SelectItem className={UI_PRESETS.selectItem} value="abandoned">Abandonado</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                            </div>
-
-                            <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
-                                <div className="flex flex-col gap-1">
-                                    <span className="text-xs font-medium text-muted-foreground">Inicio desde</span>
-                                    <Input
-                                        type="date"
-                                        value={startDateFrom}
-                                        onChange={(event) => setStartDateFrom(event.target.value)}
-                                        className={`${UI_PRESETS.simpleSearchInput} h-9 text-sm`}
-                                    />
-                                </div>
-
-                                <div className="flex flex-col gap-1">
-                                    <span className="text-xs font-medium text-muted-foreground">Inicio hasta</span>
-                                    <Input
-                                        type="date"
-                                        value={startDateTo}
-                                        onChange={(event) => setStartDateTo(event.target.value)}
-                                        className={`${UI_PRESETS.simpleSearchInput} h-9 text-sm`}
-                                    />
-                                </div>
-
-                                <div className="flex flex-col gap-1">
-                                    <span className="text-xs font-medium text-muted-foreground">Fin desde</span>
-                                    <Input
-                                        type="date"
-                                        value={endDateFrom}
-                                        onChange={(event) => setEndDateFrom(event.target.value)}
-                                        className={`${UI_PRESETS.simpleSearchInput} h-9 text-sm`}
-                                    />
-                                </div>
-
-                                <div className="flex flex-col gap-1">
-                                    <span className="text-xs font-medium text-muted-foreground">Fin hasta</span>
-                                    <Input
-                                        type="date"
-                                        value={endDateTo}
-                                        onChange={(event) => setEndDateTo(event.target.value)}
-                                        className={`${UI_PRESETS.simpleSearchInput} h-9 text-sm`}
-                                    />
-                                </div>
-                            </div>
-
-                            {hasInvalidStartDateRange ? (
-                                <p className="text-sm font-medium text-destructive">
-                                    En fechas de inicio: &quot;Inicio desde&quot; no puede ser posterior a &quot;Inicio hasta&quot;.
-                                </p>
-                            ) : null}
-                            {hasInvalidEndDateRange ? (
-                                <p className="text-sm font-medium text-destructive">
-                                    En fechas de fin: &quot;Fin desde&quot; no puede ser posterior a &quot;Fin hasta&quot;.
-                                </p>
-                            ) : null}
-                        </div>
-                    </form>
-
-                    <div className={UI_PRESETS.tableContainer}>
-                        <table className="w-full min-w-[980px] text-sm">
-                            <thead className={UI_PRESETS.tableHead}>
-                                <tr>
-                                    <th className="w-40 px-4 py-3 text-center font-semibold">Becario</th>
-                                    <th className="w-40 px-4 py-3 text-center font-semibold">Centro</th>
-                                    <th className="w-40 px-4 py-3 text-center font-semibold">Ciclo formativo</th>
-                                    <th className="w-40 px-4 py-3 text-center font-semibold">Prácticas</th>
-                                    <th className="w-40 px-4 py-3 text-center font-semibold">Estado</th>
-                                    <th className="w-40 px-4 py-3 text-center font-semibold">Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {hasRows ? (
-                                    internPagination.data.map((intern, index) => (
-                                        <tr key={intern.id} className={`border-t align-middle ${stripedRowClass(index)}`}>
-                                            <td className={`${UI_PRESETS.tableCellCentered} w-40`}>
-                                                <div className="flex items-center justify-center gap-3">
-                                                    <Avatar className="bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-50">
-                                                        <AvatarFallback className="text-xs font-semibold">
-                                                            {getInitials(intern)}
-                                                        </AvatarFallback>
-                                                    </Avatar>
-                                                    <div className="min-w-0 text-left">
-                                                        <Link
-                                                            href={interns.show(intern.id).url}
-                                                            className="block max-w-[8.5rem] truncate font-semibold text-primary underline-offset-2 hover:underline"
-                                                            title={`${intern.first_name} ${intern.last_name}`}
-                                                        >
-                                                            {intern.first_name} {intern.last_name}
-                                                        </Link>
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td className={`${UI_PRESETS.tableCellCentered} w-40 font-medium`}>
-                                                {intern.education_center ? (
-                                                    <Link
-                                                        href={educationCentersRoutes.show(intern.education_center.id).url}
-                                                        className="text-primary underline-offset-2 hover:underline"
-                                                    >
-                                                        {intern.education_center.name}
-                                                    </Link>
-                                                ) : '-'}
-                                            </td>
-                                            <td className={`${UI_PRESETS.tableCellCentered} w-40 font-medium`}>
-                                                {intern.training_program?.name ?? '-'}
-                                            </td>
-                                            <td className={`${UI_PRESETS.tableCellCentered} w-40`}>
-                                                <p className="text-xs font-semibold text-muted-foreground">Inicio</p>
-                                                <p className="font-medium">{formatDate(intern.internship_start_date)}</p>
-                                                <p className="mt-2 text-xs font-semibold text-muted-foreground">Fin</p>
-                                                <p className="font-medium">{formatDate(intern.internship_end_date)}</p>
-                                            </td>
-                                            <td className={`${UI_PRESETS.tableCellCentered} w-40`}>
-                                                <span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold uppercase ${INTERN_STATUS_META[intern.status].badgeClass}`}>
-                                                    {INTERN_STATUS_META[intern.status].label}
-                                                </span>
-                                            </td>
-                                            <td className={`${UI_PRESETS.tableCellCentered} w-40`}>
-                                                <div className="flex justify-center gap-2">
-                                                    <Button
-                                                        variant="outline"
-                                                        size="icon"
-                                                        className={UI_PRESETS.iconActionButton}
-                                                        asChild
-                                                    >
-                                                        <Link href={interns.show(intern.id).url} aria-label="Ver Becario" title="Ver Becario">
-                                                            <Eye />
-                                                        </Link>
-                                                    </Button>
-                                                    <Button
-                                                        variant="outline"
-                                                        size="icon"
-                                                        className={UI_PRESETS.iconActionButton}
-                                                        asChild
-                                                    >
-                                                        <Link href={interns.edit(intern.id).url} aria-label="Editar Becario" title="Editar Becario">
-                                                            <Pencil />
-                                                        </Link>
-                                                    </Button>
-                                                    <Button
-                                                        variant="outline"
-                                                        size="icon"
-                                                        className={UI_PRESETS.iconActionButtonDanger}
-                                                        aria-label="Eliminar Becario"
-                                                        title="Eliminar Becario"
-                                                        onClick={() => setInternToDelete(intern)}
-                                                    >
-                                                        <Trash2 />
-                                                    </Button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))
-                                ) : (
-                                    <tr>
-                                        <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
-                                            No hay becarios para mostrar con el filtro actual.
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <div className={UI_PRESETS.tablePagination}>
-                        <p className="text-sm text-muted-foreground">{paginationSummary}</p>
-
-                        <div className="flex flex-wrap items-center gap-2">
-                            {internPagination.links.map((link, index) => (
-                                <Button
-                                    key={`${link.label}-${index}`}
-                                    variant='outline'
-                                    size="sm"
-                                    className={`${UI_PRESETS.paginationButton} ${link.active ? UI_PRESETS.paginationButtonActive : ''}`}
-                                    disabled={!link.url}
-                                    asChild={Boolean(link.url)}
-                                >
-                                    {link.url ? (
-                                        <Link href={link.url}>{normalizePaginationLabel(link.label)}</Link>
-                                    ) : (
-                                        <span>{normalizePaginationLabel(link.label)}</span>
-                                    )}
-                                </Button>
-                            ))}
-                        </div>
-                    </div>
+                    <InternsFiltersBar
+                        search={search}
+                        onSearchChange={setSearch}
+                        status={status}
+                        onStatusChange={setStatus}
+                        educationCenterId={educationCenterId}
+                        onEducationCenterChange={setEducationCenterId}
+                        trainingProgramId={trainingProgramId}
+                        onTrainingProgramChange={setTrainingProgramId}
+                        startDateFrom={startDateFrom}
+                        onStartDateFromChange={setStartDateFrom}
+                        startDateTo={startDateTo}
+                        onStartDateToChange={setStartDateTo}
+                        endDateFrom={endDateFrom}
+                        onEndDateFromChange={setEndDateFrom}
+                        endDateTo={endDateTo}
+                        onEndDateToChange={setEndDateTo}
+                        hasActiveFilters={hasActiveFilters}
+                        hasInvalidDateRange={hasInvalidDateRange}
+                        hasInvalidStartDateRange={hasInvalidStartDateRange}
+                        hasInvalidEndDateRange={hasInvalidEndDateRange}
+                        onClearFilters={handleClearFilters}
+                        onExport={handleExport}
+                        educationCenters={educationCenters}
+                        trainingPrograms={trainingPrograms}
+                    />
+                    <InternsTable
+                        interns={internPagination.data}
+                        hasRows={hasRows}
+                        onDelete={setInternToDelete}
+                    />
+                    <TablePagination summary={paginationSummary} links={internPagination.links} />
                 </div>
             </div>
-
-            <Dialog open={internToDelete !== null} onOpenChange={(open) => !open && setInternToDelete(null)}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Confirmar eliminación</DialogTitle>
-                        <DialogDescription>
-                            Esta acción eliminará el becario seleccionado.
-                        </DialogDescription>
-                    </DialogHeader>
-
-                    <p className="text-sm">
-                        Becario:{' '}
-                        <span className="font-medium">
-                            {internToDelete ? `${internToDelete.first_name} ${internToDelete.last_name}` : ''}
-                        </span>
-                    </p>
-
-                    <DialogFooter>
-                        <Button variant="secondary" className={UI_PRESETS.interactiveHover} onClick={() => setInternToDelete(null)}>
-                            Cancelar
-                        </Button>
-                        <Button variant="destructive" className={UI_PRESETS.interactiveHover} onClick={confirmDelete} disabled={isDeleting}>
-                            {isDeleting ? 'Eliminando...' : 'Eliminar'}
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+            <ConfirmDeleteDialog
+                open={internToDelete !== null}
+                title="Confirmar eliminación"
+                description="Esta acción eliminará el becario seleccionado."
+                entityLabel="Becario"
+                entityName={internToDelete ? `${internToDelete.first_name} ${internToDelete.last_name}` : ''}
+                isLoading={isDeleting}
+                onCancel={() => setInternToDelete(null)}
+                onConfirm={confirmDelete}
+            />
         </AppLayout>
     );
 }
-

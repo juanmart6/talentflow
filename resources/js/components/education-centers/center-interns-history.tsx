@@ -1,4 +1,4 @@
-import { Link } from '@inertiajs/react';
+﻿import { Link } from '@inertiajs/react';
 import { formatSpanishDate, internStatusBadgeClass, internStatusLabel } from '@/lib/education-centers';
 import { UI_PRESETS, stripedRowClass } from '@/lib/ui-presets';
 import interns from '@/routes/interns';
@@ -22,10 +22,10 @@ type CenterInternsHistoryProps = {
 
 export default function CenterInternsHistory({ internsHistory }: CenterInternsHistoryProps) {
     return (
-        <section className={UI_PRESETS.sectionCard}>
-            <div className="flex items-center justify-between gap-2">
-                <h2 className="text-lg font-bold">Histórico de becarios por centro</h2>
-                <p className="text-sm text-muted-foreground">Total: {internsHistory.length}</p>
+        <section className="space-y-4 pt-4">
+            <div>
+                <h2 className="text-lg font-bold tracking-tight">Histórico de becarios</h2>
+                <p className="text-sm text-muted-foreground">Relación de estudiantes del centro.</p>
             </div>
 
             {internsHistory.length === 0 ? (
@@ -43,7 +43,7 @@ export default function CenterInternsHistory({ internsHistory }: CenterInternsHi
                             <tr>
                                 <th className="px-4 py-3 text-center font-semibold">Becario</th>
                                 <th className="px-4 py-3 text-center font-semibold">Ciclo formativo</th>
-                                <th className="px-4 py-3 text-center font-semibold">Período</th>
+                                <th className="px-4 py-3 text-center font-semibold">Periodo</th>
                                 <th className="px-4 py-3 text-center font-semibold">Estado</th>
                             </tr>
                         </thead>
