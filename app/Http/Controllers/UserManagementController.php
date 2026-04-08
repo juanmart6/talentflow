@@ -50,6 +50,18 @@ class UserManagementController extends Controller
 
         $newRole = $validated['role'];
         $currentRole = $user->roles()->value('name');
+        $actingUser = $request->user();
+
+        if (
+            $actingUser
+            && $actingUser->is($user)
+            && $currentRole === 'admin'
+            && $newRole !== 'admin'
+        ) {
+            return redirect()
+                ->back()
+                ->with('error', 'No puedes quitarte a ti mismo el rol admin.');
+        }
 
         if ($currentRole === 'admin' && $newRole !== 'admin') {
             $adminCount = User::role('admin')->count();
@@ -68,4 +80,3 @@ class UserManagementController extends Controller
             ->with('success', 'Rol actualizado correctamente.');
     }
 }
-
