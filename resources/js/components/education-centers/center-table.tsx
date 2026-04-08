@@ -1,7 +1,7 @@
 import { Link } from '@inertiajs/react';
-import { Button } from '@/components/ui/button';
 import { Copy, Eye, Mail, MapPin, Pencil, Phone, Trash2 } from 'lucide-react';
-import { CENTER_STATUS_META, type CenterStatus } from '@/lib/center-status';
+import { Button } from '@/components/ui/button';
+import { CENTER_STATUS_META } from '@/lib/education-centers/center-status';
 import { UI_PRESETS, stripedRowClass } from '@/lib/ui-presets';
 import educationCenters from '@/routes/education-centers';
 

@@ -1,16 +1,16 @@
 ﻿import { Head, router, usePage } from '@inertiajs/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import ConfirmDeleteDialog from '@/components/shared/confirm-delete-dialog';
-import { centerStatusDetail, formatSpanishDate } from '@/lib/education-centers';
-import { UI_PRESETS } from '@/lib/ui-presets';
-import AppLayout from '@/layouts/app-layout';
-import educationCenters from '@/routes/education-centers';
 import { toast } from 'sonner';
 import CenterFiltersBar from '@/components/education-centers/center-filters-bar';
-import TablePagination from '@/components/shared/table-pagination';
 import CenterTable from '@/components/education-centers/center-table';
-import type { CenterRow, CentersPagination, CenterFilters } from '@/types/education-centers';
+import ConfirmDeleteDialog from '@/components/shared/confirm-delete-dialog';
+import TablePagination from '@/components/shared/table-pagination';
+import AppLayout from '@/layouts/app-layout';
+import { centerStatusDetail, formatSpanishDate } from '@/lib/education-centers/education-centers';
+import { UI_PRESETS } from '@/lib/ui-presets';
+import educationCenters from '@/routes/education-centers';
 import type { BreadcrumbItem } from '@/types';
+import type { CenterRow, CentersPagination, CenterFilters } from '@/types/education-centers';
 
 type Props = {
     centers: CentersPagination;

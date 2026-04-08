@@ -3,7 +3,7 @@ import { CirclePlus, FileSpreadsheet, FilterX, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { CENTER_STATUS_OPTIONS } from '@/lib/center-status';
+import { CENTER_STATUS_OPTIONS } from '@/lib/education-centers/center-status';
 import { UI_PRESETS } from '@/lib/ui-presets';
 import educationCenters from '@/routes/education-centers';
 

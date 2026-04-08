@@ -18,7 +18,7 @@ export const UI_PRESETS = {
     tableHead: 'bg-slate-100 text-left dark:bg-slate-800/70',
     tableCell: 'px-4 py-3',
     tableCellCentered: 'px-4 py-3 text-center',
-    tablePagination: 'flex flex-col gap-4 border-t border-sidebar-border/70 px-4 pt-4 md:flex-row md:items-center md:justify-between dark:border-sidebar-border',
+    tablePagination: 'flex flex-col gap-4 px-4 pt-4 md:flex-row md:items-center md:justify-between',
     paginationButton: 'h-8 rounded-md border-slate-300/90 bg-white text-slate-700 shadow-none hover:border-[#2563eb]/35 hover:bg-[#2563eb]/6 hover:text-[#1d4ed8] dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:hover:border-[#2563eb]/40 dark:hover:bg-[#2563eb]/12 dark:hover:text-sky-100',
     paginationButtonActive: 'border-[#2563eb]/30 bg-[#2563eb]/10 text-[#1e40af] hover:bg-[#2563eb]/14 dark:border-[#2563eb]/40 dark:bg-[#2563eb]/18 dark:text-sky-100 dark:hover:bg-[#2563eb]/22',
     iconActionButton: 'cursor-pointer border-[#2563eb]/25 text-[#1d4ed8] hover:border-[#2563eb]/40 hover:bg-[#2563eb]/6 hover:text-[#1e40af] dark:border-[#2563eb]/35 dark:text-sky-300 dark:hover:bg-[#2563eb]/12 dark:hover:text-sky-100',

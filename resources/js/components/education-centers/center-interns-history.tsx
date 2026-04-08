@@ -1,5 +1,5 @@
 ﻿import { Link } from '@inertiajs/react';
-import { formatSpanishDate, internStatusBadgeClass, internStatusLabel } from '@/lib/education-centers';
+import { formatSpanishDate, internStatusBadgeClass, internStatusLabel } from '@/lib/education-centers/education-centers';
 import { UI_PRESETS, stripedRowClass } from '@/lib/ui-presets';
 import interns from '@/routes/interns';
 

@@ -1,10 +1,10 @@
 import { Trash2 } from 'lucide-react';
 import { FieldLabel, SectionIntro } from '@/components/form-ui';
+import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { formatSpanishDate } from '@/lib/education-centers';
+import { formatSpanishDate } from '@/lib/education-centers/education-centers';
 import { UI_PRESETS } from '@/lib/ui-presets';
-import InputError from '@/components/input-error';
 
 type AgreementHistoryItem = {
     id: number;

@@ -1,13 +1,13 @@
 ﻿import { Head, router, usePage } from '@inertiajs/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { UI_PRESETS } from '@/lib/ui-presets';
 import { toast } from 'sonner';
-import AppLayout from '@/layouts/app-layout';
-import interns from '@/routes/interns';
 import InternsFiltersBar from '@/components/interns/interns-filters-bar';
-import TablePagination from '@/components/shared/table-pagination';
-import ConfirmDeleteDialog from '@/components/shared/confirm-delete-dialog';
 import InternsTable from '@/components/interns/interns-table';
+import ConfirmDeleteDialog from '@/components/shared/confirm-delete-dialog';
+import TablePagination from '@/components/shared/table-pagination';
+import AppLayout from '@/layouts/app-layout';
+import { UI_PRESETS } from '@/lib/ui-presets';
+import interns from '@/routes/interns';
 import type { BreadcrumbItem } from '@/types';
 import type {
     InternRow,

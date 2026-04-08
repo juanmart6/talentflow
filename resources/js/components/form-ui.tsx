@@ -1,6 +1,6 @@
-import { Label } from '@/components/ui/label';
+import type {ReactNode} from 'react';
 import HeaderBackIcon from '@/components/header-back-icon';
-import { type ReactNode } from 'react';
+import { Label } from '@/components/ui/label';
 
 type SectionIntroProps = {
     title: string;

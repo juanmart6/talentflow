@@ -1,4 +1,5 @@
 ﻿import { Award, Clock9, GraduationCap, LayoutGrid, NotebookPen, School, Users } from 'lucide-react';
+import logo from '@/assets/TF_logo.svg';
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
 import {
@@ -7,7 +8,6 @@ import {
     SidebarFooter,
     SidebarHeader,
 } from '@/components/ui/sidebar';
-import logo from '@/assets/TF_logo.svg';
 import { dashboard } from '@/routes';
 import educationCenters from '@/routes/education-centers';
 import interns from '@/routes/interns';

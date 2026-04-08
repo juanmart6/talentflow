@@ -1,13 +1,14 @@
 ﻿import { Head, Link, router, useForm } from '@inertiajs/react';
-import { useMemo, useState, type FormEvent } from 'react';
 import { FileText, History, MessageSquare, Paperclip, Trash2, Users } from 'lucide-react';
+import { useMemo, useState  } from 'react';
+import type {FormEvent} from 'react';
 import { FieldLabel, FormPageHeader, SectionIntro } from '@/components/form-ui';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { UI_PRESETS } from '@/lib/ui-presets';
 import AppLayout from '@/layouts/app-layout';
+import { UI_PRESETS } from '@/lib/ui-presets';
 import practiceTasks from '@/routes/practice-tasks';
 import type { BreadcrumbItem, InternOption } from '@/types';
 

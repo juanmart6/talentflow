@@ -1,10 +1,7 @@
 import { Head, router, usePage } from '@inertiajs/react';
 import { ShieldCheck, UserCog } from 'lucide-react';
 import { useEffect, useRef } from 'react';
-import AppLayout from '@/layouts/app-layout';
-import { UI_PRESETS, stripedRowClass } from '@/lib/ui-presets';
 import { toast } from 'sonner';
-import type { BreadcrumbItem } from '@/types';
 import {
     Select,
     SelectContent,
@@ -12,6 +9,9 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import AppLayout from '@/layouts/app-layout';
+import { UI_PRESETS, stripedRowClass } from '@/lib/ui-presets';
+import type { BreadcrumbItem } from '@/types';
 
 type UserRow = {
     id: number;

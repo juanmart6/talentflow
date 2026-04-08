@@ -1,18 +1,18 @@
 ﻿import { Form, Head, Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
+import CenterAgreementSection from '@/components/education-centers/center-agreement-section';
+import CenterFormTabs from '@/components/education-centers/center-form-tabs';
+import CenterInternsHistory from '@/components/education-centers/center-interns-history';
 import { FieldLabel, FormPageHeader, SectionIntro } from '@/components/form-ui';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { UI_PRESETS } from '@/lib/ui-presets';
 import AppLayout from '@/layouts/app-layout';
+import { UI_PRESETS } from '@/lib/ui-presets';
 import educationCenters from '@/routes/education-centers';
-import { toast } from 'sonner';
 import type { BreadcrumbItem } from '@/types';
 
-import CenterFormTabs from '@/components/education-centers/center-form-tabs';
-import CenterInternsHistory from '@/components/education-centers/center-interns-history';
-import CenterAgreementSection from '@/components/education-centers/center-agreement-section';
 
 type CenterFormData = {
     id?: number;
@@ -116,17 +116,12 @@ export default function EducationCenterForm({ mode, center, trainingPrograms, ag
         }
     }, [page.props.flash?.success, page.props.flash?.error]);
 
-    useEffect(() => {
+    const handleFormError = (errors: CenterValidationErrors) => {
         if (isReadOnly) {
             return;
         }
 
-        const errors = page.props.errors ?? {};
-        const errorKeys = Object.keys(errors);
-
-        if (errorKeys.length === 0) {
-            return;
-        }
+        const errorKeys = Object.keys(errors ?? {});
 
         if (
             errorKeys.some((key) =>
@@ -144,7 +139,7 @@ export default function EducationCenterForm({ mode, center, trainingPrograms, ag
         }
 
         setActiveTab('center');
-    }, [isReadOnly, page.props.errors]);
+    };
 
     const handleDeleteAgreement = (agreementId: number) => {
         if (!center?.id) {
@@ -178,6 +173,7 @@ export default function EducationCenterForm({ mode, center, trainingPrograms, ag
                     <Form
                         {...formRoute}
                         options={{ preserveScroll: true, preserveState: true }}
+                        onError={handleFormError}
                         className="space-y-2"
                         encType="multipart/form-data"
                         noValidate
@@ -440,7 +436,7 @@ export default function EducationCenterForm({ mode, center, trainingPrograms, ag
                                         </div>
                                     </fieldset>
                                 </section>
-                                    <div className="flex flex-col gap-2 border-t border-sidebar-border/70 pt-4 md:flex-row md:items-center md:justify-end dark:border-sidebar-border">
+                                    <div className="flex flex-col gap-2 pt-4 md:flex-row md:items-center md:justify-end">
                                         {isReadOnly ? (
                                             <Button type="button" variant="secondary" asChild>
                                                 <Link href={educationCenters.index().url}>Volver al listado</Link>

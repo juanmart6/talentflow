@@ -1,16 +1,18 @@
 ﻿import { Head, Link, useForm, usePage } from '@inertiajs/react';
-import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { Briefcase, FileText, Paperclip, User } from 'lucide-react';
+import type { FormEvent} from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import { FieldLabel, FormPageHeader, SectionIntro } from '@/components/form-ui';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { INTERN_STATUS_META, type InternStatus } from '@/lib/intern-status';
-import { UI_PRESETS } from '@/lib/ui-presets';
 import AppLayout from '@/layouts/app-layout';
+import { INTERN_STATUS_META  } from '@/lib/interns/intern-status';
+import type {InternStatus} from '@/lib/interns/intern-status';
+import { UI_PRESETS } from '@/lib/ui-presets';
 import interns from '@/routes/interns';
-import { toast } from 'sonner';
 import type { BreadcrumbItem } from '@/types';
 
 type EducationCenterOption = {
@@ -224,7 +226,10 @@ export default function InternFormPage({ mode, intern, educationCenters, documen
         () => educationCenters.find((center) => String(center.id) === data.education_center_id) ?? null,
         [educationCenters, data.education_center_id],
     );
-    const availableTrainingPrograms = selectedCenter?.training_programs ?? [];
+    const availableTrainingPrograms = useMemo(
+        () => selectedCenter?.training_programs ?? [],
+        [selectedCenter],
+    );
     const hasTrainingPrograms = availableTrainingPrograms.length > 0;
     const selectedTrainingProgram = useMemo(
         () => availableTrainingPrograms.find((program) => String(program.id) === data.training_program_id) ?? null,
@@ -788,7 +793,7 @@ export default function InternFormPage({ mode, intern, educationCenters, documen
                             </fieldset>
                             </section>
 
-                            <div className="flex flex-col gap-2 border-t border-sidebar-border/70 pt-4 md:flex-row md:items-center md:justify-end dark:border-sidebar-border">
+                            <div className="flex flex-col gap-2 pt-4 md:flex-row md:items-center md:justify-end">
                                 {isReadOnly ? (
                                     <Button type="button" variant="secondary" asChild>
                                         <Link href={interns.index().url}>Volver al listado</Link>

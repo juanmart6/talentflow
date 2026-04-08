@@ -2,11 +2,11 @@ import { Link } from '@inertiajs/react';
 import { Eye, Pencil, Trash2 } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { INTERN_STATUS_META } from '@/lib/intern-status';
+import { INTERN_STATUS_META } from '@/lib/interns/intern-status';
 import { UI_PRESETS, stripedRowClass } from '@/lib/ui-presets';
-import type { InternRow } from '@/types/interns';
 import educationCentersRoutes from '@/routes/education-centers';
 import internsRoutes from '@/routes/interns';
+import type { InternRow } from '@/types/interns';
 
 type InternsTableProps = {
     interns: InternRow[];

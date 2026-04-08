@@ -1,6 +1,6 @@
+import type { ImgHTMLAttributes } from 'react';
 import TFLogo from '@/assets/TF_logo.svg';
 import { cn } from '@/lib/utils';
-import type { ImgHTMLAttributes } from 'react';
 
 export default function AppLogoIcon({
     className,
