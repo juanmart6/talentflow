@@ -9,30 +9,21 @@ import { toast } from 'sonner';
 import CenterFiltersBar from '@/components/education-centers/center-filters-bar';
 import TablePagination from '@/components/shared/table-pagination';
 import CenterTable from '@/components/education-centers/center-table';
-import type { CenterRow, CentersPagination } from '@/types/education-centers';
+import type { CenterRow, CentersPagination, CenterFilters } from '@/types/education-centers';
 import type { BreadcrumbItem } from '@/types';
 
 type Props = {
     centers: CentersPagination;
-    summaryCounts: {
-        total: number;
-        renewal_soon: number;
-        without_agreement: number;
-    };
-    filters: {
-        search: string;
-        agreement_status: string;
-    };
+    filters: CenterFilters;
 };
 
-// DefiniciÃ³n de breadcrumbs para la navegaciÃ³n:
+// Definición de breadcrumbs para la navegación:
 const breadcrumbs: BreadcrumbItem[] = [
     {
         title: 'Centros Educativos',
         href: educationCenters.index().url,
     },
 ];
-
 
 export default function EducationCenters({ centers, filters }: Props) {
     const page = usePage<{ flash?: { success?: string; error?: string } }>();
@@ -59,7 +50,7 @@ export default function EducationCenters({ centers, filters }: Props) {
         });
     };
 
-    // FunciÃ³n para copiar al portapapeles:
+    // Función para copiar al portapapeles:
     const copyToClipboard = async (value: string, label: string) => {
         try {
             if (!value.trim()) {
@@ -107,7 +98,7 @@ export default function EducationCenters({ centers, filters }: Props) {
         }
     }, [page.props.flash?.success, page.props.flash?.error]);
 
-    // Resumen de paginaciÃ³n:
+    // Resumen de paginación:
     const paginationSummary = useMemo(() => {
         if (!hasRows || centers.from === null || centers.to === null) {
             return 'Sin resultados';
@@ -116,7 +107,7 @@ export default function EducationCenters({ centers, filters }: Props) {
         return `Mostrando ${centers.from} - ${centers.to} de ${centers.total} centros`;
     }, [centers.from, centers.to, centers.total, hasRows]);
 
-    // Efecto para manejar la bÃºsqueda con debounce:
+    // Efecto para manejar la búsqueda con debounce:
     useEffect(() => {
         const normalizedSearch = search.trim();
         const normalizedFilter = (filters.search ?? '').trim();
@@ -140,7 +131,7 @@ export default function EducationCenters({ centers, filters }: Props) {
         return () => window.clearTimeout(timeoutId);
     }, [search, filters.search, agreementStatus]);
 
-    // FunciÃ³n para confirmar eliminaciÃ³n:
+    // Función para confirmar eliminación:
     const confirmDelete = () => {
         if (!centerToDelete) {
             return;
@@ -157,7 +148,7 @@ export default function EducationCenters({ centers, filters }: Props) {
         });
     };
 
-    // FunciÃ³n para manejar exportaciÃ³n:
+    // Función para manejar exportación:
     const handleExport = () => {
         const params = new URLSearchParams();
         const normalizedSearch = search.trim();
@@ -200,7 +191,7 @@ export default function EducationCenters({ centers, filters }: Props) {
                 <div className={UI_PRESETS.pageSection}>
                     <CenterFiltersBar
                         search={search}
-                        setSearch={setSearch}
+                        onSearchChange={setSearch}
                         agreementStatus={agreementStatus}
                         onStatusChange={handleStatusChange}
                         onClearFilters={handleClearFilters}

@@ -15,15 +15,12 @@ import type {
     EducationCenterOption,
     TrainingProgramOption,
     InternFilters,
-    InternStatusCounts
 } from '@/types/interns';
-
 
 type Props = {
     interns: InternsPagination;
     educationCenters: EducationCenterOption[];
     trainingPrograms: TrainingProgramOption[];
-    statusCounts: InternStatusCounts;
     filters: InternFilters;
 };
 

@@ -1,5 +1,5 @@
-import type { Paginated } from "./pagination";
-import type { CenterStatus } from "@/lib/center-status";
+import type { Paginated } from '@/types/pagination';
+import type { CenterStatus } from '@/lib/center-status';
 
 export type Agreement = {
     signed_at: string | null;
@@ -22,4 +22,9 @@ export type CenterRow = {
 };
 
 export type CentersPagination = Paginated<CenterRow>;
+
+export type CenterFilters = {
+    search: string;
+    agreement_status: string;
+};
 
