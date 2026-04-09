@@ -2,10 +2,6 @@ import { Head, router, usePage } from '@inertiajs/react';
 import { ShieldCheck, UserCog } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import UserManagementTabs, { type UserManagementTab } from '@/components/users/user-management-tabs';
-import AppLayout from '@/layouts/app-layout';
-import { UI_PRESETS, stripedRowClass } from '@/lib/ui-presets';
-import type { BreadcrumbItem } from '@/types';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
     Select,
@@ -14,6 +10,11 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import UserManagementTabs from '@/components/users/user-management-tabs';
+import type {UserManagementTab} from '@/components/users/user-management-tabs';
+import AppLayout from '@/layouts/app-layout';
+import { UI_PRESETS, stripedRowClass } from '@/lib/ui-presets';
+import type { BreadcrumbItem } from '@/types';
 
 type RoleRow = {
     id: number;
@@ -71,7 +72,7 @@ export default function UsersIndexPage({ users, roles, availableRoles, permissio
     const page = usePage<{ flash?: { success?: string; error?: string } }>();
     const [activeTab, setActiveTab] = useState<UserManagementTab>('users-roles');
     const [selectedRoleId, setSelectedRoleId] = useState<string>(roles[0] ? String(roles[0].id) : '');
-    const [selectedPermissions, setSelectedPermissions] = useState<string[]>([]);
+    const [permissionDraft, setPermissionDraft] = useState<string[] | null>(null);
 
     const selectedRole = useMemo(
         () => roles.find((role) => String(role.id) === selectedRoleId) ?? null,
@@ -80,6 +81,11 @@ export default function UsersIndexPage({ users, roles, availableRoles, permissio
 
     const selectedRoleName = selectedRole?.name ?? '';
     const isAdminRoleSelected = selectedRoleName === 'admin';
+    const rolePermissionsBase = useMemo(
+        () => rolePermissions[selectedRoleName] ?? [],
+        [selectedRoleName, rolePermissions],
+    );
+    const selectedPermissions = permissionDraft ?? rolePermissionsBase;
 
     const groupedPermissions = useMemo(() => {
         const groups: Record<string, string[]> = {};
@@ -103,10 +109,6 @@ export default function UsersIndexPage({ users, roles, availableRoles, permissio
                 permissions: modulePermissions.sort((a, b) => a.localeCompare(b)),
             }));
     }, [permissions]);
-
-    useEffect(() => {
-        setSelectedPermissions(rolePermissions[selectedRoleName] ?? []);
-    }, [selectedRoleName, rolePermissions]);
 
     useEffect(() => {
         const successMessage = page.props.flash?.success;
@@ -133,7 +135,9 @@ export default function UsersIndexPage({ users, roles, availableRoles, permissio
     };
 
     const togglePermission = (permission: string, checked: boolean) => {
-        setSelectedPermissions((current) => {
+        setPermissionDraft((currentDraft) => {
+            const current = currentDraft ?? rolePermissionsBase;
+
             if (checked) {
                 if (current.includes(permission)) {
                     return current;
@@ -158,6 +162,7 @@ export default function UsersIndexPage({ users, roles, availableRoles, permissio
             {
                 preserveScroll: true,
                 preserveState: true,
+                onSuccess: () => setPermissionDraft(null),
             },
         );
     };
@@ -277,7 +282,13 @@ export default function UsersIndexPage({ users, roles, availableRoles, permissio
                                             <span className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
                                                 Rol
                                             </span>
-                                            <Select value={selectedRoleId} onValueChange={setSelectedRoleId}>
+                                            <Select
+                                                value={selectedRoleId}
+                                                onValueChange={(value) => {
+                                                    setSelectedRoleId(value);
+                                                    setPermissionDraft(null);
+                                                }}
+                                            >
                                                 <SelectTrigger className={`${UI_PRESETS.selectTrigger} w-full`}>
                                                     <SelectValue placeholder="Seleccionar rol" />
                                                 </SelectTrigger>

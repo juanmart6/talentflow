@@ -1,7 +1,7 @@
 import { Trash2 } from 'lucide-react';
-import DatePicker from '@/components/shared/date-picker';
 import { FieldLabel, SectionIntro } from '@/components/form-ui';
 import InputError from '@/components/input-error';
+import DatePicker from '@/components/shared/date-picker';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { formatSpanishDate } from '@/lib/education-centers/education-centers';
