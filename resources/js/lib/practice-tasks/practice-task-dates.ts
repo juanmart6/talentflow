@@ -39,19 +39,19 @@ export function dueIndicatorMeta(dueAt: string): { dotClass: string; text: strin
     if (days <= 7) {
         return {
             dotClass: 'bg-red-500',
-            text: days === 0 ? 'Vence hoy' : `Te quedan ${days} día(s)`,
+            text: days === 0 ? 'Vence hoy' : `Quedan ${days} día(s)`,
         };
     }
 
     if (days <= 14) {
         return {
             dotClass: 'bg-yellow-400',
-            text: `Te quedan ${days} día(s)`,
+            text: `Quedan ${days} día(s)`,
         };
     }
 
     return {
         dotClass: 'bg-emerald-500',
-        text: `Te quedan ${days} día(s)`,
+        text: `Quedan ${days} día(s)`,
     };
 }

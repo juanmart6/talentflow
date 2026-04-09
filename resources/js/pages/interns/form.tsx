@@ -4,6 +4,7 @@ import type { FormEvent} from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { FieldLabel, FormPageHeader, SectionIntro } from '@/components/form-ui';
+import DatePicker from '@/components/shared/date-picker';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -321,11 +322,7 @@ export default function InternFormPage({ mode, intern, educationCenters, documen
                                             type="button"
                                             variant="ghost"
                                             size="sm"
-                                            className={`h-9 min-w-[118px] justify-center rounded-b-none border border-b-0 px-3 cursor-pointer ${
-                                                activeTab === 'personal'
-                                                    ? 'border-[#2563eb]/45 bg-white text-[#1d4ed8] shadow-sm hover:bg-white dark:bg-slate-950 dark:text-sky-300 dark:hover:bg-slate-950'
-                                                    : 'border-transparent text-muted-foreground hover:border-[#2563eb]/30 hover:bg-[#2563eb]/8 hover:text-[#1d4ed8] dark:hover:border-[#2563eb]/40 dark:hover:bg-[#2563eb]/15 dark:hover:text-sky-300'
-                                            }`}
+                                            className={`${UI_PRESETS.tabBase} ${activeTab === 'personal' ? UI_PRESETS.tabActive : UI_PRESETS.tabInactive}`}
                                             onClick={() => setActiveTab('personal')}
                                         >
                                             <User className="mr-1.5 size-4 shrink-0" />
@@ -335,11 +332,7 @@ export default function InternFormPage({ mode, intern, educationCenters, documen
                                             type="button"
                                             variant="ghost"
                                             size="sm"
-                                            className={`h-9 min-w-[118px] justify-center rounded-b-none border border-b-0 px-3 cursor-pointer ${
-                                                activeTab === 'academic'
-                                                    ? 'border-[#2563eb]/45 bg-white text-[#1d4ed8] shadow-sm hover:bg-white dark:bg-slate-950 dark:text-sky-300 dark:hover:bg-slate-950'
-                                                    : 'border-transparent text-muted-foreground hover:border-[#2563eb]/30 hover:bg-[#2563eb]/8 hover:text-[#1d4ed8] dark:hover:border-[#2563eb]/40 dark:hover:bg-[#2563eb]/15 dark:hover:text-sky-300'
-                                            }`}
+                                            className={`${UI_PRESETS.tabBase} ${activeTab === 'academic' ? UI_PRESETS.tabActive : UI_PRESETS.tabInactive}`}
                                             onClick={() => setActiveTab('academic')}
                                         >
                                             <Briefcase className="mr-1.5 size-4 shrink-0" />
@@ -349,11 +342,7 @@ export default function InternFormPage({ mode, intern, educationCenters, documen
                                             type="button"
                                             variant="ghost"
                                             size="sm"
-                                            className={`h-9 min-w-[118px] justify-center rounded-b-none border border-b-0 px-3 cursor-pointer ${
-                                                activeTab === 'documents'
-                                                    ? 'border-[#2563eb]/45 bg-white text-[#1d4ed8] shadow-sm hover:bg-white dark:bg-slate-950 dark:text-sky-300 dark:hover:bg-slate-950'
-                                                    : 'border-transparent text-muted-foreground hover:border-[#2563eb]/30 hover:bg-[#2563eb]/8 hover:text-[#1d4ed8] dark:hover:border-[#2563eb]/40 dark:hover:bg-[#2563eb]/15 dark:hover:text-sky-300'
-                                            }`}
+                                            className={`${UI_PRESETS.tabBase} ${activeTab === 'documents' ? UI_PRESETS.tabActive : UI_PRESETS.tabInactive}`}
                                             onClick={() => setActiveTab('documents')}
                                         >
                                             <Paperclip className="mr-1.5 size-4 shrink-0" />
@@ -363,11 +352,7 @@ export default function InternFormPage({ mode, intern, educationCenters, documen
                                             type="button"
                                             variant="ghost"
                                             size="sm"
-                                            className={`h-9 min-w-[118px] justify-center rounded-b-none border border-b-0 px-3 cursor-pointer ${
-                                                activeTab === 'general'
-                                                    ? 'border-[#2563eb]/45 bg-white text-[#1d4ed8] shadow-sm hover:bg-white dark:bg-slate-950 dark:text-sky-300 dark:hover:bg-slate-950'
-                                                    : 'border-transparent text-muted-foreground hover:border-[#2563eb]/30 hover:bg-[#2563eb]/8 hover:text-[#1d4ed8] dark:hover:border-[#2563eb]/40 dark:hover:bg-[#2563eb]/15 dark:hover:text-sky-300'
-                                            }`}
+                                            className={`${UI_PRESETS.tabBase} ${activeTab === 'general' ? UI_PRESETS.tabActive : UI_PRESETS.tabInactive}`}
                                             onClick={() => setActiveTab('general')}
                                         >
                                             <FileText className="mr-1.5 size-4 shrink-0" />
@@ -629,12 +614,26 @@ export default function InternFormPage({ mode, intern, educationCenters, documen
                                         </div>
                                         <div className="grid gap-2">
                                             <FieldLabel htmlFor="internship_start_date">Fecha inicio</FieldLabel>
-                                            <Input id="internship_start_date" type="date" value={data.internship_start_date} onChange={(e) => setData('internship_start_date', e.target.value)} className={UI_PRESETS.simpleSearchInput} required />
+                                            <DatePicker
+                                                id="internship_start_date"
+                                                value={data.internship_start_date}
+                                                onChange={(value) => setData('internship_start_date', value)}
+                                                placeholder="Seleccionar fecha"
+                                                className={UI_PRESETS.simpleSearchInput}
+                                                required
+                                            />
                                             <InputError message={errors.internship_start_date} />
                                         </div>
                                         <div className="grid gap-2">
                                             <FieldLabel htmlFor="internship_end_date">Fecha fin</FieldLabel>
-                                            <Input id="internship_end_date" type="date" value={data.internship_end_date} onChange={(e) => setData('internship_end_date', e.target.value)} className={UI_PRESETS.simpleSearchInput} required />
+                                            <DatePicker
+                                                id="internship_end_date"
+                                                value={data.internship_end_date}
+                                                onChange={(value) => setData('internship_end_date', value)}
+                                                placeholder="Seleccionar fecha"
+                                                className={UI_PRESETS.simpleSearchInput}
+                                                required
+                                            />
                                             <InputError message={errors.internship_end_date === 'Las fechas de practicas deben estar dentro del periodo de un convenio del centro educativo.' ? '' : errors.internship_end_date} />
                                         </div>
                                         <div className="grid gap-2">
@@ -662,11 +661,11 @@ export default function InternFormPage({ mode, intern, educationCenters, documen
                                         </div>
                                         <div className="grid gap-2">
                                             <FieldLabel htmlFor="abandonment_date">Fecha abandono (opcional)</FieldLabel>
-                                            <Input
+                                            <DatePicker
                                                 id="abandonment_date"
-                                                type="date"
                                                 value={data.abandonment_date}
-                                                onChange={(e) => setData('abandonment_date', e.target.value)}
+                                                onChange={(value) => setData('abandonment_date', value)}
+                                                placeholder="Seleccionar fecha"
                                                 className={UI_PRESETS.simpleSearchInput}
                                                 required={isAbandoned}
                                             />
@@ -815,3 +814,5 @@ export default function InternFormPage({ mode, intern, educationCenters, documen
         </AppLayout>
     );
 }
+
+

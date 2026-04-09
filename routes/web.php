@@ -142,6 +142,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->middleware('permission:practice-tasks.delete')
         ->name('practice-tasks.destroy');
 
+
+        // Rutas para el módulo Usuarios y permisos:
+
     Route::get('autenticacion-usuarios', [UserManagementController::class, 'index'])
         ->middleware('permission:users.manage')
         ->name('users.index');
@@ -149,6 +152,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::patch('autenticacion-usuarios/{user}/role', [UserManagementController::class, 'updateRole'])
         ->middleware('permission:users.manage')
         ->name('users.update-role');
+
+    Route::patch('autenticacion-usuarios/roles/{role}/permissions', [UserManagementController::class, 'updateRolePermissions'])
+        ->middleware('permission:users.manage')
+        ->name('users.update-role-permissions');
+
 });
 
 require __DIR__.'/settings.php';

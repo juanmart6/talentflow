@@ -1,4 +1,5 @@
 import { Trash2 } from 'lucide-react';
+import DatePicker from '@/components/shared/date-picker';
 import { FieldLabel, SectionIntro } from '@/components/form-ui';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
@@ -96,11 +97,11 @@ export default function CenterAgreementSection({
                 <div className="grid gap-4 md:grid-cols-2">
                     <div className="grid gap-2">
                         <FieldLabel htmlFor="agreement_signed_at">Fecha de firma</FieldLabel>
-                        <Input
+                        <DatePicker
                             id="agreement_signed_at"
-                            type="date"
                             name="agreement_signed_at"
                             defaultValue={center?.agreement_signed_at ?? ''}
+                            placeholder="Seleccionar fecha"
                             className={UI_PRESETS.simpleSearchInput}
                             required
                         />
@@ -109,11 +110,11 @@ export default function CenterAgreementSection({
 
                     <div className="grid gap-2">
                         <FieldLabel htmlFor="agreement_expires_at">Fecha de vencimiento</FieldLabel>
-                        <Input
+                        <DatePicker
                             id="agreement_expires_at"
-                            type="date"
                             name="agreement_expires_at"
                             defaultValue={center?.agreement_expires_at ?? ''}
+                            placeholder="Seleccionar fecha"
                             className={UI_PRESETS.simpleSearchInput}
                             required
                         />

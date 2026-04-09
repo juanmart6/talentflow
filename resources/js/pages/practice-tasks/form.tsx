@@ -1,8 +1,10 @@
 ﻿import { Head, Link, router, useForm } from '@inertiajs/react';
-import { FileText, History, MessageSquare, Paperclip, Trash2, Users } from 'lucide-react';
-import { useMemo, useState  } from 'react';
+import { FileText, History, MessageSquare, Paperclip, Trash2, Users, X } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState  } from 'react';
 import type {FormEvent} from 'react';
+import { toast } from 'sonner';
 import { FieldLabel, FormPageHeader, SectionIntro } from '@/components/form-ui';
+import DatePicker from '@/components/shared/date-picker';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -89,10 +91,18 @@ const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
 
 const formatTaskStatus = (status: TaskStatus | null): string => {
     if (!status) {
-        return 'SIN ESTADO';
+        return '';
     }
 
     return TASK_STATUS_LABELS[status] ?? status.toUpperCase();
+};
+
+const formatStatusLogLine = (fromStatus: TaskStatus | null, toStatus: TaskStatus): string => {
+    if (!fromStatus) {
+        return `Creada en ${formatTaskStatus(toStatus)}`;
+    }
+
+    return `${formatTaskStatus(fromStatus)} -> ${formatTaskStatus(toStatus)}`;
 };
 
 const formatDateTime = (value: string | null): string => {
@@ -118,13 +128,15 @@ const formatDateTime = (value: string | null): string => {
 export default function PracticeTasksFormPage({ interns, trainingPrograms, messages = [], taskAttachments = [], statusLogs = [], task }: Props) {
     const isEditing = Boolean(task);
     const [activeTab, setActiveTab] = useState<FormTab>('resumen');
-    const [internToAdd, setInternToAdd] = useState<string>('');
+    const [internQuery, setInternQuery] = useState('');
+    const [isInternDropdownOpen, setIsInternDropdownOpen] = useState(false);
     const [messageBody, setMessageBody] = useState('');
     const [tutorSpecFile, setTutorSpecFile] = useState<File | null>(null);
     const [deliverableFile, setDeliverableFile] = useState<File | null>(null);
     const [isSendingMessage, setIsSendingMessage] = useState(false);
     const [uploadingCategory, setUploadingCategory] = useState<'tutor_spec' | 'intern_deliverable' | null>(null);
     const [deletingAttachmentId, setDeletingAttachmentId] = useState<number | null>(null);
+    const internComboboxRef = useRef<HTMLDivElement | null>(null);
     const breadcrumbs: BreadcrumbItem[] = [
         {
             title: 'Prácticas y Tareas',
@@ -163,8 +175,22 @@ export default function PracticeTasksFormPage({ interns, trainingPrograms, messa
     );
 
     const availableInterns = useMemo(
-        () => interns.filter((intern) => !data.intern_ids.includes(intern.id)),
-        [interns, data.intern_ids],
+        () => {
+            const normalizedQuery = internQuery.trim().toLowerCase();
+
+            return interns.filter((intern) => {
+                if (data.intern_ids.includes(intern.id)) {
+                    return false;
+                }
+
+                if (normalizedQuery === '') {
+                    return true;
+                }
+
+                return intern.name.toLowerCase().includes(normalizedQuery);
+            });
+        },
+        [interns, data.intern_ids, internQuery],
     );
     const internsInSelectedTrainingProgram = useMemo(
         () => interns.filter((intern) => intern.trainingProgramId === data.training_program_id),
@@ -183,20 +209,83 @@ export default function PracticeTasksFormPage({ interns, trainingPrograms, messa
         [trainingPrograms, data.training_program_id],
     );
 
-    const handleAddIntern = () => {
-        if (internToAdd === '') return;
-        toggleIntern(internToAdd, true);
-        setInternToAdd('');
+    const addIntern = (internId: string) => {
+        toggleIntern(internId, true);
+        setInternQuery('');
     };
+
+    const removeIntern = (internId: string) => {
+        toggleIntern(internId, false);
+    };
+
+    const clearSelectedInterns = () => {
+        setData('intern_ids', []);
+        setInternQuery('');
+    };
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (!internComboboxRef.current) {
+                return;
+            }
+
+            if (!internComboboxRef.current.contains(event.target as Node)) {
+                setIsInternDropdownOpen(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, []);
 
     const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
+
+        if (data.assignment_mode === 'interns' && data.intern_ids.length === 0) {
+            setActiveTab('asignacion');
+            toast.error('Añade al menos un becario antes de guardar la tarea.');
+            return;
+        }
+
+        if (data.assignment_mode === 'training_program' && data.training_program_id === '') {
+            setActiveTab('asignacion');
+            toast.error('Selecciona un grado formativo antes de guardar la tarea.');
+            return;
+        }
+
+        if (
+            data.assignment_mode === 'training_program'
+            && data.training_program_id !== ''
+            && internsInSelectedTrainingProgram.length === 0
+        ) {
+            setActiveTab('asignacion');
+            toast.error('El grado formativo seleccionado no tiene becarios disponibles.');
+            return;
+        }
 
         transform((values) => (isEditing ? { ...values, _method: 'patch' } : values));
 
         post(isEditing && task ? practiceTasks.update(task.id).url : practiceTasks.store().url, {
             preserveScroll: true,
             forceFormData: true,
+            onError: (formErrors) => {
+                const firstError = Object.values(formErrors).find(
+                    (value): value is string => typeof value === 'string' && value.trim() !== '',
+                );
+
+                toast.error(firstError ?? 'No se pudo guardar la tarea. Revisa los campos obligatorios.');
+
+                if (
+                    formErrors.assignment_mode
+                    || formErrors.training_program_id
+                    || formErrors.intern_ids
+                ) {
+                    setActiveTab('asignacion');
+                }
+            },
         });
     };
 
@@ -276,11 +365,7 @@ export default function PracticeTasksFormPage({ interns, trainingPrograms, messa
                                         type="button"
                                         variant="ghost"
                                         size="sm"
-                                        className={`h-9 min-w-[118px] justify-center rounded-b-none border border-b-0 px-3 cursor-pointer ${
-                                            activeTab === 'resumen'
-                                                ? 'border-[#2563eb]/45 bg-white text-[#1d4ed8] shadow-sm hover:bg-white dark:bg-slate-950 dark:text-sky-300 dark:hover:bg-slate-950'
-                                                : 'border-transparent text-muted-foreground hover:border-[#2563eb]/30 hover:bg-[#2563eb]/8 hover:text-[#1d4ed8] dark:hover:border-[#2563eb]/40 dark:hover:bg-[#2563eb]/15 dark:hover:text-sky-300'
-                                        }`}
+                                        className={`${UI_PRESETS.tabBase} ${activeTab === 'resumen' ? UI_PRESETS.tabActive : UI_PRESETS.tabInactive}`}
                                         onClick={() => setActiveTab('resumen')}
                                     >
                                         <FileText className="mr-1.5 size-4 shrink-0" />
@@ -290,11 +375,7 @@ export default function PracticeTasksFormPage({ interns, trainingPrograms, messa
                                         type="button"
                                         variant="ghost"
                                         size="sm"
-                                        className={`h-9 min-w-[118px] justify-center rounded-b-none border border-b-0 px-3 cursor-pointer ${
-                                            activeTab === 'asignacion'
-                                                ? 'border-[#2563eb]/45 bg-white text-[#1d4ed8] shadow-sm hover:bg-white dark:bg-slate-950 dark:text-sky-300 dark:hover:bg-slate-950'
-                                                : 'border-transparent text-muted-foreground hover:border-[#2563eb]/30 hover:bg-[#2563eb]/8 hover:text-[#1d4ed8] dark:hover:border-[#2563eb]/40 dark:hover:bg-[#2563eb]/15 dark:hover:text-sky-300'
-                                        }`}
+                                        className={`${UI_PRESETS.tabBase} ${activeTab === 'asignacion' ? UI_PRESETS.tabActive : UI_PRESETS.tabInactive}`}
                                         onClick={() => setActiveTab('asignacion')}
                                     >
                                         <Users className="mr-1.5 size-4 shrink-0" />
@@ -304,11 +385,7 @@ export default function PracticeTasksFormPage({ interns, trainingPrograms, messa
                                         type="button"
                                         variant="ghost"
                                         size="sm"
-                                        className={`h-9 min-w-[118px] justify-center rounded-b-none border border-b-0 px-3 cursor-pointer ${
-                                            activeTab === 'adjuntos'
-                                                ? 'border-[#2563eb]/45 bg-white text-[#1d4ed8] shadow-sm hover:bg-white dark:bg-slate-950 dark:text-sky-300 dark:hover:bg-slate-950'
-                                                : 'border-transparent text-muted-foreground hover:border-[#2563eb]/30 hover:bg-[#2563eb]/8 hover:text-[#1d4ed8] dark:hover:border-[#2563eb]/40 dark:hover:bg-[#2563eb]/15 dark:hover:text-sky-300'
-                                        }`}
+                                        className={`${UI_PRESETS.tabBase} ${activeTab === 'adjuntos' ? UI_PRESETS.tabActive : UI_PRESETS.tabInactive}`}
                                         onClick={() => setActiveTab('adjuntos')}
                                     >
                                         <Paperclip className="mr-1.5 size-4 shrink-0" />
@@ -318,11 +395,7 @@ export default function PracticeTasksFormPage({ interns, trainingPrograms, messa
                                         type="button"
                                         variant="ghost"
                                         size="sm"
-                                        className={`h-9 min-w-[118px] justify-center rounded-b-none border border-b-0 px-3 cursor-pointer ${
-                                            activeTab === 'chat'
-                                                ? 'border-[#2563eb]/45 bg-white text-[#1d4ed8] shadow-sm hover:bg-white dark:bg-slate-950 dark:text-sky-300 dark:hover:bg-slate-950'
-                                                : 'border-transparent text-muted-foreground hover:border-[#2563eb]/30 hover:bg-[#2563eb]/8 hover:text-[#1d4ed8] dark:hover:border-[#2563eb]/40 dark:hover:bg-[#2563eb]/15 dark:hover:text-sky-300'
-                                        }`}
+                                        className={`${UI_PRESETS.tabBase} ${activeTab === 'chat' ? UI_PRESETS.tabActive : UI_PRESETS.tabInactive}`}
                                         onClick={() => setActiveTab('chat')}
                                     >
                                         <MessageSquare className="mr-1.5 size-4 shrink-0" />
@@ -332,11 +405,7 @@ export default function PracticeTasksFormPage({ interns, trainingPrograms, messa
                                         type="button"
                                         variant="ghost"
                                         size="sm"
-                                        className={`h-9 min-w-[118px] justify-center rounded-b-none border border-b-0 px-3 cursor-pointer ${
-                                            activeTab === 'historial'
-                                                ? 'border-[#2563eb]/45 bg-white text-[#1d4ed8] shadow-sm hover:bg-white dark:bg-slate-950 dark:text-sky-300 dark:hover:bg-slate-950'
-                                                : 'border-transparent text-muted-foreground hover:border-[#2563eb]/30 hover:bg-[#2563eb]/8 hover:text-[#1d4ed8] dark:hover:border-[#2563eb]/40 dark:hover:bg-[#2563eb]/15 dark:hover:text-sky-300'
-                                        }`}
+                                        className={`${UI_PRESETS.tabBase} ${activeTab === 'historial' ? UI_PRESETS.tabActive : UI_PRESETS.tabInactive}`}
                                         onClick={() => setActiveTab('historial')}
                                     >
                                         <History className="mr-1.5 size-4 shrink-0" />
@@ -416,11 +485,11 @@ export default function PracticeTasksFormPage({ interns, trainingPrograms, messa
 
                                         <div className="grid gap-2">
                                             <FieldLabel htmlFor="due_at">Fecha de entrega</FieldLabel>
-                                            <Input
+                                            <DatePicker
                                                 id="due_at"
-                                                type="date"
                                                 value={data.due_at}
-                                                onChange={(event) => setData('due_at', event.target.value)}
+                                                onChange={(value) => setData('due_at', value)}
+                                                placeholder="Seleccionar fecha"
                                                 className={`${UI_PRESETS.simpleSearchInput} w-full`}
                                             />
                                             <InputError message={errors.due_at} />
@@ -501,7 +570,7 @@ export default function PracticeTasksFormPage({ interns, trainingPrograms, messa
                                                             setData('training_program_id', '');
                                                         } else {
                                                             setData('intern_ids', []);
-                                                            setInternToAdd('');
+                                                            setInternQuery('');
                                                         }
                                                     }}
                                                 >
@@ -543,50 +612,71 @@ export default function PracticeTasksFormPage({ interns, trainingPrograms, messa
 
                                             {data.assignment_mode === 'interns' ? (
                                                 <>
-                                                    <div className="grid gap-3 rounded-xl border border-slate-200 bg-slate-50/70 p-3 dark:border-slate-700 dark:bg-slate-900/50">
-                                                        <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto]">
-                                                            <Select value={internToAdd} onValueChange={setInternToAdd} disabled={availableInterns.length === 0}>
-                                                                <SelectTrigger className={`${UI_PRESETS.selectTrigger} w-full`}>
-                                                                    <SelectValue placeholder={availableInterns.length > 0 ? 'Selecciona un becario' : 'No hay más becarios'} />
-                                                                </SelectTrigger>
-                                                                <SelectContent>
-                                                                    {availableInterns.map((intern) => (
-                                                                        <SelectItem key={intern.id} value={intern.id} className={UI_PRESETS.selectItem}>
-                                                                            {intern.name}
-                                                                        </SelectItem>
-                                                                    ))}
-                                                                </SelectContent>
-                                                            </Select>
-                                                            <Button type="button" onClick={handleAddIntern} disabled={internToAdd === ''}>
-                                                                Añadir becario
-                                                            </Button>
-                                                        </div>
-
-                                                        {selectedInterns.length > 0 ? (
-                                                            <div className="flex flex-wrap gap-2">
+                                                    <div className="grid gap-2" ref={internComboboxRef}>
+                                                        <div className="relative">
+                                                            <div className="flex min-h-9 w-full flex-wrap items-center gap-1.5 rounded-md border border-slate-300 bg-white px-2 py-1 text-sm shadow-xs transition-colors focus-within:border-slate-400 dark:border-slate-600 dark:bg-slate-950">
                                                                 {selectedInterns.map((intern) => (
-                                                                    <div
+                                                                    <span
                                                                         key={intern.id}
-                                                                        className="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-3 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-950"
+                                                                        className="inline-flex items-center gap-1 rounded-full border border-slate-300 bg-white px-2 py-1 text-xs dark:border-slate-700 dark:bg-slate-950"
                                                                     >
-                                                                        <span>{intern.name}</span>
+                                                                        <span className="max-w-[9rem] truncate">{intern.name}</span>
                                                                         <button
                                                                             type="button"
-                                                                            className="text-xs font-semibold text-muted-foreground hover:text-destructive"
-                                                                            onClick={() => toggleIntern(intern.id, false)}
+                                                                            className="text-muted-foreground transition-colors hover:text-destructive"
+                                                                            onClick={() => removeIntern(intern.id)}
+                                                                            aria-label={`Quitar ${intern.name}`}
                                                                         >
-                                                                            Quitar
+                                                                            <X className="size-3" />
                                                                         </button>
-                                                                    </div>
+                                                                    </span>
                                                                 ))}
+                                                                <Input
+                                                                    value={internQuery}
+                                                                    onChange={(event) => setInternQuery(event.target.value)}
+                                                                    onFocus={() => setIsInternDropdownOpen(true)}
+                                                                    className="h-7 min-w-[140px] flex-1 border-0 bg-transparent p-0 text-sm shadow-none focus-visible:ring-0"
+                                                                    placeholder={selectedInterns.length > 0 ? 'Añadir más becarios...' : 'Buscar becarios...'}
+                                                                />
+                                                                {selectedInterns.length > 0 ? (
+                                                                    <Button
+                                                                        type="button"
+                                                                        variant="ghost"
+                                                                        size="sm"
+                                                                        className="h-7 px-2 text-xs"
+                                                                        onClick={clearSelectedInterns}
+                                                                    >
+                                                                        Limpiar
+                                                                    </Button>
+                                                                ) : null}
                                                             </div>
-                                                        ) : (
-                                                            <p className="text-sm text-muted-foreground">
-                                                                Todavía no hay becarios asignados.
-                                                            </p>
-                                                        )}
+
+                                                            {isInternDropdownOpen ? (
+                                                                <div className="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-md border border-slate-200 bg-white p-1 shadow-md dark:border-slate-700 dark:bg-slate-900">
+                                                                    {availableInterns.length > 0 ? (
+                                                                        availableInterns.map((intern) => (
+                                                                            <button
+                                                                                key={intern.id}
+                                                                                type="button"
+                                                                                className="flex w-full items-center rounded-sm px-2 py-1.5 text-left text-sm transition-colors hover:bg-slate-100 dark:hover:bg-slate-800"
+                                                                                onClick={() => addIntern(intern.id)}
+                                                                            >
+                                                                                {intern.name}
+                                                                            </button>
+                                                                        ))
+                                                                    ) : (
+                                                                        <p className="px-2 py-1.5 text-sm text-muted-foreground">
+                                                                            No hay becarios disponibles.
+                                                                        </p>
+                                                                    )}
+                                                                </div>
+                                                            ) : null}
+                                                        </div>
+
+                                                        <p className="text-xs text-muted-foreground">
+                                                            Selecciona uno o varios becarios. Se creará una tarea por cada seleccionado.
+                                                        </p>
                                                     </div>
-                                                    <InputError message={errors.intern_ids} />
                                                 </>
                                             ) : (
                                                 <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50/70 p-3 dark:border-slate-700 dark:bg-slate-900/50">
@@ -708,9 +798,7 @@ export default function PracticeTasksFormPage({ interns, trainingPrograms, messa
                                                         <span className="text-[11px] text-muted-foreground">{formatDateTime(log.changed_at)}</span>
                                                     </div>
                                                     <p className="mt-1 text-sm">
-                                                        <span className="font-semibold">{formatTaskStatus(log.from_status)}</span>
-                                                        {' -> '}
-                                                        <span className="font-semibold">{formatTaskStatus(log.to_status)}</span>
+                                                        <span className="font-semibold">{formatStatusLogLine(log.from_status, log.to_status)}</span>
                                                     </p>
                                                     {log.notes ? (
                                                         <p className="mt-1 text-xs text-muted-foreground">{log.notes}</p>
@@ -917,3 +1005,5 @@ export default function PracticeTasksFormPage({ interns, trainingPrograms, messa
         </AppLayout>
     );
 }
+
+

@@ -1,5 +1,5 @@
 ﻿import { Link, router } from '@inertiajs/react';
-import { CirclePlus, GripVertical, Trash2 } from 'lucide-react';
+import { CirclePlus, GraduationCap, GripVertical, Trash2, User } from 'lucide-react';
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 import { Button } from '@/components/ui/button';
 import { UI_PRESETS } from '@/lib/ui-presets';
@@ -99,13 +99,25 @@ export default function PracticeTasksBoard(props: PracticeTasksBoardProps) {
                         return (
                             <section
                                 key={column.status}
-                                className={`w-[300px] min-w-[300px] rounded-2xl border p-3 xl:w-full xl:min-w-0 ${column.className} ${dropColumn === column.status ? 'ring-2 ring-sky-300 dark:ring-sky-700' : ''}`}
-                                onDragOver={(event) => {
+                                className={`w-[300px] min-w-[300px] rounded-2xl border p-3.5 xl:w-full xl:min-w-0 ${column.className} ${dropColumn === column.status ? 'shadow-[inset_0_0_0_2px_rgba(56,189,248,0.55)] dark:shadow-[inset_0_0_0_2px_rgba(14,116,144,0.75)]' : ''}`}
+                                onDragEnter={(event) => {
                                     event.preventDefault();
                                     event.dataTransfer.dropEffect = 'move';
                                     setDropColumn(column.status);
                                 }}
-                                onDragLeave={() => setDropColumn((current) => (current === column.status ? null : current))}
+                                onDragOver={(event) => {
+                                    event.preventDefault();
+                                    event.dataTransfer.dropEffect = 'move';
+                                }}
+                                onDragLeave={(event) => {
+                                    const nextTarget = event.relatedTarget as Node | null;
+
+                                    if (nextTarget && event.currentTarget.contains(nextTarget)) {
+                                        return;
+                                    }
+
+                                    setDropColumn((current) => (current === column.status ? null : current));
+                                }}
                                 onDrop={(event) => {
                                     event.preventDefault();
                                     setHoveredEndStatus(null);
@@ -113,7 +125,7 @@ export default function PracticeTasksBoard(props: PracticeTasksBoardProps) {
                                 }}
                             >
                                 <div className={`mb-3 flex items-center justify-between border-b border-l-4 border-slate-200/70 pb-2 pl-2 dark:border-slate-700/70 ${STATUS_COLUMN_ACCENT_CLASS[column.status]}`}>
-                                    <h2 className="text-sm font-semibold">{column.label}</h2>
+                                    <h2 className="text-sm font-semibold tracking-tight">{column.label}</h2>
                                     <div className="flex items-center gap-1.5">
                                         {column.status === 'pending' ? (
                                             <Button
@@ -129,7 +141,7 @@ export default function PracticeTasksBoard(props: PracticeTasksBoardProps) {
                                                 </Link>
                                             </Button>
                                         ) : null}
-                                        <span className="rounded-full border border-slate-300 px-2 py-0.5 text-xs font-semibold text-slate-600 dark:border-slate-700 dark:text-slate-300">
+                                        <span className="rounded-full border border-slate-300 bg-white/80 px-2 py-0.5 text-xs font-semibold text-slate-600 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-300">
                                             {tasksInColumn.length}
                                         </span>
                                     </div>
@@ -147,7 +159,7 @@ export default function PracticeTasksBoard(props: PracticeTasksBoardProps) {
                                                     ) : null}
 
                                                     <article
-                                                        className={`cursor-pointer space-y-3 rounded-xl border border-slate-200 border-l-4 bg-white p-3 text-sm shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md dark:border-slate-700 dark:bg-slate-950 ${STATUS_ACCENT_BORDER_CLASS[task.status]} ${STATUS_CARD_HOVER_CLASS[task.status]} ${draggedTask?.id === task.id ? 'opacity-60' : ''}`}
+                                                        className={`cursor-pointer space-y-2.5 rounded-xl border border-slate-200/90 border-l-4 bg-white p-3 text-sm shadow-sm transition-all hover:shadow-md dark:border-slate-700 dark:bg-slate-950 ${draggedTask ? 'hover:translate-y-0' : 'hover:-translate-y-0.5'} ${STATUS_ACCENT_BORDER_CLASS[task.status]} ${STATUS_CARD_HOVER_CLASS[task.status]} ${draggedTask?.id === task.id ? 'opacity-60' : ''}`}
                                                         draggable
                                                         onClick={() => router.get(practiceTasks.edit(task.id).url)}
                                                         onDragStart={(event) => {
@@ -228,19 +240,20 @@ export default function PracticeTasksBoard(props: PracticeTasksBoardProps) {
 
                                                             event.preventDefault();
                                                             event.dataTransfer.dropEffect = 'move';
+                                                            setDropColumn(task.status);
                                                         }}
                                                     >
                                                         <div className="flex items-start justify-between gap-2">
                                                             <div className="flex min-w-0 items-start gap-1.5">
-                                                                <GripVertical className="mt-0.5 size-4 shrink-0 text-slate-400 dark:text-slate-500" />
-                                                                <h3 className="line-clamp-2 text-sm font-semibold leading-5 text-slate-800 dark:text-slate-100">{task.title}</h3>
+                                                                <GripVertical className="mt-0.5 size-4 shrink-0 text-slate-400/90 dark:text-slate-500" />
+                                                                <h3 className="line-clamp-2 text-sm font-semibold leading-[1.3] text-slate-800 dark:text-slate-100">{task.title}</h3>
                                                             </div>
                                                             <div className="flex items-start gap-1">
                                                                 <Button
                                                                     type="button"
                                                                     variant="ghost"
                                                                     size="icon"
-                                                                    className="h-7 w-7 text-slate-400 hover:text-destructive dark:text-slate-500"
+                                                                    className="h-7 w-7 rounded-md text-slate-400 hover:bg-red-50 hover:text-destructive dark:text-slate-500 dark:hover:bg-red-950/30"
                                                                     onClick={(event) => {
                                                                         event.stopPropagation();
                                                                         setTaskToDelete(task);
@@ -251,27 +264,29 @@ export default function PracticeTasksBoard(props: PracticeTasksBoardProps) {
                                                                 </Button>
                                                             </div>
                                                         </div>
-                                                        <div className="rounded-lg border border-slate-200/80 bg-slate-50/70 p-2 dark:border-slate-700 dark:bg-slate-900/40">
-                                                            <p className="line-clamp-1 text-xs font-semibold text-slate-700 dark:text-slate-200">
-                                                                Becario: {task.internNames[0] ?? 'Sin becario asignado'}
+                                                        <div className="space-y-1.5">
+                                                            <p className="inline-flex items-center gap-1.5 line-clamp-1 text-xs font-semibold tracking-tight text-slate-700 dark:text-slate-200">
+                                                                <User className="size-3.5 shrink-0 text-muted-foreground" />
+                                                                <span className="truncate">
+                                                                    {task.internNames[0] ?? 'Sin becario asignado'}
+                                                                    {task.internNames.length > 1 ? ` · +${task.internNames.length - 1}` : ''}
+                                                                </span>
                                                             </p>
                                                             {task.assignmentMode === 'training_program' && task.trainingProgramName ? (
-                                                                <p className="line-clamp-1 text-[11px] text-muted-foreground">
-                                                                    Grupo: {task.trainingProgramName}
-                                                                </p>
-                                                            ) : null}
-                                                            {task.internNames.length > 1 ? (
-                                                                <p className="line-clamp-1 text-[11px] text-muted-foreground">
-                                                                    +{task.internNames.length - 1} becario(s) adicional(es)
+                                                                <p className="inline-flex items-center gap-1.5 line-clamp-1 text-[11px] text-muted-foreground/90">
+                                                                    <GraduationCap className="size-3.5 shrink-0 text-muted-foreground" />
+                                                                    <span className="truncate">{task.trainingProgramName}</span>
                                                                 </p>
                                                             ) : null}
                                                         </div>
                                                         {task.dueAt !== '' ? (
-                                                            <div className="rounded-lg border border-slate-200/80 bg-white p-2 dark:border-slate-700 dark:bg-slate-950">
-                                                                <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">Entrega: {task.dueAt}</p>
+                                                            <div className="flex items-center justify-between gap-2 rounded-md border border-slate-200/90 bg-slate-50/80 px-2.5 py-1.5 dark:border-slate-700 dark:bg-slate-900/50">
+                                                                <p className="truncate text-xs font-medium text-slate-700 dark:text-slate-200">
+                                                                    {task.dueAt}
+                                                                </p>
                                                                 {dueMeta ? (
-                                                                    <p className="mt-0.5 inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-                                                                        <span className={`inline-block size-2 rounded-full ${dueMeta.dotClass}`} />
+                                                                    <p className="inline-flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
+                                                                        <span className={`inline-block size-3.5 rounded-full ${dueMeta.dotClass}`} />
                                                                         <span>{dueMeta.text}</span>
                                                                     </p>
                                                                 ) : null}

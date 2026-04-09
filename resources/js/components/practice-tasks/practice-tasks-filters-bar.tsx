@@ -1,5 +1,7 @@
-﻿import { Link } from '@inertiajs/react';
-import { CirclePlus, FilterX, Search } from 'lucide-react';
+import { Link } from '@inertiajs/react';
+import { CirclePlus, FilterX, Search, X } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import DatePicker from '@/components/shared/date-picker';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -12,8 +14,8 @@ type PracticeTasksFiltersBarProps = {
     viewMode: 'tutor' | 'intern';
     search: string;
     onSearchChange: (value: string) => void;
-    internFilter: string;
-    onInternFilterChange: (value: string) => void;
+    selectedInternIds: string[];
+    onSelectedInternIdsChange: (ids: string[]) => void;
     trainingProgramFilter: string;
     onTrainingProgramFilterChange: (value: string) => void;
     dateFrom: string;
@@ -33,8 +35,8 @@ export default function PracticeTasksFiltersBar(props: PracticeTasksFiltersBarPr
         viewMode,
         search,
         onSearchChange,
-        internFilter,
-        onInternFilterChange,
+        selectedInternIds,
+        onSelectedInternIdsChange,
         trainingProgramFilter,
         onTrainingProgramFilterChange,
         dateFrom,
@@ -48,6 +50,66 @@ export default function PracticeTasksFiltersBar(props: PracticeTasksFiltersBarPr
         interns,
         trainingPrograms,
     } = props;
+    const [internQuery, setInternQuery] = useState('');
+    const [isInternDropdownOpen, setIsInternDropdownOpen] = useState(false);
+    const internComboboxRef = useRef<HTMLDivElement | null>(null);
+
+    const selectedInterns = useMemo(
+        () => interns.filter((intern) => selectedInternIds.includes(intern.id)),
+        [interns, selectedInternIds],
+    );
+
+    const availableInterns = useMemo(() => {
+        const normalizedQuery = internQuery.trim().toLowerCase();
+
+        return interns.filter((intern) => {
+            if (selectedInternIds.includes(intern.id)) {
+                return false;
+            }
+
+            if (normalizedQuery === '') {
+                return true;
+            }
+
+            return intern.name.toLowerCase().includes(normalizedQuery);
+        });
+    }, [interns, selectedInternIds, internQuery]);
+
+    const addIntern = (internId: string) => {
+        if (selectedInternIds.includes(internId)) {
+            return;
+        }
+
+        onSelectedInternIdsChange([...selectedInternIds, internId]);
+        setInternQuery('');
+    };
+
+    const removeIntern = (internId: string) => {
+        onSelectedInternIdsChange(selectedInternIds.filter((id) => id !== internId));
+    };
+
+    const clearSelectedInterns = () => {
+        onSelectedInternIdsChange([]);
+        setInternQuery('');
+    };
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (!internComboboxRef.current) {
+                return;
+            }
+
+            if (!internComboboxRef.current.contains(event.target as Node)) {
+                setIsInternDropdownOpen(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, []);
 
     return (
         <form className={`${UI_PRESETS.filterBar} mb-2`} onSubmit={(event) => event.preventDefault()}>
@@ -91,27 +153,72 @@ export default function PracticeTasksFiltersBar(props: PracticeTasksFiltersBarPr
                     </div>
                 </div>
 
-                <div className={`grid gap-2 ${viewMode === 'tutor' ? 'md:grid-cols-2 xl:grid-cols-5' : 'md:grid-cols-2 xl:grid-cols-4'}`}>
-                    {viewMode === 'tutor' ? (
-                        <div className="flex flex-col gap-1">
-                            <span className="text-xs font-medium text-muted-foreground">Becario</span>
-                            <Select value={internFilter} onValueChange={onInternFilterChange}>
-                                <SelectTrigger className={`${UI_PRESETS.selectTrigger} w-full`}>
-                                    <SelectValue placeholder="Becario" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem className={UI_PRESETS.selectItem} value="all">
-                                        Todos los becarios
-                                    </SelectItem>
-                                    {interns.map((intern) => (
-                                        <SelectItem className={UI_PRESETS.selectItem} key={intern.id} value={intern.id}>
-                                            {intern.name}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                {viewMode === 'tutor' ? (
+                    <div className="flex flex-col gap-1" ref={internComboboxRef}>
+                        <span className="text-xs font-medium text-muted-foreground">Becarios</span>
+                        <div className="relative">
+                            <div className="flex min-h-9 w-full flex-wrap items-center gap-1.5 rounded-md border border-slate-300 bg-white px-2 py-1 text-sm shadow-xs transition-colors focus-within:border-slate-400 dark:border-slate-600 dark:bg-slate-950">
+                                {selectedInterns.map((intern) => (
+                                    <span
+                                        key={intern.id}
+                                        className="inline-flex items-center gap-1 rounded-full border border-slate-300 bg-white px-2 py-1 text-xs dark:border-slate-700 dark:bg-slate-950"
+                                    >
+                                        <span className="max-w-[9rem] truncate">{intern.name}</span>
+                                        <button
+                                            type="button"
+                                            className="text-muted-foreground transition-colors hover:text-destructive"
+                                            onClick={() => removeIntern(intern.id)}
+                                            aria-label={`Quitar ${intern.name}`}
+                                        >
+                                            <X className="size-3" />
+                                        </button>
+                                    </span>
+                                ))}
+                                <Input
+                                    value={internQuery}
+                                    onChange={(event) => setInternQuery(event.target.value)}
+                                    onFocus={() => setIsInternDropdownOpen(true)}
+                                    className="h-7 min-w-[140px] flex-1 border-0 bg-transparent p-0 text-sm shadow-none focus-visible:ring-0"
+                                    placeholder={selectedInternIds.length > 0 ? 'Añadir más becarios...' : 'Buscar becarios...'}
+                                />
+                                {selectedInternIds.length > 0 ? (
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-7 px-2 text-xs"
+                                        onClick={clearSelectedInterns}
+                                    >
+                                        Limpiar
+                                    </Button>
+                                ) : null}
+                            </div>
+
+                            {isInternDropdownOpen ? (
+                                <div className="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-md border border-slate-200 bg-white p-1 shadow-md dark:border-slate-700 dark:bg-slate-900">
+                                    {availableInterns.length > 0 ? (
+                                        availableInterns.map((intern) => (
+                                            <button
+                                                key={intern.id}
+                                                type="button"
+                                                className="flex w-full items-center rounded-sm px-2 py-1.5 text-left text-sm transition-colors hover:bg-slate-100 dark:hover:bg-slate-800"
+                                                onClick={() => addIntern(intern.id)}
+                                            >
+                                                {intern.name}
+                                            </button>
+                                        ))
+                                    ) : (
+                                        <p className="px-2 py-1.5 text-sm text-muted-foreground">
+                                            No hay becarios disponibles.
+                                        </p>
+                                    )}
+                                </div>
+                            ) : null}
                         </div>
-                    ) : null}
+                    </div>
+                ) : null}
+
+                <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
 
                     <div className="flex flex-col gap-1">
                         <span className="text-xs font-medium text-muted-foreground">Grado formativo</span>
@@ -134,20 +241,22 @@ export default function PracticeTasksFiltersBar(props: PracticeTasksFiltersBarPr
 
                     <div className="flex flex-col gap-1">
                         <span className="text-xs font-medium text-muted-foreground">Desde</span>
-                        <Input
-                            type="date"
+                        <DatePicker
+                            id="practice-tasks-date-from"
                             value={dateFrom}
-                            onChange={(event) => onDateFromChange(event.target.value)}
+                            onChange={onDateFromChange}
+                            placeholder="Seleccionar fecha"
                             className={`${UI_PRESETS.simpleSearchInput} h-9 text-sm`}
                         />
                     </div>
 
                     <div className="flex flex-col gap-1">
                         <span className="text-xs font-medium text-muted-foreground">Hasta</span>
-                        <Input
-                            type="date"
+                        <DatePicker
+                            id="practice-tasks-date-to"
                             value={dateTo}
-                            onChange={(event) => onDateToChange(event.target.value)}
+                            onChange={onDateToChange}
+                            placeholder="Seleccionar fecha"
                             className={`${UI_PRESETS.simpleSearchInput} h-9 text-sm`}
                         />
                     </div>
@@ -179,3 +288,5 @@ export default function PracticeTasksFiltersBar(props: PracticeTasksFiltersBarPr
         </form>
     );
 }
+
+

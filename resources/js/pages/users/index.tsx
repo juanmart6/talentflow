@@ -1,11 +1,12 @@
 import { Head, router, usePage } from '@inertiajs/react';
 import { ShieldCheck, UserCog } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import UserManagementTabs, { type UserManagementTab } from '@/components/users/user-management-tabs';
 import AppLayout from '@/layouts/app-layout';
 import { UI_PRESETS, stripedRowClass } from '@/lib/ui-presets';
 import type { BreadcrumbItem } from '@/types';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
     Select,
     SelectContent,
@@ -13,6 +14,13 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+
+type RoleRow = {
+    id: number;
+    name: string;
+};
+
+type RolePermissionsMap = Record<string, string[]>;
 
 type UserRow = {
     id: number;
@@ -25,7 +33,10 @@ type UserRow = {
 
 type Props = {
     users: UserRow[];
+    roles: RoleRow[];
     availableRoles: string[];
+    permissions: string[];
+    rolePermissions: RolePermissionsMap;
 };
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -41,21 +52,65 @@ const roleLabels: Record<string, string> = {
     intern: 'BECARIO',
 };
 
-export default function UsersIndexPage({ users, availableRoles }: Props) {
+const permissionModuleLabels: Record<string, string> = {
+    'education-centers': 'Centros Educativos',
+    interns: 'Becarios',
+    'practice-tasks': 'Prácticas y tareas',
+    users: 'Usuarios y roles',
+};
+
+const permissionActionLabels: Record<string, string> = {
+    view: 'Ver',
+    create: 'Crear',
+    update: 'Editar',
+    delete: 'Eliminar',
+    manage: 'Gestionar',
+};
+
+export default function UsersIndexPage({ users, roles, availableRoles, permissions, rolePermissions }: Props) {
     const page = usePage<{ flash?: { success?: string; error?: string } }>();
-    const lastFlashRef = useRef<string | null>(null);
     const [activeTab, setActiveTab] = useState<UserManagementTab>('users-roles');
+    const [selectedRoleId, setSelectedRoleId] = useState<string>(roles[0] ? String(roles[0].id) : '');
+    const [selectedPermissions, setSelectedPermissions] = useState<string[]>([]);
+
+    const selectedRole = useMemo(
+        () => roles.find((role) => String(role.id) === selectedRoleId) ?? null,
+        [roles, selectedRoleId],
+    );
+
+    const selectedRoleName = selectedRole?.name ?? '';
+    const isAdminRoleSelected = selectedRoleName === 'admin';
+
+    const groupedPermissions = useMemo(() => {
+        const groups: Record<string, string[]> = {};
+
+        for (const permission of permissions) {
+            const [module] = permission.split('.');
+            const key = module ?? 'general';
+
+            if (!groups[key]) {
+                groups[key] = [];
+            }
+
+            groups[key].push(permission);
+        }
+
+        return Object.entries(groups)
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([module, modulePermissions]) => ({
+                module,
+                label: permissionModuleLabels[module] ?? module,
+                permissions: modulePermissions.sort((a, b) => a.localeCompare(b)),
+            }));
+    }, [permissions]);
+
+    useEffect(() => {
+        setSelectedPermissions(rolePermissions[selectedRoleName] ?? []);
+    }, [selectedRoleName, rolePermissions]);
 
     useEffect(() => {
         const successMessage = page.props.flash?.success;
         const errorMessage = page.props.flash?.error;
-        const flashKey = successMessage ? `success:${successMessage}` : errorMessage ? `error:${errorMessage}` : null;
-
-        if (!flashKey || lastFlashRef.current === flashKey) {
-            return;
-        }
-
-        lastFlashRef.current = flashKey;
 
         if (successMessage) {
             toast.success(successMessage);
@@ -70,6 +125,36 @@ export default function UsersIndexPage({ users, availableRoles }: Props) {
         router.patch(
             `/autenticacion-usuarios/${userId}/role`,
             { role },
+            {
+                preserveScroll: true,
+                preserveState: true,
+            },
+        );
+    };
+
+    const togglePermission = (permission: string, checked: boolean) => {
+        setSelectedPermissions((current) => {
+            if (checked) {
+                if (current.includes(permission)) {
+                    return current;
+                }
+
+                return [...current, permission];
+            }
+
+            return current.filter((item) => item !== permission);
+        });
+    };
+
+    const handleSaveRolePermissions = () => {
+        if (!selectedRole) {
+            toast.error('Selecciona un rol para editar sus permisos.');
+            return;
+        }
+
+        router.patch(
+            `/autenticacion-usuarios/roles/${selectedRole.id}/permissions`,
+            { permissions: selectedPermissions },
             {
                 preserveScroll: true,
                 preserveState: true,
@@ -137,21 +222,31 @@ export default function UsersIndexPage({ users, availableRoles }: Props) {
                                                             </span>
                                                         </td>
                                                         <td className="px-4 py-3 text-center align-middle">
-                                                            <Select
-                                                                value={user.role ?? ''}
-                                                                onValueChange={(value) => handleRoleChange(user.id, value)}
-                                                            >
-                                                                <SelectTrigger className={`${UI_PRESETS.selectTrigger} mx-auto w-[210px]`}>
-                                                                    <SelectValue placeholder="Seleccionar rol" />
-                                                                </SelectTrigger>
-                                                                <SelectContent>
-                                                                    {availableRoles.map((role) => (
-                                                                        <SelectItem className={UI_PRESETS.selectItem} key={role} value={role}>
-                                                                            {roleLabels[role] ?? role.toUpperCase()}
-                                                                        </SelectItem>
-                                                                    ))}
-                                                                </SelectContent>
-                                                            </Select>
+                                                            <div className="grid place-items-center gap-1">
+                                                                <Select
+                                                                    value={user.role ?? ''}
+                                                                    disabled={user.role === 'admin'}
+                                                                    onValueChange={(value) => handleRoleChange(user.id, value)}
+                                                                >
+                                                                    <SelectTrigger
+                                                                        className={`${UI_PRESETS.selectTrigger} mx-auto w-[210px] disabled:cursor-not-allowed disabled:opacity-60`}
+                                                                    >
+                                                                        <SelectValue placeholder="Seleccionar rol" />
+                                                                    </SelectTrigger>
+                                                                    <SelectContent>
+                                                                        {availableRoles
+                                                                            .filter((role) => user.role === 'admin' || role !== 'admin')
+                                                                            .map((role) => (
+                                                                            <SelectItem className={UI_PRESETS.selectItem} key={role} value={role}>
+                                                                                {roleLabels[role] ?? role.toUpperCase()}
+                                                                            </SelectItem>
+                                                                        ))}
+                                                                    </SelectContent>
+                                                                </Select>
+                                                                {user.role === 'admin' ? (
+                                                                    <span className="text-[11px] text-muted-foreground">Rol protegido</span>
+                                                                ) : null}
+                                                            </div>
                                                         </td>
                                                     </tr>
                                                 ))
@@ -177,8 +272,72 @@ export default function UsersIndexPage({ users, availableRoles }: Props) {
 
                             {activeTab === 'permisos' && (
                                 <div className={UI_PRESETS.tableContainer}>
-                                    <div className="px-4 py-8 text-sm text-muted-foreground">
-                                        Proximamente: matriz de permisos granulares por funcionalidad.
+                                    <div className="space-y-4 px-4 py-4">
+                                        <div className="grid gap-2 md:max-w-xs">
+                                            <span className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                                                Rol
+                                            </span>
+                                            <Select value={selectedRoleId} onValueChange={setSelectedRoleId}>
+                                                <SelectTrigger className={`${UI_PRESETS.selectTrigger} w-full`}>
+                                                    <SelectValue placeholder="Seleccionar rol" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {roles.map((role) => (
+                                                        <SelectItem className={UI_PRESETS.selectItem} key={role.id} value={String(role.id)}>
+                                                            {roleLabels[role.name] ?? role.name.toUpperCase()}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+
+                                        <div className="grid gap-3">
+                                            {groupedPermissions.map((group) => (
+                                                <div
+                                                    key={group.module}
+                                                    className="rounded-lg border border-slate-200/80 bg-slate-50/60 p-3 dark:border-slate-700/80 dark:bg-slate-900/30"
+                                                >
+                                                    <p className="mb-3 text-sm font-semibold">{group.label}</p>
+                                                    <div className="grid gap-2 md:grid-cols-2">
+                                                        {group.permissions.map((permission) => {
+                                                            const [, action = permission] = permission.split('.');
+                                                            const actionLabel = permissionActionLabels[action] ?? action;
+
+                                                            return (
+                                                                <label
+                                                                    key={permission}
+                                                                    className="flex cursor-pointer items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:hover:bg-slate-900"
+                                                                >
+                                                                    <Checkbox
+                                                                        checked={selectedPermissions.includes(permission)}
+                                                                        disabled={isAdminRoleSelected}
+                                                                        onCheckedChange={(checked) => togglePermission(permission, checked === true)}
+                                                                    />
+                                                                    <span className="font-medium">{actionLabel}</span>
+                                                                    <span className="text-xs text-muted-foreground">({permission})</span>
+                                                                </label>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+
+                                        <div className="flex justify-end pt-1">
+                                            <button
+                                                type="button"
+                                                className="inline-flex h-9 items-center rounded-md bg-[#2563eb] px-4 text-sm font-medium text-white transition-colors hover:bg-[#1d4ed8] disabled:cursor-not-allowed disabled:opacity-60"
+                                                onClick={handleSaveRolePermissions}
+                                                disabled={!selectedRole || isAdminRoleSelected}
+                                            >
+                                                Guardar permisos
+                                            </button>
+                                        </div>
+                                        {isAdminRoleSelected ? (
+                                            <p className="text-right text-xs text-muted-foreground">
+                                                El rol admin está protegido y no se puede editar.
+                                            </p>
+                                        ) : null}
                                     </div>
                                 </div>
                             )}

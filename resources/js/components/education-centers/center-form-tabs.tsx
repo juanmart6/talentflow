@@ -1,5 +1,6 @@
 import { Building2, FileText, GraduationCap, Handshake } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { UI_PRESETS } from '@/lib/ui-presets';
 
 export type CenterFormTab = 'center' | 'agreement' | 'general' | 'history';
 
@@ -16,10 +17,10 @@ export default function CenterFormTabs({ activeTab, onTabChange, isReadOnly }: C
                 type="button"
                 variant="ghost"
                 size="sm"
-                className={`h-9 min-w-[118px] justify-center rounded-b-none border border-b-0 px-3 cursor-pointer ${
+                className={`${UI_PRESETS.tabBase} ${
                     activeTab === 'center'
-                        ? 'border-[#2563eb]/45 bg-white text-[#1d4ed8] shadow-sm hover:bg-white dark:bg-slate-950 dark:text-sky-300 dark:hover:bg-slate-950'
-                        : 'border-transparent text-muted-foreground hover:border-[#2563eb]/30 hover:bg-[#2563eb]/8 hover:text-[#1d4ed8] dark:hover:border-[#2563eb]/40 dark:hover:bg-[#2563eb]/15 dark:hover:text-sky-300'
+                        ? UI_PRESETS.tabActive
+                        : UI_PRESETS.tabInactive
                 }`}
                 onClick={() => onTabChange('center')}
             >
@@ -31,10 +32,10 @@ export default function CenterFormTabs({ activeTab, onTabChange, isReadOnly }: C
                 type="button"
                 variant="ghost"
                 size="sm"
-                className={`h-9 min-w-[118px] justify-center rounded-b-none border border-b-0 px-3 cursor-pointer ${
+                className={`${UI_PRESETS.tabBase} ${
                     activeTab === 'agreement'
-                        ? 'border-[#2563eb]/45 bg-white text-[#1d4ed8] shadow-sm hover:bg-white dark:bg-slate-950 dark:text-sky-300 dark:hover:bg-slate-950'
-                        : 'border-transparent text-muted-foreground hover:border-[#2563eb]/30 hover:bg-[#2563eb]/8 hover:text-[#1d4ed8] dark:hover:border-[#2563eb]/40 dark:hover:bg-[#2563eb]/15 dark:hover:text-sky-300'
+                        ? UI_PRESETS.tabActive
+                        : UI_PRESETS.tabInactive
                 }`}
                 onClick={() => onTabChange('agreement')}
             >
@@ -46,10 +47,10 @@ export default function CenterFormTabs({ activeTab, onTabChange, isReadOnly }: C
                 type="button"
                 variant="ghost"
                 size="sm"
-                className={`h-9 min-w-[118px] justify-center rounded-b-none border border-b-0 px-3 cursor-pointer ${
+                className={`${UI_PRESETS.tabBase} ${
                     activeTab === 'general'
-                        ? 'border-[#2563eb]/45 bg-white text-[#1d4ed8] shadow-sm hover:bg-white dark:bg-slate-950 dark:text-sky-300 dark:hover:bg-slate-950'
-                        : 'border-transparent text-muted-foreground hover:border-[#2563eb]/30 hover:bg-[#2563eb]/8 hover:text-[#1d4ed8] dark:hover:border-[#2563eb]/40 dark:hover:bg-[#2563eb]/15 dark:hover:text-sky-300'
+                        ? UI_PRESETS.tabActive
+                        : UI_PRESETS.tabInactive
                 }`}
                 onClick={() => onTabChange('general')}
             >
@@ -63,12 +64,12 @@ export default function CenterFormTabs({ activeTab, onTabChange, isReadOnly }: C
                 size="sm"
                 onClick={() => isReadOnly && onTabChange('history')}
                 disabled={!isReadOnly}
-                className={`h-9 min-w-[118px] justify-center rounded-b-none border border-b-0 px-3 ${
+                className={`${UI_PRESETS.tabBase} ${
                     !isReadOnly
-                        ? 'cursor-not-allowed border-transparent text-muted-foreground/60'
+                        ? UI_PRESETS.tabDisabled
                         : activeTab === 'history'
-                            ? 'cursor-pointer border-[#2563eb]/45 bg-white text-[#1d4ed8] shadow-sm hover:bg-white dark:bg-slate-950 dark:text-sky-300 dark:hover:bg-slate-950'
-                            : 'cursor-pointer border-transparent text-muted-foreground hover:border-[#2563eb]/30 hover:bg-[#2563eb]/8 hover:text-[#1d4ed8] dark:hover:border-[#2563eb]/40 dark:hover:bg-[#2563eb]/15 dark:hover:text-sky-300'
+                            ? UI_PRESETS.tabActive
+                            : UI_PRESETS.tabInactive
                 }`}
             >
                 <GraduationCap className="mr-1.5 size-4 shrink-0" />

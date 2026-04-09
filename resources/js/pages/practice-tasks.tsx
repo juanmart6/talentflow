@@ -1,13 +1,15 @@
 ﻿import { Head, router, usePage } from '@inertiajs/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import PracticeTasksBoard from '@/components/practice-tasks/practice-tasks-board';
-import PracticeTasksFiltersBar from '@/components/practice-tasks/practice-tasks-filters-bar';
-import ConfirmDeleteDialog from '@/components/shared/confirm-delete-dialog';
-import AppLayout from '@/layouts/app-layout';
 import { moveTaskInStatus, moveTaskToEndInStatus } from '@/lib/practice-tasks/practice-task-board';
 import { parseDueDate, dueDaysFromToday, dueIndicatorMeta } from '@/lib/practice-tasks/practice-task-dates';
 import { UI_PRESETS } from '@/lib/ui-presets';
+import PracticeTasksBoard from '@/components/practice-tasks/practice-tasks-board';
+import PracticeTasksFiltersBar from '@/components/practice-tasks/practice-tasks-filters-bar';
+import PracticeTasksList from '@/components/practice-tasks/practice-tasks-list';
+import PracticeTasksViewToggle from '@/components/practice-tasks/practice-tasks-view-toggle';
+import ConfirmDeleteDialog from '@/components/shared/confirm-delete-dialog';
+import AppLayout from '@/layouts/app-layout';
 import practiceTasks from '@/routes/practice-tasks';
 import type { BreadcrumbItem } from '@/types';
 import type { DueStateFilter, PracticeTasksProps, TaskCard, TaskStatus } from '@/types/practice-tasks';
@@ -24,14 +26,14 @@ export default function PracticeTasksPage({ viewMode, interns, trainingPrograms,
     const page = usePage<{ flash?: { success?: string; error?: string } }>();
     const lastFlashRef = useRef<string | null>(null);
     const [search, setSearch] = useState('');
-    const [internFilter, setInternFilter] = useState('all');
+    const [selectedInternIds, setSelectedInternIds] = useState<string[]>([]);
     const [trainingProgramFilter, setTrainingProgramFilter] = useState('all');
     const [dateFrom, setDateFrom] = useState('');
     const [dateTo, setDateTo] = useState('');
     const [dueStateFilter, setDueStateFilter] = useState<DueStateFilter>('all');
     const hasActiveFilters =
         search.trim() !== ''
-        || internFilter !== 'all'
+        || selectedInternIds.length > 0
         || trainingProgramFilter !== 'all'
         || dateFrom !== ''
         || dateTo !== ''
@@ -44,6 +46,14 @@ export default function PracticeTasksPage({ viewMode, interns, trainingPrograms,
     const [hoveredTaskId, setHoveredTaskId] = useState<string | null>(null);
     const [hoveredPosition, setHoveredPosition] = useState<'before' | 'after' | null>(null);
     const [hoveredEndStatus, setHoveredEndStatus] = useState<TaskStatus | null>(null);
+    const [tasksView, setTasksView] = useState<'kanban' | 'list'>(() => {
+        if (typeof window === 'undefined') {
+            return 'kanban';
+        }
+
+        const savedView = window.localStorage.getItem('practice-tasks:view');
+        return savedView === 'list' ? 'list' : 'kanban';
+    });
     const dragStartStatusRef = useRef<TaskStatus | null>(null);
     const dragStartOrderRef = useRef<string[]>([]);
     const reorderedInCurrentDragRef = useRef(false);
@@ -51,6 +61,14 @@ export default function PracticeTasksPage({ viewMode, interns, trainingPrograms,
     useEffect(() => {
         setBoardTasks(tasks);
     }, [tasks]);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') {
+            return;
+        }
+
+        window.localStorage.setItem('practice-tasks:view', tasksView);
+    }, [tasksView]);
 
     const filteredTasks = useMemo(() => {
         const normalizedSearch = search.trim().toLowerCase();
@@ -63,7 +81,10 @@ export default function PracticeTasksPage({ viewMode, interns, trainingPrograms,
                 task.description.toLowerCase().includes(normalizedSearch) ||
                 task.internNames.some((name) => name.toLowerCase().includes(normalizedSearch));
 
-            const matchesIntern = viewMode !== 'tutor' || internFilter === 'all' || task.internIds.includes(internFilter);
+            const matchesIntern =
+                viewMode !== 'tutor'
+                || selectedInternIds.length === 0
+                || task.internIds.some((internId) => selectedInternIds.includes(internId));
             const matchesTrainingProgram =
                 trainingProgramFilter === 'all'
                 || task.trainingProgramId === trainingProgramFilter;
@@ -81,7 +102,7 @@ export default function PracticeTasksPage({ viewMode, interns, trainingPrograms,
 
             return matchesSearch && matchesIntern && matchesTrainingProgram && matchesDateFrom && matchesDateTo && matchesDueState;
         });
-    }, [search, internFilter, trainingProgramFilter, dateFrom, dateTo, dueStateFilter, viewMode, boardTasks]);
+    }, [search, selectedInternIds, trainingProgramFilter, dateFrom, dateTo, dueStateFilter, viewMode, boardTasks]);
     const hasInvalidDateRange = dateFrom !== '' && dateTo !== '' && dateFrom > dateTo;
 
     useEffect(() => {
@@ -195,7 +216,7 @@ export default function PracticeTasksPage({ viewMode, interns, trainingPrograms,
 
     const handleClearFilters = () => {
         setSearch('');
-        setInternFilter('all');
+        setSelectedInternIds([]);
         setTrainingProgramFilter('all');
         setDateFrom('');
         setDateTo('');
@@ -208,11 +229,14 @@ export default function PracticeTasksPage({ viewMode, interns, trainingPrograms,
 
             <div className={UI_PRESETS.pageContent}>
                 <div className="flex flex-col gap-4">
-                    <div>
-                        <h1 className="text-2xl font-bold">Prácticas y Tareas</h1>
-                        <p className="text-sm text-muted-foreground">
-                            Gestiona tareas y su seguimiento operativo.
-                        </p>
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                            <h1 className="text-2xl font-bold">Prácticas y Tareas</h1>
+                            <p className="text-sm text-muted-foreground">
+                                Gestiona tareas y su seguimiento operativo.
+                            </p>
+                        </div>
+                        <PracticeTasksViewToggle view={tasksView} onViewChange={setTasksView} />
                     </div>
                 </div>
 
@@ -221,8 +245,8 @@ export default function PracticeTasksPage({ viewMode, interns, trainingPrograms,
                         viewMode={viewMode}
                         search={search}
                         onSearchChange={setSearch}
-                        internFilter={internFilter}
-                        onInternFilterChange={setInternFilter}
+                        selectedInternIds={selectedInternIds}
+                        onSelectedInternIdsChange={setSelectedInternIds}
                         trainingProgramFilter={trainingProgramFilter}
                         onTrainingProgramFilterChange={setTrainingProgramFilter}
                         dateFrom={dateFrom}
@@ -242,29 +266,37 @@ export default function PracticeTasksPage({ viewMode, interns, trainingPrograms,
                         </p>
                     ) : null}
 
-                    <PracticeTasksBoard
-                        filteredTasks={filteredTasks}
-                        boardTasks={boardTasks}
-                        draggedTask={draggedTask}
-                        dropColumn={dropColumn}
-                        hoveredTaskId={hoveredTaskId}
-                        hoveredPosition={hoveredPosition}
-                        hoveredEndStatus={hoveredEndStatus}
-                        setDraggedTask={setDraggedTask}
-                        setDropColumn={setDropColumn}
-                        setHoveredTaskId={setHoveredTaskId}
-                        setHoveredPosition={setHoveredPosition}
-                        setHoveredEndStatus={setHoveredEndStatus}
-                        setBoardTasks={setBoardTasks}
-                        setTaskToDelete={setTaskToDelete}
-                        handleDropTask={handleDropTask}
-                        moveTaskInStatus={moveTaskInStatus}
-                        moveTaskToEndInStatus={moveTaskToEndInStatus}
-                        dueIndicatorMeta={dueIndicatorMeta}
-                        dragStartStatusRef={dragStartStatusRef}
-                        dragStartOrderRef={dragStartOrderRef}
-                        reorderedInCurrentDragRef={reorderedInCurrentDragRef}
-                    />
+                    {tasksView === 'kanban' ? (
+                        <PracticeTasksBoard
+                            filteredTasks={filteredTasks}
+                            boardTasks={boardTasks}
+                            draggedTask={draggedTask}
+                            dropColumn={dropColumn}
+                            hoveredTaskId={hoveredTaskId}
+                            hoveredPosition={hoveredPosition}
+                            hoveredEndStatus={hoveredEndStatus}
+                            setDraggedTask={setDraggedTask}
+                            setDropColumn={setDropColumn}
+                            setHoveredTaskId={setHoveredTaskId}
+                            setHoveredPosition={setHoveredPosition}
+                            setHoveredEndStatus={setHoveredEndStatus}
+                            setBoardTasks={setBoardTasks}
+                            setTaskToDelete={setTaskToDelete}
+                            handleDropTask={handleDropTask}
+                            moveTaskInStatus={moveTaskInStatus}
+                            moveTaskToEndInStatus={moveTaskToEndInStatus}
+                            dueIndicatorMeta={dueIndicatorMeta}
+                            dragStartStatusRef={dragStartStatusRef}
+                            dragStartOrderRef={dragStartOrderRef}
+                            reorderedInCurrentDragRef={reorderedInCurrentDragRef}
+                        />
+                    ) : (
+                        <PracticeTasksList
+                            tasks={filteredTasks}
+                            dueIndicatorMeta={dueIndicatorMeta}
+                            setTaskToDelete={setTaskToDelete}
+                        />
+                    )}
                 </div>
             </div>
 

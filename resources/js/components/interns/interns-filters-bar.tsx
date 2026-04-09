@@ -1,5 +1,6 @@
 import { Link } from '@inertiajs/react';
 import { CirclePlus, FileSpreadsheet, FilterX, Search } from 'lucide-react';
+import DatePicker from '@/components/shared/date-picker';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -175,40 +176,44 @@ export default function InternsFiltersBar({
                 <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
                     <div className="flex flex-col gap-1">
                         <span className="text-xs font-medium text-muted-foreground">Inicio desde</span>
-                        <Input
-                            type="date"
+                        <DatePicker
+                            id="interns-start-date-from"
                             value={startDateFrom}
-                            onChange={(event) => onStartDateFromChange(event.target.value)}
+                            onChange={onStartDateFromChange}
+                            placeholder="Seleccionar fecha"
                             className={`${UI_PRESETS.simpleSearchInput} h-9 text-sm`}
                         />
                     </div>
 
                     <div className="flex flex-col gap-1">
                         <span className="text-xs font-medium text-muted-foreground">Inicio hasta</span>
-                        <Input
-                            type="date"
+                        <DatePicker
+                            id="interns-start-date-to"
                             value={startDateTo}
-                            onChange={(event) => onStartDateToChange(event.target.value)}
+                            onChange={onStartDateToChange}
+                            placeholder="Seleccionar fecha"
                             className={`${UI_PRESETS.simpleSearchInput} h-9 text-sm`}
                         />
                     </div>
 
                     <div className="flex flex-col gap-1">
                         <span className="text-xs font-medium text-muted-foreground">Fin desde</span>
-                        <Input
-                            type="date"
+                        <DatePicker
+                            id="interns-end-date-from"
                             value={endDateFrom}
-                            onChange={(event) => onEndDateFromChange(event.target.value)}
+                            onChange={onEndDateFromChange}
+                            placeholder="Seleccionar fecha"
                             className={`${UI_PRESETS.simpleSearchInput} h-9 text-sm`}
                         />
                     </div>
 
                     <div className="flex flex-col gap-1">
                         <span className="text-xs font-medium text-muted-foreground">Fin hasta</span>
-                        <Input
-                            type="date"
+                        <DatePicker
+                            id="interns-end-date-to"
                             value={endDateTo}
-                            onChange={(event) => onEndDateToChange(event.target.value)}
+                            onChange={onEndDateToChange}
+                            placeholder="Seleccionar fecha"
                             className={`${UI_PRESETS.simpleSearchInput} h-9 text-sm`}
                         />
                     </div>
