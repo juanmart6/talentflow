@@ -1,8 +1,9 @@
 import { Head, router, usePage } from '@inertiajs/react';
-import { ShieldCheck, UserCog } from 'lucide-react';
+import { MailPlus, ShieldCheck, Trash2, UserCog } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
 import {
     Select,
     SelectContent,
@@ -32,12 +33,23 @@ type UserRow = {
     created_at: string | null;
 };
 
+type InvitationRow = {
+    id: number;
+    email: string;
+    role: string;
+    expires_at: string | null;
+    accepted_at: string | null;
+    invited_by_name: string;
+    created_at: string | null;
+};
+
 type Props = {
     users: UserRow[];
     roles: RoleRow[];
     availableRoles: string[];
     permissions: string[];
     rolePermissions: RolePermissionsMap;
+    invitations: InvitationRow[];
 };
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -68,9 +80,14 @@ const permissionActionLabels: Record<string, string> = {
     manage: 'Gestionar',
 };
 
-export default function UsersIndexPage({ users, roles, availableRoles, permissions, rolePermissions }: Props) {
+export default function UsersIndexPage({ users, roles, availableRoles, permissions, rolePermissions, invitations }: Props) {
     const page = usePage<{ flash?: { success?: string; error?: string } }>();
     const [activeTab, setActiveTab] = useState<UserManagementTab>('users-roles');
+    const [invitationEmail, setInvitationEmail] = useState('');
+    const [invitationRole, setInvitationRole] = useState<string>(
+        availableRoles.find((role) => role !== 'admin') ?? 'tutor',
+    );
+    const [deletingInvitationId, setDeletingInvitationId] = useState<number | null>(null);
     const [selectedRoleId, setSelectedRoleId] = useState<string>(roles[0] ? String(roles[0].id) : '');
     const [permissionDraft, setPermissionDraft] = useState<string[] | null>(null);
 
@@ -109,6 +126,11 @@ export default function UsersIndexPage({ users, roles, availableRoles, permissio
                 permissions: modulePermissions.sort((a, b) => a.localeCompare(b)),
             }));
     }, [permissions]);
+
+    const invitationRoleOptions = useMemo(
+        () => availableRoles.filter((role) => role !== 'admin'),
+        [availableRoles],
+    );
 
     useEffect(() => {
         const successMessage = page.props.flash?.success;
@@ -165,6 +187,55 @@ export default function UsersIndexPage({ users, roles, availableRoles, permissio
                 onSuccess: () => setPermissionDraft(null),
             },
         );
+    };
+
+    const handleCreateInvitation = () => {
+        if (invitationEmail.trim() === '') {
+            toast.error('Introduce un correo para invitar.');
+            return;
+        }
+
+        router.post(
+            '/autenticacion-usuarios/invitaciones',
+            {
+                email: invitationEmail.trim(),
+                role: invitationRole,
+            },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onSuccess: () => setInvitationEmail(''),
+            },
+        );
+    };
+
+    const handleDeleteInvitation = (invitationId: number) => {
+        setDeletingInvitationId(invitationId);
+
+        router.delete(`/autenticacion-usuarios/invitaciones/${invitationId}`, {
+            preserveScroll: true,
+            preserveState: true,
+            onFinish: () => setDeletingInvitationId(null),
+        });
+    };
+
+    const formatDateTime = (value: string | null): string => {
+        if (!value) {
+            return '-';
+        }
+
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) {
+            return value;
+        }
+
+        return date.toLocaleString('es-ES', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+        });
     };
 
     return (
@@ -269,8 +340,100 @@ export default function UsersIndexPage({ users, roles, availableRoles, permissio
 
                             {activeTab === 'invitaciones' && (
                                 <div className={UI_PRESETS.tableContainer}>
-                                    <div className="px-4 py-8 text-sm text-muted-foreground">
-                                        Proximamente: alta de usuarios por invitacion mediante correo electronico.
+                                    <div className="space-y-4 px-4 py-4">
+                                        <div className="rounded-lg border border-slate-200/80 bg-slate-50/60 p-3 dark:border-slate-700/80 dark:bg-slate-900/30">
+                                            <p className="mb-3 text-sm font-semibold">Crear invitación</p>
+                                            <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_220px_auto]">
+                                                <Input
+                                                    value={invitationEmail}
+                                                    onChange={(event) => setInvitationEmail(event.target.value)}
+                                                    placeholder="correo@dominio.com"
+                                                    className={UI_PRESETS.simpleSearchInput}
+                                                />
+                                                <Select value={invitationRole} onValueChange={setInvitationRole}>
+                                                    <SelectTrigger className={`${UI_PRESETS.selectTrigger} w-full`}>
+                                                        <SelectValue placeholder="Seleccionar rol" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        {invitationRoleOptions.map((role) => (
+                                                            <SelectItem className={UI_PRESETS.selectItem} key={role} value={role}>
+                                                                {roleLabels[role] ?? role.toUpperCase()}
+                                                            </SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                                <button
+                                                    type="button"
+                                                    className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md bg-[#2563eb] px-4 text-sm font-medium text-white transition-colors hover:bg-[#1d4ed8]"
+                                                    onClick={handleCreateInvitation}
+                                                >
+                                                    <MailPlus className="size-4" />
+                                                    Invitar
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <div className={UI_PRESETS.tableContainer}>
+                                            <table className="w-full table-fixed text-sm">
+                                                <colgroup>
+                                                    <col className="w-1/4" />
+                                                    <col className="w-1/6" />
+                                                    <col className="w-1/6" />
+                                                    <col className="w-1/6" />
+                                                    <col className="w-1/6" />
+                                                    <col className="w-1/12" />
+                                                </colgroup>
+                                                <thead className={UI_PRESETS.tableHead}>
+                                                    <tr>
+                                                        <th className="px-4 py-3 text-center font-semibold">Email</th>
+                                                        <th className="px-4 py-3 text-center font-semibold">Rol</th>
+                                                        <th className="px-4 py-3 text-center font-semibold">Invitado por</th>
+                                                        <th className="px-4 py-3 text-center font-semibold">Creada</th>
+                                                        <th className="px-4 py-3 text-center font-semibold">Expira</th>
+                                                        <th className="px-4 py-3 text-center font-semibold">Acciones</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {invitations.length > 0 ? (
+                                                        invitations.map((invitation, index) => (
+                                                            <tr key={invitation.id} className={`h-16 border-t align-middle ${stripedRowClass(index)}`}>
+                                                                <td className="px-4 py-3 text-center">
+                                                                    <span className="inline-block max-w-[16rem] truncate" title={invitation.email}>
+                                                                        {invitation.email}
+                                                                    </span>
+                                                                </td>
+                                                                <td className="px-4 py-3 text-center">
+                                                                    <span className="inline-flex items-center gap-1 rounded-full border border-slate-300 bg-white px-2 py-1 text-xs font-semibold dark:border-slate-700 dark:bg-slate-900">
+                                                                        {roleLabels[invitation.role] ?? invitation.role.toUpperCase()}
+                                                                    </span>
+                                                                </td>
+                                                                <td className="px-4 py-3 text-center">{invitation.invited_by_name}</td>
+                                                                <td className="px-4 py-3 text-center text-xs text-muted-foreground">{formatDateTime(invitation.created_at)}</td>
+                                                                <td className="px-4 py-3 text-center text-xs text-muted-foreground">{formatDateTime(invitation.expires_at)}</td>
+                                                                <td className="px-4 py-3 text-center">
+                                                                    <button
+                                                                        type="button"
+                                                                        className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-red-300/50 text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-red-500/40 dark:text-red-300 dark:hover:bg-red-950/30"
+                                                                        onClick={() => handleDeleteInvitation(invitation.id)}
+                                                                        disabled={deletingInvitationId === invitation.id}
+                                                                        title="Cancelar invitación"
+                                                                        aria-label="Cancelar invitación"
+                                                                    >
+                                                                        <Trash2 className="size-4" />
+                                                                    </button>
+                                                                </td>
+                                                            </tr>
+                                                        ))
+                                                    ) : (
+                                                        <tr>
+                                                            <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
+                                                                No hay invitaciones pendientes.
+                                                            </td>
+                                                        </tr>
+                                                    )}
+                                                </tbody>
+                                            </table>
+                                        </div>
                                     </div>
                                 </div>
                             )}

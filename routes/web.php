@@ -157,6 +157,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->middleware('permission:users.manage')
         ->name('users.update-role-permissions');
 
+    Route::post('autenticacion-usuarios/invitaciones', [UserManagementController::class, 'storeInvitation'])
+        ->middleware('permission:users.manage')
+        ->name('users.invitations.store');
+
+    Route::delete('autenticacion-usuarios/invitaciones/{invitation}', [UserManagementController::class, 'destroyInvitation'])
+        ->middleware('permission:users.manage')
+        ->name('users.invitations.destroy');
+
 });
 
 require __DIR__.'/settings.php';
