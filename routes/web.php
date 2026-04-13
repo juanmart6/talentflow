@@ -12,7 +12,9 @@ Route::redirect('/', '/login')->name('home');
 
 Route::middleware(['auth', 'verified'])->group(function () {
 
-    Route::inertia('dashboard', 'dashboard')->name('dashboard');
+    Route::inertia('dashboard', 'dashboard')
+        ->middleware('role:admin|tutor')
+        ->name('dashboard');
 
     // Rutas para la gestión de centros educativos:
 
@@ -166,5 +168,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('users.invitations.destroy');
 
 });
+
+    Route::get('/invitaciones/{token}', [UserManagementController::class, 'showInvitation'])
+    ->name('users.invitations.show');
+
+    Route::post('/invitaciones/{token}', [UserManagementController::class, 'acceptInvitation'])
+    ->name('users.invitations.accept');
 
 require __DIR__.'/settings.php';

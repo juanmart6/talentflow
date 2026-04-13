@@ -12,6 +12,9 @@ use Inertia\Inertia;
 use Inertia\Response;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
+use App\Mail\UserInvitationMail;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 
 class UserManagementController extends Controller
 {
@@ -179,10 +182,10 @@ class UserManagementController extends Controller
             ->exists();
 
         if ($hasPendingInvitation) {
-            return back()->with('error', 'Ya existe una invitación activa para ese correo.');
+            return back()->with('error', 'Ya existe una invitacion activa para ese correo.');
         }
 
-        UserInvitation::create([
+        $invitation = UserInvitation::create([
             'email' => $email,
             'role' => $role,
             'token' => Str::random(64),
@@ -191,17 +194,83 @@ class UserManagementController extends Controller
             'accepted_at' => null,
         ]);
 
-        return back()->with('success', 'Invitación creada correctamente.');
+        $acceptUrl = url("/invitaciones/{$invitation->token}");
+
+        Mail::to($invitation->email)->send(
+            new UserInvitationMail($invitation, $acceptUrl)
+        );
+
+        return back()->with('success', 'Invitacion creada correctamente.');
     }
 
     public function destroyInvitation(UserInvitation $invitation): RedirectResponse
     {
         if ($invitation->accepted_at !== null) {
-            return back()->with('error', 'No se puede cancelar una invitación ya aceptada.');
+            return back()->with('error', 'No se puede cancelar una invitacion ya aceptada.');
         }
 
         $invitation->delete();
 
-        return back()->with('success', 'Invitación cancelada correctamente.');
+        return back()->with('info', 'Invitacion cancelada correctamente.');
+    }
+
+    public function showInvitation(string $token): Response
+    {
+        $invitation = $this->findValidInvitationOrFail($token);
+
+        return Inertia::render('auth/accept-invitation', [
+            'token' => $invitation->token,
+            'email' => $invitation->email,
+            'role' => $invitation->role,
+            'expires_at' => $invitation->expires_at?->toDateTimeString(),
+        ]);
+    }
+
+    public function acceptInvitation(Request $request, string $token): RedirectResponse
+    {
+        $invitation = $this->findValidInvitationOrFail($token);
+
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+        ]);
+
+        $user = User::query()->create([
+            'name' => $validated['name'],
+            'email' => $invitation->email,
+            'password' => Hash::make($validated['password']),
+        ]);
+
+        $user->syncRoles([$invitation->role]);
+        $user->sendEmailVerificationNotification();
+
+        $invitation->forceFill([
+            'accepted_at' => now(),
+        ])->save();
+
+        return redirect()
+            ->route('login')
+            ->with('success', 'Cuenta creada correctamente. Revisa tu correo para verificar la cuenta.');
+    }
+
+    private function findValidInvitationOrFail(string $token): UserInvitation
+    {
+        $invitation = UserInvitation::query()
+            ->where('token', $token)
+            ->first();
+
+        if (!$invitation) {
+            abort(404, 'Invitacion no encontrada.');
+        }
+
+        if ($invitation->accepted_at !== null) {
+            abort(410, 'Esta invitacion ya fue aceptada.');
+        }
+
+        if ($invitation->expires_at === null || $invitation->expires_at->isPast()) {
+            abort(410, 'Esta invitacion ha caducado.');
+        }
+
+        return $invitation;
     }
 }

@@ -1,4 +1,4 @@
-import { Link } from '@inertiajs/react';
+﻿import { Link } from '@inertiajs/react';
 import {
     SidebarGroup,
     SidebarGroupLabel,
@@ -16,7 +16,7 @@ export function NavMain({ items = [] }: { items: NavItem[] }) {
     return (
         <SidebarGroup className="px-2 py-1">
             <SidebarGroupLabel className="px-2 text-[11px] font-semibold tracking-[0.14em] uppercase text-sidebar-foreground/55">
-                Navegacion
+                Navegación
             </SidebarGroupLabel>
             <SidebarMenu className="gap-1.5">
                 {items.map((item) => (

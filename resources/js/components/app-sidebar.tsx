@@ -1,4 +1,5 @@
-﻿import { Award, Clock9, GraduationCap, LayoutGrid, NotebookPen, School, Users } from 'lucide-react';
+import { usePage } from '@inertiajs/react';
+import { Award, Clock9, GraduationCap, LayoutGrid, NotebookPen, School, Users } from 'lucide-react';
 import logo from '@/assets/TF_logo.svg';
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
@@ -12,7 +13,7 @@ import { dashboard } from '@/routes';
 import educationCenters from '@/routes/education-centers';
 import interns from '@/routes/interns';
 import practiceTasks from '@/routes/practice-tasks';
-import type { NavItem } from '@/types';
+import type { Auth, NavItem } from '@/types';
 
 const mainNavItems: NavItem[] = [
     {
@@ -46,13 +47,22 @@ const mainNavItems: NavItem[] = [
         icon: Award,
     },
     {
-        title: 'Autenticación y Usuarios',
+        title: 'Autenticacion y Usuarios',
         href: '/autenticacion-usuarios',
         icon: Users,
     },
 ];
 
 export function AppSidebar() {
+    const { auth } = usePage<{ auth: Auth }>().props;
+    const isIntern = auth.user?.role === 'intern';
+
+    const visibleNavItems = isIntern
+        ? mainNavItems.filter((item) =>
+              ['Prácticas y Tareas', 'Control Horario', 'Evaluación y Notas'].includes(item.title),
+          )
+        : mainNavItems;
+
     return (
         <Sidebar
             collapsible="icon"
@@ -73,7 +83,7 @@ export function AppSidebar() {
             </SidebarHeader>
 
             <SidebarContent>
-                <NavMain items={mainNavItems} />
+                <NavMain items={visibleNavItems} />
             </SidebarContent>
 
             <SidebarFooter>
