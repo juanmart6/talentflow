@@ -4,17 +4,26 @@ use App\Http\Controllers\EducationCenterController;
 use App\Http\Controllers\InternController;
 use App\Http\Controllers\PracticeTaskController;
 use App\Http\Controllers\UserManagementController;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use Laravel\Fortify\Features;
 
 Route::redirect('/', '/login')->name('home');
 
-Route::middleware(['auth', 'verified'])->group(function () {
+Route::middleware(['auth'])->group(function () {
 
-    Route::inertia('dashboard', 'dashboard')
-        ->middleware('role:admin|tutor')
-        ->name('dashboard');
+    Route::get('dashboard', function (Request $request) {
+        $user = $request->user();
+
+        if ($user?->hasRole('intern')) {
+            return redirect()->route('practice-tasks.index');
+        }
+
+        abort_unless($user?->hasAnyRole(['admin', 'tutor']), 403, 'USER DOES NOT HAVE THE RIGHT ROLES.');
+
+        return Inertia::render('dashboard');
+    })->name('dashboard');
 
     // Rutas para la gestión de centros educativos:
 
@@ -98,6 +107,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->middleware('permission:interns.delete')
         ->name('interns.destroy');
 
+    Route::post('interns/{intern}/invite-access', [InternController::class, 'inviteAccess'])
+        ->middleware('permission:interns.update')
+        ->name('interns.invite-access');
+
         // Rutas para el módulo de prácticas y tareas:
 
     Route::get('practice-tasks', [PracticeTaskController::class, 'index'])
@@ -148,24 +161,28 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // Rutas para el módulo Usuarios y permisos:
 
     Route::get('autenticacion-usuarios', [UserManagementController::class, 'index'])
-        ->middleware('permission:users.manage')
+        ->middleware('role_or_permission:admin|users.manage')
         ->name('users.index');
 
     Route::patch('autenticacion-usuarios/{user}/role', [UserManagementController::class, 'updateRole'])
-        ->middleware('permission:users.manage')
+        ->middleware('role_or_permission:admin|users.manage')
         ->name('users.update-role');
 
     Route::patch('autenticacion-usuarios/roles/{role}/permissions', [UserManagementController::class, 'updateRolePermissions'])
-        ->middleware('permission:users.manage')
+        ->middleware('role_or_permission:admin|users.manage')
         ->name('users.update-role-permissions');
 
     Route::post('autenticacion-usuarios/invitaciones', [UserManagementController::class, 'storeInvitation'])
-        ->middleware('permission:users.manage')
+        ->middleware('role_or_permission:admin|users.manage')
         ->name('users.invitations.store');
 
     Route::delete('autenticacion-usuarios/invitaciones/{invitation}', [UserManagementController::class, 'destroyInvitation'])
-        ->middleware('permission:users.manage')
+        ->middleware('role_or_permission:admin|users.manage')
         ->name('users.invitations.destroy');
+
+    Route::delete('autenticacion-usuarios/{user}', [UserManagementController::class, 'destroyUser'])
+        ->middleware('role_or_permission:admin|users.manage')
+        ->name('users.destroy');
 
 });
 

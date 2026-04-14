@@ -20,7 +20,7 @@ export default function UserManagementTabs({ activeTab, onTabChange }: UserManag
                 onClick={() => onTabChange('users-roles')}
             >
                 <UserCog className="mr-1.5 size-4 shrink-0" />
-                Usuarios y roles
+                Staff
             </Button>
 
             <Button

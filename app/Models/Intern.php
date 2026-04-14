@@ -14,6 +14,7 @@ class Intern extends Model
     use HasFactory, SoftDeletes;
 
     protected $fillable = [
+        'user_id',
         'education_center_id',
         'training_program_id',
         'first_name',
@@ -56,6 +57,11 @@ class Intern extends Model
     public function educationCenter(): BelongsTo
     {
         return $this->belongsTo(EducationCenter::class);
+    }
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
     }
 
     public function trainingProgram(): BelongsTo

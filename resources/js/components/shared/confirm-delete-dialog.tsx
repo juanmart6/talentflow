@@ -1,4 +1,4 @@
-import { Button } from '@/components/ui/button';
+﻿import { Button } from '@/components/ui/button';
 import {
     Dialog,
     DialogContent,
@@ -7,7 +7,6 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import { UI_PRESETS } from '@/lib/ui-presets';
 
 type ConfirmDeleteDialogProps = {
     open: boolean;
@@ -43,15 +42,10 @@ export default function ConfirmDeleteDialog({
                 </p>
 
                 <DialogFooter>
-                    <Button variant="secondary" className={UI_PRESETS.interactiveHover} onClick={onCancel}>
+                    <Button variant="outline" onClick={onCancel}>
                         Cancelar
                     </Button>
-                    <Button
-                        variant="destructive"
-                        className={UI_PRESETS.interactiveHover}
-                        onClick={onConfirm}
-                        disabled={isLoading}
-                    >
+                    <Button variant="destructive" onClick={onConfirm} disabled={isLoading}>
                         {isLoading ? 'Eliminando...' : 'Eliminar'}
                     </Button>
                 </DialogFooter>

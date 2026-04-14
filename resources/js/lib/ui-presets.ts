@@ -3,6 +3,8 @@ export const UI_PRESETS = {
     pageSection: 'w-full max-w-5xl mx-auto',
     summaryCardTitle: 'text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400',
     summaryCardValue: 'mt-1 text-xl font-semibold',
+    readOnlyFieldLabel: 'text-[11px] font-semibold tracking-[0.08em] uppercase text-slate-500 dark:text-slate-400',
+    readOnlyFieldValue: 'mt-1 text-[15px] font-semibold text-slate-900 dark:text-slate-100',
     simpleSearchBar: 'rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900',
     simpleSearchInput: 'border-slate-300 bg-white focus-visible:border-slate-400 focus-visible:ring-0 focus-visible:ring-offset-0 dark:border-slate-600 dark:bg-slate-950',
     simpleSearchClearButton: 'bg-slate-100 text-slate-700 hover:bg-slate-200 focus-visible:ring-0 focus-visible:ring-offset-0 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700',
@@ -65,3 +67,4 @@ export function stripedRowClass(index: number): string {
         ? 'bg-white/60 dark:bg-transparent'
         : 'bg-slate-50/60 dark:bg-slate-900/20';
 }
+

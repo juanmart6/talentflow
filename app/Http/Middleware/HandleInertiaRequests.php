@@ -49,6 +49,7 @@ class HandleInertiaRequests extends Middleware
                         ...$request->user()->toArray(),
                         'role' => $request->user()->getRoleNames()->first(),
                         'roles' => $request->user()->getRoleNames()->values()->all(),
+                        'can_manage_users' => $request->user()->can('users.manage'),
                     ]
                     : null,
             ],

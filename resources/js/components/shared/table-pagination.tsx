@@ -2,7 +2,7 @@ import { Link } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { UI_PRESETS } from '@/lib/ui-presets';
 import { normalizePaginationLabel } from '@/lib/utils';
-import type { PaginationLink } from '@/types/pagination';
+import type { PaginationLink } from '@/types/core/pagination';
 
 type TablePaginationProps = {
     summary: string;

@@ -1,4 +1,4 @@
-export type * from './auth';
-export type * from './interns';
-export type * from './navigation';
-export type * from './ui';
+export type * from './core/auth';
+export type * from './domains/interns';
+export type * from './core/navigation';
+export type * from './core/ui';

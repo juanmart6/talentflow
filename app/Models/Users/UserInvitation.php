@@ -2,6 +2,7 @@
 
 namespace App\Models\Users;
 
+use App\Models\Intern;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -9,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class UserInvitation extends Model
 {
     protected $fillable = [
+        'intern_id',
         'email',
         'role',
         'token',
@@ -28,6 +30,11 @@ class UserInvitation extends Model
     public function invitedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'invited_by_user_id');
+    }
+
+    public function intern(): BelongsTo
+    {
+        return $this->belongsTo(Intern::class);
     }
 }
 

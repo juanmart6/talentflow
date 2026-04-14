@@ -4,7 +4,7 @@ import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 import { Button } from '@/components/ui/button';
 import { UI_PRESETS } from '@/lib/ui-presets';
 import practiceTasks from '@/routes/practice-tasks';
-import type { TaskCard, TaskStatus } from '@/types/practice-tasks';
+import type { TaskCard, TaskStatus } from '@/types/domains/practice-tasks';
 
 const STATUS_COLUMNS: Array<{ status: TaskStatus; label: string; className: string }> = [
     { status: 'pending', label: 'Pendiente', className: 'border-slate-200 bg-slate-50/35 dark:border-slate-700 dark:bg-slate-900/20' },

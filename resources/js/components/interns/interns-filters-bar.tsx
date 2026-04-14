@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/select';
 import { UI_PRESETS } from '@/lib/ui-presets';
 import internsRoutes from '@/routes/interns';
-import type { EducationCenterOption, TrainingProgramOption } from '@/types/interns';
+import type { EducationCenterOption, TrainingProgramOption } from '@/types/domains/interns';
 
 type InternsFiltersBarProps = {
     search: string;

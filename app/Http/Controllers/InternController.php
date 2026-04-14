@@ -5,14 +5,19 @@ namespace App\Http\Controllers;
 use App\Exports\InternsExport;
 use App\Http\Requests\Interns\StoreInternRequest;
 use App\Http\Requests\Interns\UpdateInternRequest;
+use App\Mail\UserInvitationMail;
 use App\Models\EducationCenter;
 use App\Models\Intern;
 use App\Models\TrainingProgram;
+use App\Models\User;
+use App\Models\Users\UserInvitation;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\URL;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -58,10 +63,67 @@ class InternController extends Controller
             ->with(['educationCenter', 'trainingProgram'])
             ->orderBy('last_name')
             ->orderBy('first_name')
-            ->paginate(10)
-            ->through(function (Intern $intern): array {
+            ->paginate(10);
+
+        $internRows = $interns->getCollection();
+        $internIds = $internRows->pluck('id')->all();
+        $internEmails = $internRows
+            ->pluck('email')
+            ->filter(fn ($email) => is_string($email) && trim($email) !== '')
+            ->map(fn (string $email) => mb_strtolower(trim($email)))
+            ->values()
+            ->all();
+
+        $invitationsByInternAndEmail = collect();
+
+        if (!empty($internIds) || !empty($internEmails)) {
+            $invitationsByInternAndEmail = UserInvitation::query()
+                ->where(function ($query) use ($internIds, $internEmails) {
+                    if (!empty($internIds)) {
+                        $query->whereIn('intern_id', $internIds);
+                    }
+
+                    if (!empty($internEmails)) {
+                        $query->orWhereIn(DB::raw('LOWER(email)'), $internEmails);
+                    }
+                })
+                ->get(['id', 'intern_id', 'email', 'accepted_at', 'expires_at'])
+                ->groupBy(function (UserInvitation $invitation): string {
+                    if ($invitation->intern_id !== null) {
+                        return 'intern:'.$invitation->intern_id;
+                    }
+
+                    return 'email:'.mb_strtolower($invitation->email);
+                });
+        }
+
+        $interns->setCollection(
+            $internRows->map(function (Intern $intern) use ($invitationsByInternAndEmail): array {
+                $invitationsForIntern = $invitationsByInternAndEmail->get('intern:'.$intern->id)
+                    ?? $invitationsByInternAndEmail->get('email:'.mb_strtolower($intern->email))
+                    ?? collect();
+
+                $hasPendingInvitation = $invitationsForIntern->contains(fn (UserInvitation $invitation) => $invitation->accepted_at === null
+                    && $invitation->expires_at !== null
+                    && $invitation->expires_at->isFuture());
+
+                $hasExpiredInvitation = $invitationsForIntern->contains(fn (UserInvitation $invitation) => $invitation->accepted_at === null
+                    && ($invitation->expires_at === null || $invitation->expires_at->isPast()));
+
+                $accessStatus = 'none';
+
+                if ($intern->user_id !== null) {
+                    $accessStatus = 'accepted';
+                } elseif ($hasPendingInvitation) {
+                    $accessStatus = 'pending';
+                } elseif ($hasExpiredInvitation) {
+                    $accessStatus = 'expired';
+                }
+
                 return [
                     'id' => $intern->id,
+                    'user_id' => $intern->user_id,
+                    'access_status' => $accessStatus,
                     'first_name' => $intern->first_name,
                     'last_name' => $intern->last_name,
                     'dni_nie' => $intern->dni_nie,
@@ -85,7 +147,9 @@ class InternController extends Controller
                     ] : null,
                 ];
             })
-            ->withQueryString();
+        );
+
+        $interns->withQueryString();
 
         return Inertia::render('interns', [
             'interns' => $interns,
@@ -252,6 +316,7 @@ class InternController extends Controller
         return Inertia::render('interns/form', [
             'mode' => 'create',
             'intern' => null,
+            'access' => null,
             'documentHistory' => $this->emptyDocumentHistory(),
             'educationCenters' => $this->educationCenterOptions(),
         ]);
@@ -280,6 +345,7 @@ class InternController extends Controller
             $intern = Intern::create($internPayload);
 
             $this->syncUploadedDocuments($request, $intern);
+            $invitationResult = $this->createInitialAccessForIntern($request, $intern);
         } catch (QueryException $exception) {
             report($exception);
 
@@ -297,9 +363,16 @@ class InternController extends Controller
                 ->with('error', 'No se pudo crear el becario. Intenta de nuevo más tarde.');
         }
 
-        return redirect()
+        $redirect = redirect()
             ->route('interns.index')
-            ->with('success', 'Becario creado correctamente.');
+            ->with('success', 'Usuario creado correctamente.');
+
+        return match ($invitationResult) {
+            'invited' => $redirect->with('info', 'Invitación enviada correctamente.'),
+            'already-pending-invitation' => $redirect->with('info', 'Ya existía una invitación pendiente para este correo.'),
+            'existing-user-email' => $redirect->with('info', 'No se envió invitación porque ese correo ya existe en usuarios.'),
+            default => $redirect,
+        };
     }
 
     // Formulario de edición de becario:
@@ -308,6 +381,7 @@ class InternController extends Controller
         return Inertia::render('interns/form', [
             'mode' => 'edit',
             'intern' => $intern,
+            'access' => $this->buildInternAccessData($intern),
             'documentHistory' => $this->documentHistory($intern),
             'educationCenters' => $this->educationCenterOptions(),
         ]);
@@ -322,6 +396,7 @@ class InternController extends Controller
             'insurance_policy_document',
             'dni_scan_document',
         ])->all();
+        $newEmail = mb_strtolower(trim((string) ($internPayload['email'] ?? $intern->email)));
 
         if (($internPayload['status'] ?? null) !== 'abandoned') {
             $internPayload['abandonment_reason'] = null;
@@ -332,8 +407,33 @@ class InternController extends Controller
             );
         }
 
+        $internPayload['email'] = $newEmail;
+
+        if ($intern->user_id !== null) {
+            $emailTakenByAnotherUser = User::query()
+                ->whereKeyNot($intern->user_id)
+                ->whereRaw('LOWER(email) = ?', [$newEmail])
+                ->exists();
+
+            if ($emailTakenByAnotherUser) {
+                return back()->withErrors([
+                    'email' => 'Ese correo ya está en uso por otro usuario con acceso.',
+                ]);
+            }
+        }
+
         try {
-            $intern->update($internPayload);
+            DB::transaction(function () use ($intern, $internPayload, $newEmail): void {
+                $intern->update($internPayload);
+
+                if ($intern->user_id !== null) {
+                    User::query()
+                        ->whereKey($intern->user_id)
+                        ->update([
+                            'email' => $newEmail,
+                        ]);
+                }
+            });
 
             $this->syncUploadedDocuments($request, $intern);
         } catch (QueryException $exception) {
@@ -375,12 +475,75 @@ class InternController extends Controller
             ->with('success', 'Becario eliminado correctamente.');
     }
 
+    public function inviteAccess(Request $request, Intern $intern): RedirectResponse
+    {
+        if ($intern->user_id !== null) {
+            return back()->with('error', 'Este becario ya tiene una cuenta vinculada.');
+        }
+
+        $email = mb_strtolower(trim((string) $intern->email));
+
+        if ($email === '') {
+            return back()->with('error', 'El becario no tiene correo electrónico válido para enviar invitación.');
+        }
+
+        $existingUser = User::query()
+            ->whereRaw('LOWER(email) = ?', [$email])
+            ->exists();
+
+        if ($existingUser) {
+            return back()->with('error', 'Ya existe una cuenta con ese correo. Revisa el email del becario antes de invitar.');
+        }
+
+        $hadPendingInvitation = UserInvitation::query()
+            ->whereNull('accepted_at')
+            ->where('expires_at', '>', now())
+            ->where(function ($query) use ($intern, $email) {
+                $query
+                    ->where('intern_id', $intern->id)
+                    ->orWhereRaw('LOWER(email) = ?', [$email]);
+            })
+            ->exists();
+
+        UserInvitation::query()
+            ->whereNull('accepted_at')
+            ->where(function ($query) use ($intern, $email) {
+                $query
+                    ->where('intern_id', $intern->id)
+                    ->orWhereRaw('LOWER(email) = ?', [$email]);
+            })
+            ->update([
+                'expires_at' => now()->subSecond(),
+            ]);
+
+        $invitation = UserInvitation::create([
+            'intern_id' => $intern->id,
+            'email' => $email,
+            'role' => 'intern',
+            'token' => Str::random(64),
+            'invited_by_user_id' => $request->user()?->id,
+            'expires_at' => now()->addDays(7),
+            'accepted_at' => null,
+        ]);
+
+        $acceptUrl = url("/invitaciones/{$invitation->token}");
+
+        Mail::to($invitation->email)->send(
+            new UserInvitationMail($invitation, $acceptUrl)
+        );
+
+        return back()->with('success', $hadPendingInvitation
+            ? 'Invitación reenviada correctamente al becario.'
+            : 'Invitación enviada correctamente al becario.');
+    }
+
     // Visualización de un becario:
     public function show(Intern $intern): Response
     {
         return Inertia::render('interns/form', [
             'mode' => 'show',
             'intern' => $intern,
+            'access' => $this->buildInternAccessData($intern),
             'documentHistory' => $this->documentHistory($intern),
             'educationCenters' => $this->educationCenterOptions(),
         ]);
@@ -576,5 +739,128 @@ class InternController extends Controller
         }
 
         return 'active';
+    }
+
+    private function buildInternAccessData(Intern $intern): array
+    {
+        $status = 'none';
+        $invitations = UserInvitation::query()
+            ->where(function ($query) use ($intern) {
+                $query
+                    ->where('intern_id', $intern->id)
+                    ->orWhereRaw('LOWER(email) = ?', [mb_strtolower($intern->email)]);
+            })
+            ->latest('id')
+            ->with('invitedBy:id,name')
+            ->get(['id', 'invited_by_user_id', 'created_at', 'accepted_at', 'expires_at']);
+
+        $latestInvitation = $invitations->first();
+
+        $history = $invitations
+            ->flatMap(function (UserInvitation $invitation): array {
+                $events = [];
+
+                if ($invitation->created_at !== null) {
+                    $events[] = [
+                        'id' => "{$invitation->id}-sent",
+                        'step' => 'sent',
+                        'happened_at' => $invitation->created_at->toDateTimeString(),
+                        'by_name' => $invitation->invitedBy?->name ?? 'Sistema',
+                    ];
+                }
+
+                if ($invitation->accepted_at !== null) {
+                    $events[] = [
+                        'id' => "{$invitation->id}-accepted",
+                        'step' => 'accepted',
+                        'happened_at' => $invitation->accepted_at->toDateTimeString(),
+                        'by_name' => null,
+                    ];
+                } elseif ($invitation->expires_at !== null && $invitation->expires_at->isPast()) {
+                    $events[] = [
+                        'id' => "{$invitation->id}-expired",
+                        'step' => 'expired',
+                        'happened_at' => $invitation->expires_at->toDateTimeString(),
+                        'by_name' => null,
+                    ];
+                }
+
+                return $events;
+            })
+            ->sortByDesc('happened_at')
+            ->take(20)
+            ->values()
+            ->all();
+
+        if ($intern->user_id !== null) {
+            $status = 'accepted';
+        } elseif ($latestInvitation !== null) {
+            if ($latestInvitation->accepted_at !== null) {
+                $status = 'accepted';
+            } elseif ($latestInvitation->expires_at !== null && $latestInvitation->expires_at->isFuture()) {
+                $status = 'pending';
+            } else {
+                $status = 'expired';
+            }
+        }
+
+        return [
+            'status' => $status,
+            'can_invite' => in_array($status, ['none', 'pending', 'expired'], true),
+            'history' => $history,
+        ];
+    }
+
+    private function createInitialAccessForIntern(Request $request, Intern $intern): string
+    {
+        if ($intern->user_id !== null) {
+            return 'already-linked';
+        }
+
+        $email = mb_strtolower(trim((string) $intern->email));
+
+        if ($email === '') {
+            return 'no-email';
+        }
+
+        $existingUser = User::query()
+            ->whereRaw('LOWER(email) = ?', [$email])
+            ->exists();
+
+        if ($existingUser) {
+            return 'existing-user-email';
+        }
+
+        $hasPendingInvitation = UserInvitation::query()
+            ->whereNull('accepted_at')
+            ->where('expires_at', '>', now())
+            ->where(function ($query) use ($intern, $email) {
+                $query
+                    ->where('intern_id', $intern->id)
+                    ->orWhereRaw('LOWER(email) = ?', [$email]);
+            })
+            ->exists();
+
+        if ($hasPendingInvitation) {
+            return 'already-pending-invitation';
+        }
+
+        $invitation = UserInvitation::create([
+            'intern_id' => $intern->id,
+            'email' => $email,
+            'role' => 'intern',
+            'token' => Str::random(64),
+            'invited_by_user_id' => $request->user()?->id,
+            'expires_at' => now()->addDays(7),
+            'accepted_at' => null,
+        ]);
+
+        $acceptUrl = url("/invitaciones/{$invitation->token}");
+
+        Mail::to($invitation->email)->send(
+            new UserInvitationMail($invitation, $acceptUrl)
+        );
+
+        return 'invited';
     }
 }

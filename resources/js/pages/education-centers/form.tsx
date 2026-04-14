@@ -1,4 +1,4 @@
-﻿import { Form, Head, Link, router, usePage } from '@inertiajs/react';
+import { Form, Head, Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import CenterAgreementSection from '@/components/education-centers/center-agreement-section';
@@ -9,6 +9,7 @@ import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
+import { getFirstFormErrorMessage } from '@/lib/form-errors';
 import { UI_PRESETS } from '@/lib/ui-presets';
 import educationCenters from '@/routes/education-centers';
 import type { BreadcrumbItem } from '@/types';
@@ -121,6 +122,13 @@ export default function EducationCenterForm({ mode, center, trainingPrograms, ag
             return;
         }
 
+        const firstError = getFirstFormErrorMessage(errors as Record<string, unknown>);
+        if (firstError) {
+            toast.error(firstError);
+        } else {
+            toast.error('No se pudo guardar el centro. Revisa los campos obligatorios.');
+        }
+
         const errorKeys = Object.keys(errors ?? {});
 
         if (
@@ -174,7 +182,7 @@ export default function EducationCenterForm({ mode, center, trainingPrograms, ag
                         {...formRoute}
                         options={{ preserveScroll: true, preserveState: true }}
                         onError={handleFormError}
-                        className="space-y-2"
+                        className="space-y-2 [&_[data-slot=input-error]]:hidden"
                         encType="multipart/form-data"
                         noValidate
                     >
@@ -205,28 +213,28 @@ export default function EducationCenterForm({ mode, center, trainingPrograms, ag
                                                 <div className="overflow-hidden rounded-xl border border-slate-200/80 dark:border-slate-700/80">
                                                     <dl className="divide-y divide-slate-200/80 dark:divide-slate-700/80">
                                                         <div className="grid gap-1 px-4 py-3 md:grid-cols-[220px_1fr] md:gap-3">
-                                                            <dt className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Nombre</dt>
-                                                            <dd className="text-sm font-medium text-slate-800 dark:text-slate-100">{center?.name || '-'}</dd>
+                                                            <dt className={UI_PRESETS.readOnlyFieldLabel}>Nombre</dt>
+                                                            <dd className={UI_PRESETS.readOnlyFieldValue}>{center?.name || '-'}</dd>
                                                         </div>
                                                         <div className="grid gap-1 px-4 py-3 md:grid-cols-[220px_1fr] md:gap-3">
-                                                            <dt className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Dirección</dt>
-                                                            <dd className="text-sm font-medium text-slate-800 dark:text-slate-100">{center?.address || '-'}</dd>
+                                                            <dt className={UI_PRESETS.readOnlyFieldLabel}>Dirección</dt>
+                                                            <dd className={UI_PRESETS.readOnlyFieldValue}>{center?.address || '-'}</dd>
                                                         </div>
                                                         <div className="grid gap-1 px-4 py-3 md:grid-cols-[220px_1fr] md:gap-3">
-                                                            <dt className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Teléfono</dt>
-                                                            <dd className="text-sm font-medium text-slate-800 dark:text-slate-100">{center?.phone || '-'}</dd>
+                                                            <dt className={UI_PRESETS.readOnlyFieldLabel}>Teléfono</dt>
+                                                            <dd className={UI_PRESETS.readOnlyFieldValue}>{center?.phone || '-'}</dd>
                                                         </div>
                                                         <div className="grid gap-1 px-4 py-3 md:grid-cols-[220px_1fr] md:gap-3">
-                                                            <dt className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Email institucional</dt>
-                                                            <dd className="text-sm font-medium text-slate-800 dark:text-slate-100">{center?.institutional_email || '-'}</dd>
+                                                            <dt className={UI_PRESETS.readOnlyFieldLabel}>Email institucional</dt>
+                                                            <dd className={UI_PRESETS.readOnlyFieldValue}>{center?.institutional_email || '-'}</dd>
                                                         </div>
                                                         <div className="grid gap-1 px-4 py-3 md:grid-cols-[220px_1fr] md:gap-3">
-                                                            <dt className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Web</dt>
-                                                            <dd className="text-sm font-medium text-slate-800 dark:text-slate-100">{center?.website || '-'}</dd>
+                                                            <dt className={UI_PRESETS.readOnlyFieldLabel}>Web</dt>
+                                                            <dd className={UI_PRESETS.readOnlyFieldValue}>{center?.website || '-'}</dd>
                                                         </div>
                                                         <div className="grid gap-1 px-4 py-3 md:grid-cols-[220px_1fr] md:gap-3">
-                                                            <dt className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Grados formativos</dt>
-                                                            <dd className="text-sm font-medium text-slate-800 dark:text-slate-100">
+                                                            <dt className={UI_PRESETS.readOnlyFieldLabel}>Grados formativos</dt>
+                                                            <dd className={UI_PRESETS.readOnlyFieldValue}>
                                                                 {selectedTrainingPrograms.length > 0 ? selectedTrainingPrograms.map((program) => program.name).join(', ') : '-'}
                                                             </dd>
                                                         </div>
@@ -313,20 +321,20 @@ export default function EducationCenterForm({ mode, center, trainingPrograms, ag
                                                 <div className="overflow-hidden rounded-xl border border-slate-200/80 dark:border-slate-700/80">
                                                     <dl className="divide-y divide-slate-200/80 dark:divide-slate-700/80">
                                                         <div className="grid gap-1 px-4 py-3 md:grid-cols-[220px_1fr] md:gap-3">
-                                                            <dt className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Nombre</dt>
-                                                            <dd className="text-sm font-medium text-slate-800 dark:text-slate-100">{center?.contact_name || '-'}</dd>
+                                                            <dt className={UI_PRESETS.readOnlyFieldLabel}>Nombre</dt>
+                                                            <dd className={UI_PRESETS.readOnlyFieldValue}>{center?.contact_name || '-'}</dd>
                                                         </div>
                                                         <div className="grid gap-1 px-4 py-3 md:grid-cols-[220px_1fr] md:gap-3">
-                                                            <dt className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Cargo</dt>
-                                                            <dd className="text-sm font-medium text-slate-800 dark:text-slate-100">{center?.contact_position || '-'}</dd>
+                                                            <dt className={UI_PRESETS.readOnlyFieldLabel}>Cargo</dt>
+                                                            <dd className={UI_PRESETS.readOnlyFieldValue}>{center?.contact_position || '-'}</dd>
                                                         </div>
                                                         <div className="grid gap-1 px-4 py-3 md:grid-cols-[220px_1fr] md:gap-3">
-                                                            <dt className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Teléfono</dt>
-                                                            <dd className="text-sm font-medium text-slate-800 dark:text-slate-100">{center?.contact_phone || '-'}</dd>
+                                                            <dt className={UI_PRESETS.readOnlyFieldLabel}>Teléfono</dt>
+                                                            <dd className={UI_PRESETS.readOnlyFieldValue}>{center?.contact_phone || '-'}</dd>
                                                         </div>
                                                         <div className="grid gap-1 px-4 py-3 md:grid-cols-[220px_1fr] md:gap-3">
-                                                            <dt className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Email</dt>
-                                                            <dd className="text-sm font-medium text-slate-800 dark:text-slate-100">{center?.contact_email || '-'}</dd>
+                                                            <dt className={UI_PRESETS.readOnlyFieldLabel}>Email</dt>
+                                                            <dd className={UI_PRESETS.readOnlyFieldValue}>{center?.contact_email || '-'}</dd>
                                                         </div>
                                                     </dl>
                                                 </div>
@@ -409,8 +417,8 @@ export default function EducationCenterForm({ mode, center, trainingPrograms, ag
                                         {isReadOnly ? (
                                             <div className="overflow-hidden rounded-xl border border-slate-200/80 dark:border-slate-700/80">
                                                 <div className="grid gap-1 px-4 py-3 md:grid-cols-[220px_1fr] md:gap-3">
-                                                    <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Notas</p>
-                                                    <p className="text-sm font-medium whitespace-pre-line text-slate-800 dark:text-slate-100">
+                                                    <p className={UI_PRESETS.readOnlyFieldLabel}>Notas</p>
+                                                    <p className={`${UI_PRESETS.readOnlyFieldValue} whitespace-pre-line`}>
                                                         {center?.general_notes?.trim() ? center.general_notes : '-'}
                                                     </p>
                                                 </div>

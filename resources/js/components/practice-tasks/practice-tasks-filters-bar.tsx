@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { UI_PRESETS } from '@/lib/ui-presets';
 import practiceTasks from '@/routes/practice-tasks';
 import type { InternOption } from '@/types';
-import type { DueStateFilter, TrainingProgramOption } from '@/types/practice-tasks';
+import type { DueStateFilter, TrainingProgramOption } from '@/types/domains/practice-tasks';
 
 type PracticeTasksFiltersBarProps = {
     viewMode: 'tutor' | 'intern';

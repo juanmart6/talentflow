@@ -1,5 +1,5 @@
 import type { CenterStatus } from '@/lib/education-centers/center-status';
-import type { Paginated } from '@/types/pagination';
+import type { Paginated } from '@/types/core/pagination';
 
 export type Agreement = {
     signed_at: string | null;

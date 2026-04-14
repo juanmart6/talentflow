@@ -8,20 +8,17 @@ import { Label } from '@/components/ui/label';
 import { PlaceholderPattern } from '@/components/ui/placeholder-pattern';
 import { Spinner } from '@/components/ui/spinner';
 import AuthLayout from '@/layouts/auth-layout';
-import { register } from '@/routes';
 import { store } from '@/routes/login';
 import { request } from '@/routes/password';
 
 type Props = {
     status?: string;
     canResetPassword: boolean;
-    canRegister: boolean;
 };
 
 export default function Login({
     status,
     canResetPassword,
-    canRegister,
 }: Props) {
     return (
         <AuthLayout containerClassName="max-w-5xl">
@@ -152,14 +149,6 @@ export default function Login({
                                             )}
                                         </div>
 
-                                        {canRegister && (
-                                            <div className="text-center text-sm text-muted-foreground">
-                                                ¿No tienes cuenta?{' '}
-                                                <TextLink href={register()} tabIndex={5}>
-                                                    Regístrate
-                                                </TextLink>
-                                            </div>
-                                        )}
                                     </>
                                 )}
                             </Form>

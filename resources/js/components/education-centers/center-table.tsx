@@ -5,7 +5,7 @@ import { CENTER_STATUS_META } from '@/lib/education-centers/center-status';
 import { UI_PRESETS, stripedRowClass } from '@/lib/ui-presets';
 import educationCenters from '@/routes/education-centers';
 
-import type { CenterRow, CentersPagination } from '@/types/education-centers';
+import type { CenterRow, CentersPagination } from '@/types/domains/education-centers';
 
 type CenterTableProps = {
     centers: CentersPagination;

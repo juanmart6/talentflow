@@ -1,5 +1,5 @@
-import { Transition } from '@headlessui/react';
-import { Form, Head, Link, usePage } from '@inertiajs/react';
+﻿import { Transition } from '@headlessui/react';
+import { Form, Head, usePage } from '@inertiajs/react';
 import ProfileController from '@/actions/App/Http/Controllers/Settings/ProfileController';
 import DeleteUser from '@/components/delete-user';
 import Heading from '@/components/heading';
@@ -10,12 +10,11 @@ import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
 import { edit } from '@/routes/profile';
-import { send } from '@/routes/verification';
 import type { BreadcrumbItem } from '@/types';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
-        title: 'Configuración del perfil',
+        title: 'Configuracion del perfil',
         href: edit(),
     },
 ];
@@ -31,16 +30,16 @@ export default function Profile({
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Información del perfil" />
+            <Head title="Informacion del perfil" />
 
-            <h1 className="sr-only">Información del perfil</h1>
+            <h1 className="sr-only">Informacion del perfil</h1>
 
             <SettingsLayout>
                 <div className="space-y-6">
                     <Heading
                         variant="small"
-                        title="Información del perfil"
-                        description="Actualiza tu nombre y dirección de correo electrónico"
+                        title="Informacion del perfil"
+                        description="Actualiza tu nombre y direccion de correo electronico"
                     />
 
                     <Form
@@ -72,7 +71,7 @@ export default function Profile({
                                 </div>
 
                                 <div className="grid gap-2">
-                                    <Label htmlFor="email">Correo electrónico</Label>
+                                    <Label htmlFor="email">Correo electronico</Label>
 
                                     <Input
                                         id="email"
@@ -82,7 +81,7 @@ export default function Profile({
                                         name="email"
                                         required
                                         autoComplete="username"
-                                        placeholder="Correo electrónico"
+                                        placeholder="Correo electronico"
                                     />
 
                                     <InputError
@@ -91,28 +90,17 @@ export default function Profile({
                                     />
                                 </div>
 
-                                {mustVerifyEmail &&
-                                    auth.user.email_verified_at === null && (
-                                        <div>
-                                            <p className="-mt-4 text-sm text-muted-foreground">
-                                                Tu email no está verificado.{' '}
-                                                <Link
-                                                    href={send()}
-                                                    as="button"
-                                                    className="text-foreground underline decoration-neutral-300 underline-offset-4 transition-colors duration-300 ease-out hover:decoration-current! dark:decoration-neutral-500"
-                                                >
-                                                    Haz clic aquí para enviarte de nuevo el correo de verificación.
-                                                </Link>
-                                            </p>
+                                {mustVerifyEmail && auth.user.email_verified_at === null ? (
+                                    <p className="-mt-4 text-sm text-muted-foreground">
+                                        La verificacion de correo esta desactivada en este entorno.
+                                    </p>
+                                ) : null}
 
-                                            {status ===
-                                                'verification-link-sent' && (
-                                                <div className="mt-2 text-sm font-medium text-green-600">
-                                                    Se ha enviado un nuevo enlace de verificación a tu dirección de correo electrónico.
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
+                                {status === 'verification-link-sent' ? (
+                                    <div className="mt-2 text-sm font-medium text-green-600">
+                                        Se ha enviado un nuevo enlace de verificacion a tu direccion de correo electronico.
+                                    </div>
+                                ) : null}
 
                                 <div className="flex items-center gap-4">
                                     <Button
@@ -144,4 +132,3 @@ export default function Profile({
         </AppLayout>
     );
 }
-

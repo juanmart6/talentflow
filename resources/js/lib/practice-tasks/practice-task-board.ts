@@ -1,4 +1,4 @@
-import type { TaskCard, TaskStatus } from "@/types/practice-tasks";
+import type { TaskCard, TaskStatus } from "@/types/domains/practice-tasks";
 
 export function moveTaskInStatus(
     current: TaskCard[],

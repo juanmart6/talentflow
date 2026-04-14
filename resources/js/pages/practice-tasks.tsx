@@ -12,7 +12,7 @@ import { parseDueDate, dueDaysFromToday, dueIndicatorMeta } from '@/lib/practice
 import { UI_PRESETS } from '@/lib/ui-presets';
 import practiceTasks from '@/routes/practice-tasks';
 import type { BreadcrumbItem } from '@/types';
-import type { DueStateFilter, PracticeTasksProps, TaskCard, TaskStatus } from '@/types/practice-tasks';
+import type { DueStateFilter, PracticeTasksProps, TaskCard, TaskStatus } from '@/types/domains/practice-tasks';
 
 
 const breadcrumbs: BreadcrumbItem[] = [

@@ -1,5 +1,5 @@
-﻿import { Head, Link, useForm, usePage } from '@inertiajs/react';
-import { Briefcase, FileText, Paperclip, User } from 'lucide-react';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
+import { Briefcase, FileText, MailPlus, Paperclip, User } from 'lucide-react';
 import type { FormEvent} from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
+import { getFirstFormErrorMessage } from '@/lib/form-errors';
 import { INTERN_STATUS_META  } from '@/lib/interns/intern-status';
 import type {InternStatus} from '@/lib/interns/intern-status';
 import { UI_PRESETS } from '@/lib/ui-presets';
@@ -73,11 +74,21 @@ type DocumentHistory = {
 type Props = {
     mode: 'create' | 'edit' | 'show';
     intern: InternFormData | null;
+    access: {
+        status: 'none' | 'pending' | 'accepted' | 'expired';
+        can_invite: boolean;
+        history: Array<{
+            id: string;
+            step: 'sent' | 'accepted' | 'expired';
+            happened_at: string | null;
+            by_name: string | null;
+        }>;
+    } | null;
     educationCenters: EducationCenterOption[];
     documentHistory: DocumentHistory;
 };
 
-type InternFormTab = 'personal' | 'academic' | 'documents' | 'general';
+type InternFormTab = 'personal' | 'academic' | 'documents' | 'general' | 'access';
 
 function toDateInput(value?: string | null): string {
     if (!value) {
@@ -146,7 +157,47 @@ function FileUploadField({ id, label, accept, file, error, onChange }: FileUploa
     );
 }
 
-export default function InternFormPage({ mode, intern, educationCenters, documentHistory }: Props) {
+const accessStatusMeta: Record<
+    NonNullable<Props['access']>['status'],
+    { label: string; badgeClass: string }
+> = {
+    none: {
+        label: 'Sin invitación',
+        badgeClass: 'bg-slate-100 text-slate-700 ring-1 ring-slate-300 dark:bg-slate-900/40 dark:text-slate-200 dark:ring-slate-700/60',
+    },
+    pending: {
+        label: 'Invitación pendiente',
+        badgeClass: 'bg-amber-100 text-amber-700 ring-1 ring-amber-300 dark:bg-amber-900/30 dark:text-amber-200 dark:ring-amber-700/40',
+    },
+    accepted: {
+        label: 'Acceso activo',
+        badgeClass: 'bg-emerald-100 text-emerald-700 ring-1 ring-emerald-300 dark:bg-emerald-900/30 dark:text-emerald-200 dark:ring-emerald-700/40',
+    },
+    expired: {
+        label: 'Invitación caducada',
+        badgeClass: 'bg-red-100 text-red-700 ring-1 ring-red-300 dark:bg-red-900/30 dark:text-red-200 dark:ring-red-700/40',
+    },
+};
+
+const accessHistoryStepMeta: Record<
+    NonNullable<NonNullable<Props['access']>['history'][number]>['step'],
+    { label: string; badgeClass: string }
+> = {
+    sent: {
+        label: 'Invitación enviada',
+        badgeClass: 'bg-sky-100 text-sky-700 ring-1 ring-sky-300 dark:bg-sky-900/30 dark:text-sky-200 dark:ring-sky-700/40',
+    },
+    accepted: {
+        label: 'Invitación aceptada',
+        badgeClass: 'bg-emerald-100 text-emerald-700 ring-1 ring-emerald-300 dark:bg-emerald-900/30 dark:text-emerald-200 dark:ring-emerald-700/40',
+    },
+    expired: {
+        label: 'Invitación caducada',
+        badgeClass: 'bg-red-100 text-red-700 ring-1 ring-red-300 dark:bg-red-900/30 dark:text-red-200 dark:ring-red-700/40',
+    },
+};
+
+export default function InternFormPage({ mode, intern, access, educationCenters, documentHistory }: Props) {
     const isCreate = mode === 'create';
     const isReadOnly = mode === 'show';
     const breadcrumbs: BreadcrumbItem[] = [
@@ -164,7 +215,7 @@ export default function InternFormPage({ mode, intern, educationCenters, documen
         },
     ];
     const hasEducationCenters = educationCenters.length > 0;
-    const page = usePage<{ flash?: { success?: string; error?: string } }>();
+    const page = usePage<{ flash?: { success?: string; error?: string; info?: string } }>();
     const lastFlashRef = useRef<string | null>(null);
     const [expandedHistory, setExpandedHistory] = useState<Record<keyof DocumentHistory, boolean>>({
         collaboration_agreement: false,
@@ -172,6 +223,7 @@ export default function InternFormPage({ mode, intern, educationCenters, documen
         dni_scan: false,
     });
     const [activeTab, setActiveTab] = useState<InternFormTab>('personal');
+    const [isInvitingAccess, setIsInvitingAccess] = useState(false);
 
     const { data, setData, post, transform, processing, errors } = useForm({
         education_center_id: intern?.education_center_id ? String(intern.education_center_id) : '',
@@ -249,9 +301,18 @@ export default function InternFormPage({ mode, intern, educationCenters, documen
     useEffect(() => {
         const successMessage = page.props.flash?.success;
         const errorMessage = page.props.flash?.error;
-        const flashKey = successMessage ? `success:${successMessage}` : errorMessage ? `error:${errorMessage}` : null;
+        const infoMessage = page.props.flash?.info;
+        const flashKey = JSON.stringify({
+            success: successMessage ?? null,
+            error: errorMessage ?? null,
+            info: infoMessage ?? null,
+        });
 
-        if (!flashKey || lastFlashRef.current === flashKey) {
+        if (!successMessage && !errorMessage && !infoMessage) {
+            return;
+        }
+
+        if (lastFlashRef.current === flashKey) {
             return;
         }
 
@@ -264,12 +325,88 @@ export default function InternFormPage({ mode, intern, educationCenters, documen
         if (errorMessage) {
             toast.error(errorMessage);
         }
-    }, [page.props.flash?.success, page.props.flash?.error]);
 
-    const showAgreementDateToastIfNeeded = (formErrors: Partial<Record<string, string>>) => {
-        const agreementDateError = formErrors.internship_end_date;
-        if (agreementDateError?.includes('Las fechas de practicas deben estar dentro del periodo de un convenio del centro educativo.')) {
-            toast.error('Las fechas de practicas deben estar dentro del periodo de un convenio del centro educativo.');
+        if (infoMessage) {
+            toast.info(infoMessage);
+        }
+    }, [page.props.flash?.success, page.props.flash?.error, page.props.flash?.info]);
+
+    const accessStatus = access?.status ?? 'none';
+    const canInviteAccess = Boolean(intern?.id) && (access?.can_invite ?? false) && !isInvitingAccess;
+    const accessHistory = access?.history ?? [];
+
+    const handleInviteAccess = () => {
+        if (!intern?.id || !canInviteAccess) {
+            return;
+        }
+
+        setIsInvitingAccess(true);
+
+        router.post(`/interns/${intern.id}/invite-access`, {}, {
+            preserveScroll: true,
+            preserveState: true,
+            onFinish: () => setIsInvitingAccess(false),
+        });
+    };
+
+    const handleFormErrors = (formErrors: Partial<Record<string, string>>) => {
+        const firstError = getFirstFormErrorMessage(formErrors as Record<string, unknown>);
+
+        if (firstError) {
+            toast.error(firstError);
+        } else {
+            toast.error('No se pudo guardar el becario. Revisa los campos obligatorios.');
+        }
+
+        const errorKeys = Object.keys(formErrors ?? {});
+        const personalFields = [
+            'first_name',
+            'last_name',
+            'dni_nie',
+            'email',
+            'phone',
+            'address_line',
+            'postal_code',
+            'city',
+            'province',
+            'country',
+        ];
+        const academicFields = [
+            'education_center_id',
+            'training_program_id',
+            'academic_year',
+            'academic_tutor_name',
+            'academic_tutor_email',
+            'internship_start_date',
+            'internship_end_date',
+            'required_hours',
+            'status',
+            'abandonment_reason',
+            'abandonment_date',
+        ];
+        const documentFields = [
+            'collaboration_agreement_document',
+            'insurance_policy_document',
+            'dni_scan_document',
+        ];
+
+        if (errorKeys.some((key) => personalFields.includes(key))) {
+            setActiveTab('personal');
+            return;
+        }
+
+        if (errorKeys.some((key) => academicFields.includes(key))) {
+            setActiveTab('academic');
+            return;
+        }
+
+        if (errorKeys.some((key) => documentFields.includes(key))) {
+            setActiveTab('documents');
+            return;
+        }
+
+        if (errorKeys.some((key) => key === 'general_notes')) {
+            setActiveTab('general');
         }
     };
 
@@ -289,7 +426,7 @@ export default function InternFormPage({ mode, intern, educationCenters, documen
             post(interns.store().url, {
                 preserveScroll: true,
                 forceFormData: true,
-                onError: (formErrors) => showAgreementDateToastIfNeeded(formErrors),
+                onError: (formErrors) => handleFormErrors(formErrors),
             });
             return;
         }
@@ -298,7 +435,7 @@ export default function InternFormPage({ mode, intern, educationCenters, documen
         post(interns.update(intern?.id ?? 0).url, {
             preserveScroll: true,
             forceFormData: true,
-            onError: (formErrors) => showAgreementDateToastIfNeeded(formErrors),
+            onError: (formErrors) => handleFormErrors(formErrors),
         });
     };
 
@@ -314,7 +451,7 @@ export default function InternFormPage({ mode, intern, educationCenters, documen
                         backHref={interns.index().url}
                     />
 
-                    <form onSubmit={submit} className="space-y-2">
+                    <form onSubmit={submit} className="space-y-2 [&_[data-slot=input-error]]:hidden">
                             <section className={UI_PRESETS.sectionCard}>
                                 <div className="-mx-4 -mt-4 border-b border-sidebar-border/70 px-4 pt-4 dark:border-sidebar-border">
                                     <div className="flex flex-wrap items-end gap-1.5">
@@ -358,11 +495,23 @@ export default function InternFormPage({ mode, intern, educationCenters, documen
                                             <FileText className="mr-1.5 size-4 shrink-0" />
                                             Notas
                                         </Button>
+                                        {!isCreate ? (
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="sm"
+                                                className={`${UI_PRESETS.tabBase} ${activeTab === 'access' ? UI_PRESETS.tabActive : UI_PRESETS.tabInactive}`}
+                                                onClick={() => setActiveTab('access')}
+                                            >
+                                                <MailPlus className="mr-1.5 size-4 shrink-0" />
+                                                Acceso
+                                            </Button>
+                                        ) : null}
                                     </div>
                                 </div>
 
                             <fieldset
-                                disabled={isReadOnly}
+                                disabled={isReadOnly && activeTab !== 'access'}
                                 className={`space-y-4 ${isReadOnly ? UI_PRESETS.readOnlyFieldset : ''}`}
                             >
 
@@ -377,44 +526,44 @@ export default function InternFormPage({ mode, intern, educationCenters, documen
                                         <div className="overflow-hidden rounded-xl border border-slate-200/80 dark:border-slate-700/80">
                                             <dl className="divide-y divide-slate-200/80 dark:divide-slate-700/80">
                                                 <div className="grid gap-1 px-4 py-3 md:grid-cols-[220px_1fr] md:gap-3">
-                                                    <dt className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Nombre</dt>
-                                                    <dd className="text-sm font-medium text-slate-800 dark:text-slate-100">{data.first_name || '-'}</dd>
+                                                    <dt className={UI_PRESETS.readOnlyFieldLabel}>Nombre</dt>
+                                                    <dd className={UI_PRESETS.readOnlyFieldValue}>{data.first_name || '-'}</dd>
                                                 </div>
                                                 <div className="grid gap-1 px-4 py-3 md:grid-cols-[220px_1fr] md:gap-3">
-                                                    <dt className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Apellidos</dt>
-                                                    <dd className="text-sm font-medium text-slate-800 dark:text-slate-100">{data.last_name || '-'}</dd>
+                                                    <dt className={UI_PRESETS.readOnlyFieldLabel}>Apellidos</dt>
+                                                    <dd className={UI_PRESETS.readOnlyFieldValue}>{data.last_name || '-'}</dd>
                                                 </div>
                                                 <div className="grid gap-1 px-4 py-3 md:grid-cols-[220px_1fr] md:gap-3">
-                                                    <dt className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">DNI/NIE</dt>
-                                                    <dd className="text-sm font-medium text-slate-800 dark:text-slate-100">{data.dni_nie || '-'}</dd>
+                                                    <dt className={UI_PRESETS.readOnlyFieldLabel}>DNI/NIE</dt>
+                                                    <dd className={UI_PRESETS.readOnlyFieldValue}>{data.dni_nie || '-'}</dd>
                                                 </div>
                                                 <div className="grid gap-1 px-4 py-3 md:grid-cols-[220px_1fr] md:gap-3">
-                                                    <dt className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Email</dt>
-                                                    <dd className="text-sm font-medium text-slate-800 dark:text-slate-100">{data.email || '-'}</dd>
+                                                    <dt className={UI_PRESETS.readOnlyFieldLabel}>Email</dt>
+                                                    <dd className={UI_PRESETS.readOnlyFieldValue}>{data.email || '-'}</dd>
                                                 </div>
                                                 <div className="grid gap-1 px-4 py-3 md:grid-cols-[220px_1fr] md:gap-3">
-                                                    <dt className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Teléfono</dt>
-                                                    <dd className="text-sm font-medium text-slate-800 dark:text-slate-100">{data.phone || '-'}</dd>
+                                                    <dt className={UI_PRESETS.readOnlyFieldLabel}>Teléfono</dt>
+                                                    <dd className={UI_PRESETS.readOnlyFieldValue}>{data.phone || '-'}</dd>
                                                 </div>
                                                 <div className="grid gap-1 px-4 py-3 md:grid-cols-[220px_1fr] md:gap-3">
-                                                    <dt className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Dirección</dt>
-                                                    <dd className="text-sm font-medium text-slate-800 dark:text-slate-100">{data.address_line || '-'}</dd>
+                                                    <dt className={UI_PRESETS.readOnlyFieldLabel}>Dirección</dt>
+                                                    <dd className={UI_PRESETS.readOnlyFieldValue}>{data.address_line || '-'}</dd>
                                                 </div>
                                                 <div className="grid gap-1 px-4 py-3 md:grid-cols-[220px_1fr] md:gap-3">
-                                                    <dt className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Código postal</dt>
-                                                    <dd className="text-sm font-medium text-slate-800 dark:text-slate-100">{data.postal_code || '-'}</dd>
+                                                    <dt className={UI_PRESETS.readOnlyFieldLabel}>Código postal</dt>
+                                                    <dd className={UI_PRESETS.readOnlyFieldValue}>{data.postal_code || '-'}</dd>
                                                 </div>
                                                 <div className="grid gap-1 px-4 py-3 md:grid-cols-[220px_1fr] md:gap-3">
-                                                    <dt className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Ciudad</dt>
-                                                    <dd className="text-sm font-medium text-slate-800 dark:text-slate-100">{data.city || '-'}</dd>
+                                                    <dt className={UI_PRESETS.readOnlyFieldLabel}>Ciudad</dt>
+                                                    <dd className={UI_PRESETS.readOnlyFieldValue}>{data.city || '-'}</dd>
                                                 </div>
                                                 <div className="grid gap-1 px-4 py-3 md:grid-cols-[220px_1fr] md:gap-3">
-                                                    <dt className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Provincia</dt>
-                                                    <dd className="text-sm font-medium text-slate-800 dark:text-slate-100">{data.province || '-'}</dd>
+                                                    <dt className={UI_PRESETS.readOnlyFieldLabel}>Provincia</dt>
+                                                    <dd className={UI_PRESETS.readOnlyFieldValue}>{data.province || '-'}</dd>
                                                 </div>
                                                 <div className="grid gap-1 px-4 py-3 md:grid-cols-[220px_1fr] md:gap-3">
-                                                    <dt className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">País</dt>
-                                                    <dd className="text-sm font-medium text-slate-800 dark:text-slate-100">{data.country || '-'}</dd>
+                                                    <dt className={UI_PRESETS.readOnlyFieldLabel}>País</dt>
+                                                    <dd className={UI_PRESETS.readOnlyFieldValue}>{data.country || '-'}</dd>
                                                 </div>
                                             </dl>
                                         </div>
@@ -486,50 +635,50 @@ export default function InternFormPage({ mode, intern, educationCenters, documen
                                         <div className="overflow-hidden rounded-xl border border-slate-200/80 dark:border-slate-700/80">
                                             <dl className="divide-y divide-slate-200/80 dark:divide-slate-700/80">
                                                 <div className="grid gap-1 px-4 py-3 md:grid-cols-[220px_1fr] md:gap-3">
-                                                    <dt className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Centro educativo</dt>
-                                                    <dd className="text-sm font-medium text-slate-800 dark:text-slate-100">{selectedCenter?.name || '-'}</dd>
+                                                    <dt className={UI_PRESETS.readOnlyFieldLabel}>Centro educativo</dt>
+                                                    <dd className={UI_PRESETS.readOnlyFieldValue}>{selectedCenter?.name || '-'}</dd>
                                                 </div>
                                                 <div className="grid gap-1 px-4 py-3 md:grid-cols-[220px_1fr] md:gap-3">
-                                                    <dt className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Ciclo formativo</dt>
-                                                    <dd className="text-sm font-medium text-slate-800 dark:text-slate-100">{selectedTrainingProgram?.name || '-'}</dd>
+                                                    <dt className={UI_PRESETS.readOnlyFieldLabel}>Ciclo formativo</dt>
+                                                    <dd className={UI_PRESETS.readOnlyFieldValue}>{selectedTrainingProgram?.name || '-'}</dd>
                                                 </div>
                                                 <div className="grid gap-1 px-4 py-3 md:grid-cols-[220px_1fr] md:gap-3">
-                                                    <dt className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Año académico</dt>
-                                                    <dd className="text-sm font-medium text-slate-800 dark:text-slate-100">{data.academic_year || '-'}</dd>
+                                                    <dt className={UI_PRESETS.readOnlyFieldLabel}>Año académico</dt>
+                                                    <dd className={UI_PRESETS.readOnlyFieldValue}>{data.academic_year || '-'}</dd>
                                                 </div>
                                                 <div className="grid gap-1 px-4 py-3 md:grid-cols-[220px_1fr] md:gap-3">
-                                                    <dt className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Tutor académico</dt>
-                                                    <dd className="text-sm font-medium text-slate-800 dark:text-slate-100">{data.academic_tutor_name || '-'}</dd>
+                                                    <dt className={UI_PRESETS.readOnlyFieldLabel}>Tutor académico</dt>
+                                                    <dd className={UI_PRESETS.readOnlyFieldValue}>{data.academic_tutor_name || '-'}</dd>
                                                 </div>
                                                 <div className="grid gap-1 px-4 py-3 md:grid-cols-[220px_1fr] md:gap-3">
-                                                    <dt className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Email tutor</dt>
-                                                    <dd className="text-sm font-medium text-slate-800 dark:text-slate-100">{data.academic_tutor_email || '-'}</dd>
+                                                    <dt className={UI_PRESETS.readOnlyFieldLabel}>Email tutor</dt>
+                                                    <dd className={UI_PRESETS.readOnlyFieldValue}>{data.academic_tutor_email || '-'}</dd>
                                                 </div>
                                                 <div className="grid gap-1 px-4 py-3 md:grid-cols-[220px_1fr] md:gap-3">
-                                                    <dt className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Fecha inicio</dt>
-                                                    <dd className="text-sm font-medium text-slate-800 dark:text-slate-100">{formatDisplayDate(data.internship_start_date)}</dd>
+                                                    <dt className={UI_PRESETS.readOnlyFieldLabel}>Fecha inicio</dt>
+                                                    <dd className={UI_PRESETS.readOnlyFieldValue}>{formatDisplayDate(data.internship_start_date)}</dd>
                                                 </div>
                                                 <div className="grid gap-1 px-4 py-3 md:grid-cols-[220px_1fr] md:gap-3">
-                                                    <dt className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Fecha fin</dt>
-                                                    <dd className="text-sm font-medium text-slate-800 dark:text-slate-100">{formatDisplayDate(data.internship_end_date)}</dd>
+                                                    <dt className={UI_PRESETS.readOnlyFieldLabel}>Fecha fin</dt>
+                                                    <dd className={UI_PRESETS.readOnlyFieldValue}>{formatDisplayDate(data.internship_end_date)}</dd>
                                                 </div>
                                                 <div className="grid gap-1 px-4 py-3 md:grid-cols-[220px_1fr] md:gap-3">
-                                                    <dt className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Horas requeridas</dt>
-                                                    <dd className="text-sm font-medium text-slate-800 dark:text-slate-100">
+                                                    <dt className={UI_PRESETS.readOnlyFieldLabel}>Horas requeridas</dt>
+                                                    <dd className={UI_PRESETS.readOnlyFieldValue}>
                                                         {Number(data.required_hours) > 0 ? `${data.required_hours} h` : '-'}
                                                     </dd>
                                                 </div>
                                                 <div className="grid gap-1 px-4 py-3 md:grid-cols-[220px_1fr] md:gap-3">
-                                                    <dt className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Estado</dt>
-                                                    <dd className="text-sm font-medium text-slate-800 dark:text-slate-100">{INTERN_STATUS_META[computedStatus].label}</dd>
+                                                    <dt className={UI_PRESETS.readOnlyFieldLabel}>Estado</dt>
+                                                    <dd className={UI_PRESETS.readOnlyFieldValue}>{INTERN_STATUS_META[computedStatus].label}</dd>
                                                 </div>
                                                 <div className="grid gap-1 px-4 py-3 md:grid-cols-[220px_1fr] md:gap-3">
-                                                    <dt className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Motivo abandono</dt>
-                                                    <dd className="text-sm font-medium text-slate-800 dark:text-slate-100">{data.abandonment_reason || '-'}</dd>
+                                                    <dt className={UI_PRESETS.readOnlyFieldLabel}>Motivo abandono</dt>
+                                                    <dd className={UI_PRESETS.readOnlyFieldValue}>{data.abandonment_reason || '-'}</dd>
                                                 </div>
                                                 <div className="grid gap-1 px-4 py-3 md:grid-cols-[220px_1fr] md:gap-3">
-                                                    <dt className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Fecha abandono</dt>
-                                                    <dd className="text-sm font-medium text-slate-800 dark:text-slate-100">{formatDisplayDate(data.abandonment_date)}</dd>
+                                                    <dt className={UI_PRESETS.readOnlyFieldLabel}>Fecha abandono</dt>
+                                                    <dd className={UI_PRESETS.readOnlyFieldValue}>{formatDisplayDate(data.abandonment_date)}</dd>
                                                 </div>
                                             </dl>
                                         </div>
@@ -767,8 +916,8 @@ export default function InternFormPage({ mode, intern, educationCenters, documen
                                     {isReadOnly ? (
                                         <div className="overflow-hidden rounded-xl border border-slate-200/80 dark:border-slate-700/80">
                                             <div className="grid gap-1 px-4 py-3 md:grid-cols-[220px_1fr] md:gap-3">
-                                                <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Notas</p>
-                                                <p className="text-sm font-medium whitespace-pre-line text-slate-800 dark:text-slate-100">
+                                                <p className={UI_PRESETS.readOnlyFieldLabel}>Notas</p>
+                                                <p className={`${UI_PRESETS.readOnlyFieldValue} whitespace-pre-line`}>
                                                     {data.general_notes?.trim() ? data.general_notes : '-'}
                                                 </p>
                                             </div>
@@ -787,6 +936,79 @@ export default function InternFormPage({ mode, intern, educationCenters, documen
                                             <InputError message={errors.general_notes} />
                                         </div>
                                     )}
+                                </section>
+                                )}
+
+                                {activeTab === 'access' && !isCreate && (
+                                <section className="space-y-4 pt-4">
+                                    <SectionIntro
+                                        title="Acceso a la plataforma"
+                                        description="Gestiona la invitación y el estado de acceso del becario."
+                                    />
+
+                                    <div className="rounded-lg border border-sidebar-border/70 bg-white/70 p-4 dark:border-sidebar-border dark:bg-slate-900/20">
+                                        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                                            <div className="space-y-1">
+                                                <p className={UI_PRESETS.readOnlyFieldLabel}>Estado de acceso</p>
+                                                <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold uppercase ${accessStatusMeta[accessStatus].badgeClass}`}>
+                                                    {accessStatusMeta[accessStatus].label}
+                                                </span>
+                                            </div>
+
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                className={UI_PRESETS.iconActionButtonPrimary}
+                                                onClick={handleInviteAccess}
+                                                disabled={!canInviteAccess}
+                                            >
+                                                <MailPlus className="size-4" />
+                                                {isInvitingAccess
+                                                    ? 'Enviando...'
+                                                    : accessStatus === 'none'
+                                                        ? 'Enviar acceso'
+                                                        : 'Reenviar invitación'}
+                                            </Button>
+                                        </div>
+
+                                        <div className="mt-4 space-y-2">
+                                            <p className={UI_PRESETS.readOnlyFieldLabel}>Historial de actividad</p>
+                                            {accessHistory.length > 0 ? (
+                                                <ul className="space-y-2">
+                                                    {accessHistory.map((item) => (
+                                                        <li
+                                                            key={item.id}
+                                                            className="flex flex-col gap-2 rounded-md border border-slate-200/80 bg-white/70 px-3 py-2 text-sm md:flex-row md:items-center md:justify-between dark:border-slate-700/80 dark:bg-slate-900/40"
+                                                        >
+                                                            <div className="flex flex-col gap-0.5">
+                                                                <span className="text-slate-700 dark:text-slate-200">
+                                                                    {item.happened_at
+                                                                        ? new Date(item.happened_at).toLocaleString('es-ES', {
+                                                                            day: '2-digit',
+                                                                            month: '2-digit',
+                                                                            year: 'numeric',
+                                                                            hour: '2-digit',
+                                                                            minute: '2-digit',
+                                                                        })
+                                                                        : '-'}
+                                                                </span>
+                                                                {item.step === 'sent' && item.by_name ? (
+                                                                    <span className="text-xs text-muted-foreground">
+                                                                        Enviada por: {item.by_name}
+                                                                    </span>
+                                                                ) : null}
+                                                            </div>
+                                                            <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase ${accessHistoryStepMeta[item.step].badgeClass}`}>
+                                                                {accessHistoryStepMeta[item.step].label}
+                                                            </span>
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            ) : (
+                                                <p className="text-sm text-muted-foreground">Todavía no se han enviado invitaciones.</p>
+                                            )}
+                                        </div>
+                                    </div>
                                 </section>
                                 )}
                             </fieldset>
@@ -814,5 +1036,3 @@ export default function InternFormPage({ mode, intern, educationCenters, documen
         </AppLayout>
     );
 }
-
-

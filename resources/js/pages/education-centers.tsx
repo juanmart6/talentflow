@@ -10,7 +10,7 @@ import { centerStatusDetail, formatSpanishDate } from '@/lib/education-centers/e
 import { UI_PRESETS } from '@/lib/ui-presets';
 import educationCenters from '@/routes/education-centers';
 import type { BreadcrumbItem } from '@/types';
-import type { CenterRow, CentersPagination, CenterFilters } from '@/types/education-centers';
+import type { CenterRow, CentersPagination, CenterFilters } from '@/types/domains/education-centers';
 
 type Props = {
     centers: CentersPagination;

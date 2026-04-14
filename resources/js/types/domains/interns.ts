@@ -1,4 +1,4 @@
-import type { Paginated } from '@/types/pagination';
+import type { Paginated } from '@/types/core/pagination';
 
 export type InternOption = {
     id: string;
@@ -9,6 +9,8 @@ export type InternOption = {
 
 export type InternRow = {
     id: number;
+    user_id: number | null;
+    access_status: 'none' | 'pending' | 'accepted' | 'expired';
     first_name: string;
     last_name: string;
     dni_nie: string;

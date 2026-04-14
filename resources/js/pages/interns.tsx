@@ -15,7 +15,7 @@ import type {
     EducationCenterOption,
     TrainingProgramOption,
     InternFilters,
-} from '@/types/interns';
+} from '@/types/domains/interns';
 
 type Props = {
     interns: InternsPagination;
@@ -34,7 +34,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 // Contiene toda la lógica de la vista:
 export default function InternsPage({ interns: internPagination, filters, educationCenters, trainingPrograms }: Props) {
-    const page = usePage<{ flash?: { success?: string; error?: string } }>();
+    const page = usePage<{ flash?: { success?: string; error?: string; info?: string } }>();
     const lastFlashRef = useRef<string | null>(null);
     const [search, setSearch] = useState(filters.search ?? '');
     const [status, setStatus] = useState(filters.status || 'all');
@@ -77,9 +77,18 @@ export default function InternsPage({ interns: internPagination, filters, educat
     useEffect(() => {
         const successMessage = page.props.flash?.success;
         const errorMessage = page.props.flash?.error;
-        const flashKey = successMessage ? `success:${successMessage}` : errorMessage ? `error:${errorMessage}` : null;
+        const infoMessage = page.props.flash?.info;
+        const flashKey = JSON.stringify({
+            success: successMessage ?? null,
+            error: errorMessage ?? null,
+            info: infoMessage ?? null,
+        });
 
-        if (!flashKey || lastFlashRef.current === flashKey) {
+        if (!successMessage && !errorMessage && !infoMessage) {
+            return;
+        }
+
+        if (lastFlashRef.current === flashKey) {
             return;
         }
 
@@ -92,7 +101,11 @@ export default function InternsPage({ interns: internPagination, filters, educat
         if (errorMessage) {
             toast.error(errorMessage);
         }
-    }, [page.props.flash?.success, page.props.flash?.error]);
+
+        if (infoMessage) {
+            toast.info(infoMessage);
+        }
+    }, [page.props.flash?.success, page.props.flash?.error, page.props.flash?.info]);
 
     // Efecto para manejar la búsqueda con debounce y sincronización de filtros:
     useEffect(() => {

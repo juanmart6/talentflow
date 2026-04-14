@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Intern;
 use App\Models\User;
 use App\Models\Users\UserInvitation;
 use Illuminate\Http\RedirectResponse;
@@ -22,6 +23,7 @@ class UserManagementController extends Controller
     {
         $users = User::query()
             ->with('roles:name')
+            ->whereDoesntHave('roles', fn ($query) => $query->where('name', 'intern'))
             ->orderBy('name')
             ->get()
             ->map(function (User $user): array {
@@ -37,6 +39,7 @@ class UserManagementController extends Controller
             ->all();
 
         $roles = Role::query()
+            ->where('name', '!=', 'intern')
             ->orderBy('name')
             ->get(['id', 'name'])
             ->map(fn (Role $role): array => [
@@ -56,6 +59,7 @@ class UserManagementController extends Controller
             ->all();
         
         $rolePermissions = Role::query()
+            ->where('name', '!=', 'intern')
             ->with('permissions:name')
             ->get(['id', 'name'])
             ->mapWithKeys(fn (Role $role) => [
@@ -64,8 +68,8 @@ class UserManagementController extends Controller
             ->all();
 
         $invitations = UserInvitation::query()
+            ->where('role', '!=', 'intern')
             ->with('invitedBy:id,name')
-            ->whereNull('accepted_at')
             ->latest('id')
             ->get()
             ->map(fn (UserInvitation $invitation): array => [
@@ -94,22 +98,33 @@ class UserManagementController extends Controller
     public function updateRole(Request $request, User $user): RedirectResponse
     {
         $validated = $request->validate([
-            'role' => ['required', 'string', Rule::exists('roles', 'name')],
+            'role' => [
+                'required',
+                'string',
+                Rule::exists('roles', 'name')->where(fn ($query) => $query->where('name', '!=', 'intern')),
+            ],
         ]);
 
         $newRole = $validated['role'];
         $isAdminUser = $user->hasRole('admin');
+        $isInternUser = $user->hasRole('intern');
+
+        if ($isInternUser || $newRole === 'intern') {
+            return redirect()
+                ->back()
+                ->with('error', 'Los becarios se gestionan desde GestiÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n de Becarios.');
+        }
 
         if ($isAdminUser && $newRole !== 'admin') {
             return redirect()
                 ->back()
-                ->with('error', 'No se puede modificar el rol de un usuario admin.');
+                ->with('error', 'No se puede modificar el rol de una cuenta administradora.');
         }
 
         if (!$isAdminUser && $newRole === 'admin') {
             return redirect()
                 ->back()
-                ->with('error', 'No se puede asignar el rol admin desde esta pantalla.');
+                ->with('error', 'No se puede asignar el rol administrador desde esta pantalla.');
         }
 
         $user->syncRoles([$newRole]);
@@ -122,7 +137,7 @@ class UserManagementController extends Controller
     public function updateRolePermissions(Request $request, Role $role): RedirectResponse
     {
         if ($role->name === 'admin') {
-            return back()->with('error', 'No se pueden modificar los permisos del rol admin.');
+            return back()->with('error', 'No se pueden modificar los permisos del rol administrador.');
         }
 
         $validated = $request->validate([
@@ -157,14 +172,18 @@ class UserManagementController extends Controller
     {
         $validated = $request->validate([
             'email' => ['required', 'email', 'max:255'],
-            'role' => ['required', 'string', Rule::exists('roles', 'name')],
+            'role' => [
+                'required',
+                'string',
+                Rule::exists('roles', 'name')->where(fn ($query) => $query->where('name', '!=', 'intern')),
+            ],
         ]);
 
         $email = mb_strtolower(trim($validated['email']));
         $role = $validated['role'];
 
-        if ($role === 'admin') {
-            return back()->with('error', 'No se pueden crear invitaciones con rol admin.');
+        if ($role === 'intern') {
+            return back()->with('error', 'Las invitaciones de becarios se envian desde Gestion de Becarios.');
         }
 
         $userAlreadyExists = User::query()
@@ -182,7 +201,7 @@ class UserManagementController extends Controller
             ->exists();
 
         if ($hasPendingInvitation) {
-            return back()->with('error', 'Ya existe una invitacion activa para ese correo.');
+            return back()->with('error', 'Ya existe una invitaciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n activa para ese correo.');
         }
 
         $invitation = UserInvitation::create([
@@ -200,29 +219,40 @@ class UserManagementController extends Controller
             new UserInvitationMail($invitation, $acceptUrl)
         );
 
-        return back()->with('success', 'Invitacion creada correctamente.');
+        return back()->with('success', 'InvitaciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n de staff creada correctamente.');
     }
 
     public function destroyInvitation(UserInvitation $invitation): RedirectResponse
     {
         if ($invitation->accepted_at !== null) {
-            return back()->with('error', 'No se puede cancelar una invitacion ya aceptada.');
+            return back()->with('error', 'No se puede cancelar una invitaciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n ya aceptada.');
         }
 
-        $invitation->delete();
+        $invitation->forceFill([
+            'expires_at' => now()->subSecond(),
+        ])->save();
 
-        return back()->with('info', 'Invitacion cancelada correctamente.');
+        return back()->with('info', 'InvitaciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n cancelada correctamente.');
     }
 
     public function showInvitation(string $token): Response
     {
         $invitation = $this->findValidInvitationOrFail($token);
+        $invitation->loadMissing('intern.educationCenter:id,name', 'intern.trainingProgram:id,name');
+
+        $intern = $invitation->intern;
 
         return Inertia::render('auth/accept-invitation', [
             'token' => $invitation->token,
             'email' => $invitation->email,
             'role' => $invitation->role,
             'expires_at' => $invitation->expires_at?->toDateTimeString(),
+            'display_name' => $this->resolveInvitationDisplayName($invitation),
+            'intern_summary' => $intern ? [
+                'dni_nie' => $intern->dni_nie,
+                'education_center_name' => $intern->educationCenter?->name,
+                'training_program_name' => $intern->trainingProgram?->name,
+            ] : null,
         ]);
     }
 
@@ -231,18 +261,18 @@ class UserManagementController extends Controller
         $invitation = $this->findValidInvitationOrFail($token);
 
         $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
         ]);
 
         $user = User::query()->create([
-            'name' => $validated['name'],
+            'name' => $this->resolveInvitationDisplayName($invitation),
             'email' => $invitation->email,
             'password' => Hash::make($validated['password']),
+            'email_verified_at' => now(),
         ]);
 
         $user->syncRoles([$invitation->role]);
-        $user->sendEmailVerificationNotification();
+        $this->linkInternProfileToUserIfNeeded($user, $invitation);
 
         $invitation->forceFill([
             'accepted_at' => now(),
@@ -250,7 +280,7 @@ class UserManagementController extends Controller
 
         return redirect()
             ->route('login')
-            ->with('success', 'Cuenta creada correctamente. Revisa tu correo para verificar la cuenta.');
+            ->with('success', 'Cuenta creada correctamente.');
     }
 
     private function findValidInvitationOrFail(string $token): UserInvitation
@@ -260,17 +290,89 @@ class UserManagementController extends Controller
             ->first();
 
         if (!$invitation) {
-            abort(404, 'Invitacion no encontrada.');
+            abort(404, 'InvitaciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n no encontrada.');
         }
 
         if ($invitation->accepted_at !== null) {
-            abort(410, 'Esta invitacion ya fue aceptada.');
+            abort(410, 'Esta invitaciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n ya fue aceptada.');
         }
 
         if ($invitation->expires_at === null || $invitation->expires_at->isPast()) {
-            abort(410, 'Esta invitacion ha caducado.');
+            abort(410, 'Esta invitaciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n ha caducado.');
         }
 
         return $invitation;
     }
+
+    public function destroyUser(User $user): RedirectResponse
+    {
+        if (request()->user()?->id === $user->id) {
+            return back()->with('error', 'No puedes eliminar tu propio usuario.');
+        }
+
+        if ($user->hasRole('admin')) {
+            return back()->with('error', 'No se puede eliminar una cuenta administradora.');
+        }
+
+        $user->delete();
+
+        return back()->with('success', 'Usuario eliminado correctamente.');
+    }
+
+    private function linkInternProfileToUserIfNeeded(User $user, UserInvitation $invitation): void
+    {
+        if ($invitation->role !== 'intern') {
+            return;
+        }
+
+        if ($invitation->intern_id !== null) {
+            Intern::query()
+                ->whereKey($invitation->intern_id)
+                ->whereNull('user_id')
+                ->first()
+                ?->update([
+                    'user_id' => $user->id,
+                ]);
+
+            return;
+        }
+
+        Intern::query()
+                ->whereNull('user_id')
+                ->whereRaw('LOWER(email) = ?', [mb_strtolower($user->email)])
+                ->first()
+                ?->update([
+                    'user_id' => $user->id,
+                ]);
+    }
+
+    private function resolveInvitationDisplayName(UserInvitation $invitation): string
+    {
+        $invitation->loadMissing('intern');
+
+        if ($invitation->intern) {
+            $fullName = trim(
+                implode(' ', array_filter([
+                    $invitation->intern->first_name,
+                    $invitation->intern->last_name,
+                ]))
+            );
+
+            if ($fullName !== '') {
+                return $fullName;
+            }
+        }
+
+        $emailLocalPart = trim((string) strstr($invitation->email, '@', true));
+
+        if ($emailLocalPart !== '') {
+            $normalized = str_replace(['.', '_', '-'], ' ', $emailLocalPart);
+            $normalized = preg_replace('/\s+/', ' ', $normalized) ?? $normalized;
+
+            return mb_convert_case(trim($normalized), MB_CASE_TITLE, 'UTF-8');
+        }
+
+        return 'Usuario';
+    }
 }
+

@@ -1,8 +1,9 @@
 ﻿import { Head, router, usePage } from '@inertiajs/react';
-import { GraduationCap, MailPlus, ShieldCheck, Trash2, UserCog, UsersRound } from 'lucide-react';
+import { MailPlus, ShieldCheck, Trash2, UserCog } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { SectionIntro } from '@/components/form-ui';
+import ConfirmDeleteDialog from '@/components/shared/confirm-delete-dialog';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -17,120 +18,42 @@ import UserManagementTabs from '@/components/users/user-management-tabs';
 import type { UserManagementTab } from '@/components/users/user-management-tabs';
 import AppLayout from '@/layouts/app-layout';
 import { UI_PRESETS, stripedRowClass } from '@/lib/ui-presets';
+import {
+    getInvitationStatus,
+    invitationStatusBadgeClasses,
+    invitationStatusLabels,
+    permissionActionLabels,
+    permissionModuleLabels,
+    roleBadgeClasses,
+    roleBadgeIconByRole,
+    roleLabels,
+} from '@/lib/users/users-ui';
 import { cn } from '@/lib/utils';
 import type { BreadcrumbItem } from '@/types';
-
-type RoleRow = {
-    id: number;
-    name: string;
-};
-
-type RolePermissionsMap = Record<string, string[]>;
-
-type UserRow = {
-    id: number;
-    name: string;
-    email: string;
-    role: string | null;
-    roles: string[];
-    created_at: string | null;
-};
-
-type InvitationRow = {
-    id: number;
-    email: string;
-    role: string;
-    expires_at: string | null;
-    accepted_at: string | null;
-    invited_by_name: string;
-    created_at: string | null;
-};
-
-type Props = {
-    users: UserRow[];
-    roles: RoleRow[];
-    availableRoles: string[];
-    permissions: string[];
-    rolePermissions: RolePermissionsMap;
-    invitations: InvitationRow[];
-};
+import type { InvitationRow, InvitationStatus, UserRow, UsersPageProps } from '@/types/domains/users';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
-        title: 'Autenticación y Usuarios',
+        title: 'Accesos y Permisos',
         href: '/autenticacion-usuarios',
     },
 ];
 
-type InvitationStatus = 'pending' | 'accepted' | 'expired';
-
-const roleLabels: Record<string, string> = {
-    admin: 'Administrador',
-    tutor: 'Tutor',
-    intern: 'Becario',
-};
-
-const roleBadgeClasses: Record<string, string> = {
-    admin: 'border-violet-300 bg-violet-50 text-violet-700 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-200',
-    tutor: 'border-sky-300 bg-sky-50 text-sky-700 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-200',
-    intern: 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200',
-};
-
-const roleBadgeIconByRole: Record<string, typeof ShieldCheck> = {
-    admin: ShieldCheck,
-    tutor: UsersRound,
-    intern: GraduationCap,
-};
-
-const permissionModuleLabels: Record<string, string> = {
-    'education-centers': 'Centros Educativos',
-    interns: 'Becarios',
-    'practice-tasks': 'Prácticas y tareas',
-    users: 'Usuarios y roles',
-};
-
-const permissionActionLabels: Record<string, string> = {
-    view: 'Ver',
-    create: 'Crear',
-    update: 'Editar',
-    delete: 'Eliminar',
-    manage: 'Gestionar',
-};
-
-const invitationStatusLabels: Record<InvitationStatus, string> = {
-    pending: 'Pendiente',
-    accepted: 'Aceptada',
-    expired: 'Expirada',
-};
-
-const invitationStatusBadgeClasses: Record<InvitationStatus, string> = {
-    pending:
-        'bg-amber-100 text-amber-700 ring-1 ring-amber-300 dark:bg-amber-900/30 dark:text-amber-200 dark:ring-amber-700/40',
-    accepted:
-        'bg-emerald-100 text-emerald-700 ring-1 ring-emerald-300 dark:bg-emerald-900/30 dark:text-emerald-200 dark:ring-emerald-700/40',
-    expired:
-        'bg-red-100 text-red-700 ring-1 ring-red-300 dark:bg-red-900/30 dark:text-red-200 dark:ring-red-700/40',
-};
-
-const getInvitationStatus = (invitation: InvitationRow): InvitationStatus => {
-    if (invitation.accepted_at) return 'accepted';
-    if (!invitation.expires_at) return 'pending';
-
-    const expiresAt = new Date(invitation.expires_at);
-    if (Number.isNaN(expiresAt.getTime())) return 'pending';
-
-    return expiresAt.getTime() < Date.now() ? 'expired' : 'pending';
-};
-
-export default function UsersIndexPage({ users, roles, availableRoles, permissions, rolePermissions, invitations }: Props) {
+export default function UsersIndexPage({ users, roles, availableRoles, permissions, rolePermissions, invitations }: UsersPageProps) {
     const PAGE_SIZE = 8;
-    const page = usePage<{ flash?: { success?: string; error?: string; info?: string } }>();
+    const page = usePage<{
+        flash?: { success?: string; error?: string; info?: string };
+        auth: { user: { id: number } | null };
+    }>();
     const [activeTab, setActiveTab] = useState<UserManagementTab>('users-roles');
     const [invitationEmail, setInvitationEmail] = useState('');
     const [invitationRole, setInvitationRole] = useState<string>(
-        availableRoles.find((role) => role !== 'admin') ?? 'tutor',
+        availableRoles.find((role) => role === 'tutor') ?? availableRoles[0] ?? '',
     );
-    const [deletingInvitationId, setDeletingInvitationId] = useState<number | null>(null);
+    const [invitationToDelete, setInvitationToDelete] = useState<InvitationRow | null>(null);
+    const [isDeletingInvitation, setIsDeletingInvitation] = useState(false);
+    const [userToDelete, setUserToDelete] = useState<UserRow | null>(null);
+    const [isDeletingUser, setIsDeletingUser] = useState(false);
     const [invitationFilter, setInvitationFilter] = useState<'all' | InvitationStatus>('all');
     const [usersPage, setUsersPage] = useState(1);
     const [invitationsPage, setInvitationsPage] = useState(1);
@@ -157,6 +80,10 @@ export default function UsersIndexPage({ users, roles, availableRoles, permissio
             const [module] = permission.split('.');
             const key = module ?? 'general';
 
+            if (key === 'interns') {
+                continue;
+            }
+
             if (!groups[key]) {
                 groups[key] = [];
             }
@@ -173,10 +100,7 @@ export default function UsersIndexPage({ users, roles, availableRoles, permissio
             }));
     }, [permissions]);
 
-    const invitationRoleOptions = useMemo(
-        () => availableRoles.filter((role) => role !== 'admin'),
-        [availableRoles],
-    );
+    const invitationRoleOptions = useMemo(() => availableRoles, [availableRoles]);
     const filteredInvitations = useMemo(() => {
         if (invitationFilter === 'all') {
             return invitations;
@@ -337,13 +261,45 @@ export default function UsersIndexPage({ users, roles, availableRoles, permissio
         );
     };
 
-    const handleDeleteInvitation = (invitationId: number) => {
-        setDeletingInvitationId(invitationId);
+    const handleDeleteInvitation = (invitation: InvitationRow) => {
+        setInvitationToDelete(invitation);
+    };
 
-        router.delete(`/autenticacion-usuarios/invitaciones/${invitationId}`, {
+    const confirmDeleteInvitation = () => {
+        if (!invitationToDelete) {
+            return;
+        }
+
+        setIsDeletingInvitation(true);
+
+        router.delete(`/autenticacion-usuarios/invitaciones/${invitationToDelete.id}`, {
             preserveScroll: true,
             preserveState: true,
-            onFinish: () => setDeletingInvitationId(null),
+            onFinish: () => {
+                setIsDeletingInvitation(false);
+                setInvitationToDelete(null);
+            },
+        });
+    };
+
+    const handleDeleteUser = (user: UserRow) => {
+        setUserToDelete(user);
+    };
+
+    const confirmDeleteUser = () => {
+        if (!userToDelete) {
+            return;
+        }
+
+        setIsDeletingUser(true);
+
+        router.delete(`/autenticacion-usuarios/${userToDelete.id}`, {
+            preserveScroll: true,
+            preserveState: true,
+            onFinish: () => {
+                setIsDeletingUser(false);
+                setUserToDelete(null);
+            },
         });
     };
 
@@ -368,13 +324,13 @@ export default function UsersIndexPage({ users, roles, availableRoles, permissio
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Autenticación y Usuarios" />
+            <Head title="Accesos y Permisos" />
 
             <div className={UI_PRESETS.pageContent}>
                 <div>
-                    <h1 className="text-2xl font-bold">Autenticación y Usuarios</h1>
+                    <h1 className="text-2xl font-bold">Accesos y Permisos</h1>
                     <p className="text-sm text-muted-foreground">
-                        Gestiona los roles de acceso: admin, tutor y becario.
+                        Gestiona usuarios internos, invitaciones y permisos del staff.
                     </p>
                 </div>
 
@@ -388,16 +344,17 @@ export default function UsersIndexPage({ users, roles, availableRoles, permissio
                             {activeTab === 'users-roles' && (
                                 <div className="space-y-4">
                                     <SectionIntro
-                                        title="Usuarios y roles"
-                                        description="Administra los roles de acceso de cada usuario del sistema."
+                                        title="Staff"
+                                        description="Administra el acceso y los roles del personal interno."
                                     />
                                     <div className={UI_PRESETS.tableContainer}>
                                         <table className="w-full table-fixed text-sm">
                                         <colgroup>
-                                            <col className="w-1/4" />
-                                            <col className="w-1/4" />
-                                            <col className="w-1/4" />
-                                            <col className="w-1/4" />
+                                            <col className="w-[22%]" />
+                                            <col className="w-[24%]" />
+                                            <col className="w-[18%]" />
+                                            <col className="w-[24%]" />
+                                            <col className="w-[12%]" />
                                         </colgroup>
                                         <thead className={UI_PRESETS.tableHead}>
                                             <tr>
@@ -405,12 +362,15 @@ export default function UsersIndexPage({ users, roles, availableRoles, permissio
                                                 <th className="px-4 py-3 text-center font-semibold">Email</th>
                                                 <th className="px-4 py-3 text-center font-semibold">Rol actual</th>
                                                 <th className="px-4 py-3 text-center font-semibold">Cambiar rol</th>
+                                                <th className="px-4 py-3 text-center font-semibold">Acciones</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             {users.length > 0 ? (
                                                 paginatedUsers.map((user, index) => {
                                                     const RoleIcon = roleBadgeIconByRole[user.role ?? ''] ?? ShieldCheck;
+                                                    const isSelfUser = page.props.auth.user?.id === user.id;
+                                                    const canDeleteUser = user.role !== 'admin' && !isSelfUser;
 
                                                     return (
                                                     <tr key={user.id} className={`h-20 border-t align-middle ${stripedRowClass(index)}`}>
@@ -465,12 +425,30 @@ export default function UsersIndexPage({ users, roles, availableRoles, permissio
                                                                 ) : null}
                                                             </div>
                                                         </td>
+                                                        <td className="px-4 py-3 text-center align-middle">
+                                                            <button
+                                                                type="button"
+                                                                className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md border border-red-300/50 text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-red-500/40 dark:text-red-300 dark:hover:bg-red-950/30"
+                                                                onClick={() => handleDeleteUser(user)}
+                                                                disabled={!canDeleteUser}
+                                                                title={
+                                                                    user.role === 'admin'
+                                                                        ? 'No se puede eliminar un usuario admin'
+                                                                        : isSelfUser
+                                                                            ? 'No puedes eliminar tu propio usuario'
+                                                                            : 'Eliminar usuario'
+                                                                }
+                                                                aria-label="Eliminar usuario"
+                                                            >
+                                                                <Trash2 className="size-4" />
+                                                            </button>
+                                                        </td>
                                                     </tr>
                                                     );
                                                 })
                                             ) : (
                                                 <tr>
-                                                    <td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">
+                                                    <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
                                                         No hay usuarios disponibles.
                                                     </td>
                                                 </tr>
@@ -485,7 +463,7 @@ export default function UsersIndexPage({ users, roles, availableRoles, permissio
                                 <div className="space-y-4">
                                     <SectionIntro
                                         title="Invitaciones"
-                                        description="Invita nuevos usuarios por correo electrónico con un rol inicial."
+                                        description="Invita por correo a nuevos miembros del equipo con su rol inicial."
                                     />
 
                                     <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_220px_auto]">
@@ -611,8 +589,8 @@ export default function UsersIndexPage({ users, roles, availableRoles, permissio
                                                                         <button
                                                                             type="button"
                                                                             className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md border border-red-300/50 text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-red-500/40 dark:text-red-300 dark:hover:bg-red-950/30"
-                                                                        onClick={() => handleDeleteInvitation(invitation.id)}
-                                                                        disabled={deletingInvitationId === invitation.id || !canCancel}
+                                                                        onClick={() => handleDeleteInvitation(invitation)}
+                                                                        disabled={!canCancel}
                                                                         title={canCancel ? 'Cancelar invitación' : 'Solo se pueden cancelar invitaciones pendientes'}
                                                                         aria-label="Cancelar invitación"
                                                                     >
@@ -638,7 +616,7 @@ export default function UsersIndexPage({ users, roles, availableRoles, permissio
                                 <div className="space-y-4">
                                     <SectionIntro
                                         title="Permisos"
-                                        description="Define los permisos por rol para cada módulo y funcionalidad."
+                                        description="Define los permisos del staff por rol y por funcionalidad."
                                     />
                                     <div className={UI_PRESETS.tableContainer}>
                                         <div className="space-y-4 px-4 py-4">
@@ -722,7 +700,7 @@ export default function UsersIndexPage({ users, roles, availableRoles, permissio
                                 <div className="space-y-4">
                                     <SectionIntro
                                         title="Seguridad"
-                                        description="Configura políticas de seguridad, acceso y protección de cuentas."
+                                        description="Configura políticas de seguridad y acceso para cuentas de staff."
                                     />
                                     <div className={UI_PRESETS.tableContainer}>
                                         <div className="px-4 py-8 text-sm text-muted-foreground">
@@ -834,6 +812,26 @@ export default function UsersIndexPage({ users, roles, availableRoles, permissio
                     ) : null}
                 </div>
             </div>
+            <ConfirmDeleteDialog
+                open={userToDelete !== null}
+                title="Confirmar eliminación"
+                description="Esta acción eliminará el usuario seleccionado."
+                entityLabel="Usuario"
+                entityName={userToDelete?.name}
+                isLoading={isDeletingUser}
+                onCancel={() => setUserToDelete(null)}
+                onConfirm={confirmDeleteUser}
+            />
+            <ConfirmDeleteDialog
+                open={invitationToDelete !== null}
+                title="Confirmar cancelación"
+                description="Esta acción cancelará la invitación seleccionada."
+                entityLabel="Invitación"
+                entityName={invitationToDelete?.email}
+                isLoading={isDeletingInvitation}
+                onCancel={() => setInvitationToDelete(null)}
+                onConfirm={confirmDeleteInvitation}
+            />
         </AppLayout>
     );
 }

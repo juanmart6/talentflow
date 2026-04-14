@@ -4,6 +4,7 @@ export type User = {
     email: string;
     role?: string | null;
     roles?: string[];
+    can_manage_users?: boolean;
     avatar?: string;
     email_verified_at: string | null;
     two_factor_enabled?: boolean;
