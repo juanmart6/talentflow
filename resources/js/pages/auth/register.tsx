@@ -8,7 +8,11 @@ import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import AuthLayout from '@/layouts/auth-layout';
 import { login } from '@/routes';
-import { store } from '@/routes/register';
+
+const registerAction = () => ({
+    action: '/register',
+    method: 'post' as const,
+});
 
 export default function Register() {
     return (
@@ -18,7 +22,7 @@ export default function Register() {
         >
             <Head title="Registro" />
             <Form
-                {...store.form()}
+                {...registerAction()}
                 resetOnSuccess={['password', 'password_confirmation']}
                 disableWhileProcessing
                 onSuccess={() => toast.success('Usuario creado correctamente.')}
