@@ -3,27 +3,21 @@
 use App\Models\User;
 use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Route;
 
-test('sends verification notification', function () {
-    Notification::fake();
-
-    $user = User::factory()->unverified()->create();
-
-    $this->actingAs($user)
-        ->post(route('verification.send'))
-        ->assertRedirect(route('home'));
-
-    Notification::assertSentTo($user, VerifyEmail::class);
+test('verification notification route is disabled', function () {
+    expect(Route::has('verification.send'))->toBeFalse();
 });
 
-test('does not send verification notification if email is verified', function () {
+test('changing profile email does not send verification notification', function () {
     Notification::fake();
 
     $user = User::factory()->create();
 
-    $this->actingAs($user)
-        ->post(route('verification.send'))
-        ->assertRedirect(route('dashboard', absolute: false));
+    $this->actingAs($user)->patch(route('profile.update'), [
+        'name' => 'User Updated',
+        'email' => 'updated@example.com',
+    ])->assertRedirect(route('profile.edit'));
 
-    Notification::assertNothingSent();
+    Notification::assertNotSentTo($user, VerifyEmail::class);
 });
