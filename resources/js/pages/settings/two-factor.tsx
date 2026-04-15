@@ -1,5 +1,5 @@
-import { Form, Head } from '@inertiajs/react';
-import { ShieldBan, ShieldCheck } from 'lucide-react';
+import { Form, Head, Link } from '@inertiajs/react';
+import { ArrowLeft, ShieldBan, ShieldCheck } from 'lucide-react';
 import { useState } from 'react';
 import { SectionIntro } from '@/components/form-ui';
 import TwoFactorRecoveryCodes from '@/components/two-factor-recovery-codes';
@@ -10,6 +10,7 @@ import { useTwoFactorAuth } from '@/hooks/use-two-factor-auth';
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
 import { UI_PRESETS } from '@/lib/ui-presets';
+import { edit as editProfile } from '@/routes/profile';
 import { disable, enable, show } from '@/routes/two-factor';
 import type { BreadcrumbItem } from '@/types';
 
@@ -48,10 +49,23 @@ export default function TwoFactor({
             <h1 className="sr-only">Configuración de autenticación 2FA</h1>
 
             <SettingsLayout>
-                <SectionIntro
-                    title="Autenticación de dos factores"
-                    description="Añade una capa extra de seguridad en cada inicio de sesión."
-                />
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <SectionIntro
+                        title="Autenticación de dos factores"
+                        description="Añade una capa extra de seguridad en cada inicio de sesión."
+                    />
+
+                    <Button
+                        variant="outline"
+                        className="cursor-pointer"
+                        asChild
+                    >
+                        <Link href={editProfile()}>
+                            <ArrowLeft className="size-4" />
+                            Volver
+                        </Link>
+                    </Button>
+                </div>
 
                 {twoFactorEnabled ? (
                     <section className={UI_PRESETS.sectionCard}>
@@ -60,7 +74,12 @@ export default function TwoFactor({
                                 <Badge variant="default">Habilitado</Badge>
                                 <Form {...disable.form()}>
                                     {({ processing }) => (
-                                        <Button variant="destructive" type="submit" className="cursor-pointer" disabled={processing}>
+                                        <Button
+                                            variant="destructive"
+                                            type="submit"
+                                            className="cursor-pointer"
+                                            disabled={processing}
+                                        >
                                             <ShieldBan className="size-4" />
                                             Desactivar 2FA
                                         </Button>
@@ -69,7 +88,8 @@ export default function TwoFactor({
                             </div>
 
                             <p className="text-sm text-muted-foreground">
-                                En cada inicio de sesión se solicitará un código temporal generado por tu app TOTP.
+                                En cada inicio de sesión se solicitará un código
+                                temporal generado por tu app TOTP.
                             </p>
 
                             <TwoFactorRecoveryCodes
@@ -86,17 +106,26 @@ export default function TwoFactor({
                                 <Badge variant="destructive">Desactivado</Badge>
 
                                 {hasSetupData ? (
-                                    <Button className="cursor-pointer" onClick={() => setShowSetupModal(true)}>
+                                    <Button
+                                        className="cursor-pointer"
+                                        onClick={() => setShowSetupModal(true)}
+                                    >
                                         <ShieldCheck className="size-4" />
                                         Continuar configuración
                                     </Button>
                                 ) : (
                                     <Form
                                         {...enable.form()}
-                                        onSuccess={() => setShowSetupModal(true)}
+                                        onSuccess={() =>
+                                            setShowSetupModal(true)
+                                        }
                                     >
                                         {({ processing }) => (
-                                            <Button type="submit" className="cursor-pointer" disabled={processing}>
+                                            <Button
+                                                type="submit"
+                                                className="cursor-pointer"
+                                                disabled={processing}
+                                            >
                                                 <ShieldCheck className="size-4" />
                                                 Activar 2FA
                                             </Button>
@@ -106,7 +135,8 @@ export default function TwoFactor({
                             </div>
 
                             <p className="text-sm text-muted-foreground">
-                                Al activarla, se pedirá un código de verificación en cada acceso a la plataforma.
+                                Al activarla, se pedirá un código de
+                                verificación en cada acceso a la plataforma.
                             </p>
                         </div>
                     </section>

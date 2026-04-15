@@ -54,12 +54,14 @@ function TwoFactorSetupStep({
     manualSetupKey,
     buttonText,
     onNextStep,
+    onReturn,
     errors,
 }: {
     qrCodeSvg: string | null;
     manualSetupKey: string | null;
     buttonText: string;
     onNextStep: () => void;
+    onReturn: () => void;
     errors: string[];
 }) {
     const { resolvedAppearance } = useAppearance();
@@ -95,8 +97,21 @@ function TwoFactorSetupStep({
                         </div>
                     </div>
 
-                    <div className="flex w-full space-x-5">
-                        <Button className="w-full" onClick={onNextStep}>
+                    <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            className="w-full sm:flex-1"
+                            onClick={onReturn}
+                        >
+                            Volver
+                        </Button>
+
+                        <Button
+                            type="button"
+                            className="w-full sm:flex-1"
+                            onClick={onNextStep}
+                        >
                             {buttonText}
                         </Button>
                     </div>
@@ -141,9 +156,11 @@ function TwoFactorSetupStep({
 function TwoFactorVerificationStep({
     onClose,
     onBack,
+    onReturn,
 }: {
     onClose: () => void;
     onBack: () => void;
+    onReturn: () => void;
 }) {
     const [code, setCode] = useState<string>('');
     const pinInputContainerRef = useRef<HTMLDivElement>(null);
@@ -201,24 +218,33 @@ function TwoFactorVerificationStep({
                             />
                         </div>
 
-                        <div className="flex w-full space-x-5">
+                        <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center">
                             <Button
                                 type="button"
                                 variant="outline"
-                                className="flex-1"
+                                className="w-full sm:flex-1"
+                                onClick={onReturn}
+                                disabled={processing}
+                            >
+                                Volver
+                            </Button>
+                            <Button
+                                type="button"
+                                variant="secondary"
+                                className="w-full sm:flex-1"
                                 onClick={onBack}
                                 disabled={processing}
                             >
-                                Back
+                                Atrás
                             </Button>
                             <Button
                                 type="submit"
-                                className="flex-1"
+                                className="w-full sm:flex-1"
                                 disabled={
                                     processing || code.length < OTP_MAX_LENGTH
                                 }
                             >
-                                Confirm
+                                Confirmar
                             </Button>
                         </div>
                     </div>
@@ -328,8 +354,9 @@ export default function TwoFactorSetupModal({
                 <div className="flex flex-col items-center space-y-5">
                     {showVerificationStep ? (
                         <TwoFactorVerificationStep
-                            onClose={onClose}
+                            onClose={handleClose}
                             onBack={() => setShowVerificationStep(false)}
+                            onReturn={handleClose}
                         />
                     ) : (
                         <TwoFactorSetupStep
@@ -337,6 +364,7 @@ export default function TwoFactorSetupModal({
                             manualSetupKey={manualSetupKey}
                             buttonText={modalConfig.buttonText}
                             onNextStep={handleModalNextStep}
+                            onReturn={handleClose}
                             errors={errors}
                         />
                     )}

@@ -61,9 +61,11 @@ export default function Password() {
                 >
                     {({ errors, processing, recentlySuccessful }) => (
                         <>
-                            <div className="grid gap-4 md:grid-cols-3">
+                            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] lg:items-end">
                                 <div className="grid gap-2">
-                                    <Label htmlFor="current_password">Contraseña actual</Label>
+                                    <Label htmlFor="current_password">
+                                        Contraseña actual
+                                    </Label>
                                     <Input
                                         id="current_password"
                                         ref={currentPasswordInput}
@@ -73,11 +75,15 @@ export default function Password() {
                                         autoComplete="current-password"
                                         placeholder="Contraseña actual"
                                     />
-                                    <InputError message={errors.current_password} />
+                                    <InputError
+                                        message={errors.current_password}
+                                    />
                                 </div>
 
                                 <div className="grid gap-2">
-                                    <Label htmlFor="password">Nueva contraseña</Label>
+                                    <Label htmlFor="password">
+                                        Nueva contraseña
+                                    </Label>
                                     <Input
                                         id="password"
                                         ref={passwordInput}
@@ -91,7 +97,9 @@ export default function Password() {
                                 </div>
 
                                 <div className="grid gap-2">
-                                    <Label htmlFor="password_confirmation">Confirmar contraseña</Label>
+                                    <Label htmlFor="password_confirmation">
+                                        Confirmar contraseña
+                                    </Label>
                                     <Input
                                         id="password_confirmation"
                                         name="password_confirmation"
@@ -100,29 +108,35 @@ export default function Password() {
                                         autoComplete="new-password"
                                         placeholder="Confirmar contraseña"
                                     />
-                                    <InputError message={errors.password_confirmation} />
+                                    <InputError
+                                        message={errors.password_confirmation}
+                                    />
                                 </div>
-                            </div>
 
-                            <div className="flex items-center justify-end gap-3">
-                                <Button
-                                    disabled={processing}
-                                    className="cursor-pointer"
-                                    data-test="update-password-button"
-                                >
-                                    <Save className="size-4" />
-                                    Guardar contraseña
-                                </Button>
+                                <div className="flex items-center justify-end gap-3 lg:self-end">
+                                    <Button
+                                        disabled={processing}
+                                        size="icon"
+                                        className="cursor-pointer"
+                                        data-test="update-password-button"
+                                        aria-label="Guardar contraseña"
+                                        title="Guardar contraseña"
+                                    >
+                                        <Save className="size-4" />
+                                    </Button>
 
-                                <Transition
-                                    show={recentlySuccessful}
-                                    enter="transition ease-in-out"
-                                    enterFrom="opacity-0"
-                                    leave="transition ease-in-out"
-                                    leaveTo="opacity-0"
-                                >
-                                    <p className="text-sm text-neutral-600">Guardada</p>
-                                </Transition>
+                                    <Transition
+                                        show={recentlySuccessful}
+                                        enter="transition ease-in-out"
+                                        enterFrom="opacity-0"
+                                        leave="transition ease-in-out"
+                                        leaveTo="opacity-0"
+                                    >
+                                        <p className="text-sm text-neutral-600">
+                                            Guardada
+                                        </p>
+                                    </Transition>
+                                </div>
                             </div>
                         </>
                     )}

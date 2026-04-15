@@ -73,9 +73,10 @@ export default function Profile({
                 preserveScroll: true,
                 forceFormData: true,
                 onError: (errors) => {
-                    const message = typeof errors.avatar === 'string'
-                        ? errors.avatar
-                        : 'No se pudo actualizar la foto de perfil.';
+                    const message =
+                        typeof errors.avatar === 'string'
+                            ? errors.avatar
+                            : 'No se pudo actualizar la foto de perfil.';
                     setAvatarError(message);
                     toast.error(message);
                 },
@@ -127,15 +128,21 @@ export default function Profile({
 
                 <section className={UI_PRESETS.sectionCard}>
                     <div>
-                        <h3 className="text-base font-semibold">Foto de perfil</h3>
+                        <h3 className="text-lg font-bold tracking-tight">
+                            Foto de perfil
+                        </h3>
                         <p className="text-sm text-muted-foreground">
-                            Esta imagen se mostrará en sidebar, becarios y accesos.
+                            Esta imagen se mostrará en sidebar, becarios y
+                            accesos.
                         </p>
                     </div>
 
                     <div className="mt-4 flex flex-col gap-4 md:flex-row md:items-center">
                         <Avatar className="h-20 w-20 overflow-hidden rounded-full ring-2 ring-slate-200 dark:ring-slate-700">
-                            <AvatarImage src={auth.user.avatar ?? undefined} alt={auth.user.name} />
+                            <AvatarImage
+                                src={auth.user.avatar ?? undefined}
+                                alt={auth.user.name}
+                            />
                             <AvatarFallback className="rounded-full bg-neutral-200 text-sm font-semibold text-black dark:bg-neutral-700 dark:text-white">
                                 {getInitials(auth.user.name)}
                             </AvatarFallback>
@@ -155,8 +162,12 @@ export default function Profile({
                                 <Button
                                     type="button"
                                     variant="outline"
-                                    className={UI_PRESETS.iconActionButtonPrimary}
-                                    onClick={() => avatarInputRef.current?.click()}
+                                    className={
+                                        UI_PRESETS.iconActionButtonPrimary
+                                    }
+                                    onClick={() =>
+                                        avatarInputRef.current?.click()
+                                    }
                                 >
                                     <Camera className="size-4" />
                                     Seleccionar imagen
@@ -186,20 +197,31 @@ export default function Profile({
                                     variant="secondary"
                                     className="cursor-pointer"
                                     onClick={handleAvatarDelete}
-                                    disabled={isAvatarRemoving || !auth.user.avatar}
+                                    disabled={
+                                        isAvatarRemoving || !auth.user.avatar
+                                    }
                                 >
                                     <Trash2 className="size-4" />
-                                    {isAvatarRemoving ? 'Eliminando...' : 'Quitar foto'}
+                                    {isAvatarRemoving
+                                        ? 'Eliminando...'
+                                        : 'Quitar foto'}
                                 </Button>
                             </div>
 
                             {avatarFile ? (
-                                <p className="text-sm text-muted-foreground">Imagen seleccionada: {avatarFile.name}</p>
+                                <p className="text-sm text-muted-foreground">
+                                    Imagen seleccionada: {avatarFile.name}
+                                </p>
                             ) : (
-                                <p className="text-sm text-muted-foreground">Formatos: PNG, JPG o WEBP (max. 2 MB).</p>
+                                <p className="text-sm text-muted-foreground">
+                                    Formatos: PNG, JPG o WEBP (max. 2 MB).
+                                </p>
                             )}
 
-                            <InputError className="mt-1" message={avatarError ?? undefined} />
+                            <InputError
+                                className="mt-1"
+                                message={avatarError ?? undefined}
+                            />
                         </div>
                     </div>
                 </section>
@@ -218,7 +240,7 @@ export default function Profile({
                                 description="Mantener estos datos actualizados mejora la consistencia del sistema."
                             />
 
-                            <div className="grid gap-4 md:grid-cols-2">
+                            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] lg:items-end">
                                 <div className="grid gap-2">
                                     <Label htmlFor="name">Nombre</Label>
                                     <Input
@@ -230,11 +252,16 @@ export default function Profile({
                                         autoComplete="name"
                                         placeholder="Nombre completo"
                                     />
-                                    <InputError className="mt-1" message={errors.name} />
+                                    <InputError
+                                        className="mt-1"
+                                        message={errors.name}
+                                    />
                                 </div>
 
                                 <div className="grid gap-2">
-                                    <Label htmlFor="email">Correo electrónico</Label>
+                                    <Label htmlFor="email">
+                                        Correo electrónico
+                                    </Label>
                                     <Input
                                         id="email"
                                         type="email"
@@ -245,42 +272,50 @@ export default function Profile({
                                         autoComplete="username"
                                         placeholder="Correo electrónico"
                                     />
-                                    <InputError className="mt-1" message={errors.email} />
+                                    <InputError
+                                        className="mt-1"
+                                        message={errors.email}
+                                    />
+                                </div>
+
+                                <div className="flex items-center justify-end gap-3 lg:self-end">
+                                    <Button
+                                        disabled={processing}
+                                        className="cursor-pointer whitespace-nowrap"
+                                        data-test="update-profile-button"
+                                    >
+                                        <Save className="size-4" />
+                                        Guardar cambios
+                                    </Button>
+
+                                    <Transition
+                                        show={recentlySuccessful}
+                                        enter="transition ease-in-out"
+                                        enterFrom="opacity-0"
+                                        leave="transition ease-in-out"
+                                        leaveTo="opacity-0"
+                                    >
+                                        <p className="text-sm text-neutral-600">
+                                            Guardado
+                                        </p>
+                                    </Transition>
                                 </div>
                             </div>
 
-                            {mustVerifyEmail && auth.user.email_verified_at === null ? (
+                            {mustVerifyEmail &&
+                            auth.user.email_verified_at === null ? (
                                 <p className="text-sm text-muted-foreground">
-                                    La verificación de correo está desactivada en este entorno.
+                                    La verificación de correo está desactivada
+                                    en este entorno.
                                 </p>
                             ) : null}
 
                             {status === 'verification-link-sent' ? (
                                 <div className="text-sm font-medium text-green-600">
-                                    Se ha enviado un nuevo enlace de verificación a tu correo electrónico.
+                                    Se ha enviado un nuevo enlace de
+                                    verificación a tu correo electrónico.
                                 </div>
                             ) : null}
-
-                            <div className="flex items-center justify-end gap-3">
-                                <Button
-                                    disabled={processing}
-                                    className="cursor-pointer"
-                                    data-test="update-profile-button"
-                                >
-                                    <Save className="size-4" />
-                                    Guardar cambios
-                                </Button>
-
-                                <Transition
-                                    show={recentlySuccessful}
-                                    enter="transition ease-in-out"
-                                    enterFrom="opacity-0"
-                                    leave="transition ease-in-out"
-                                    leaveTo="opacity-0"
-                                >
-                                    <p className="text-sm text-neutral-600">Guardado</p>
-                                </Transition>
-                            </div>
                         </>
                     )}
                 </Form>

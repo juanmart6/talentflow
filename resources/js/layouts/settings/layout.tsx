@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button';
 import { useCurrentUrl } from '@/hooks/use-current-url';
 import { UI_PRESETS } from '@/lib/ui-presets';
 import { cn, toUrl } from '@/lib/utils';
-import { edit as editAppearance } from '@/routes/appearance';
 import { edit } from '@/routes/profile';
 import { show } from '@/routes/two-factor';
 import { edit as editPassword } from '@/routes/user-password';
@@ -25,11 +24,6 @@ const settingsTabs: NavItem[] = [
     {
         title: 'Autenticación 2FA',
         href: show(),
-        icon: null,
-    },
-    {
-        title: 'Apariencia',
-        href: editAppearance(),
         icon: null,
     },
 ];
