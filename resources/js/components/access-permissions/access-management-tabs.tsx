@@ -1,15 +1,15 @@
-import { KeyRound, ShieldCheck, UserCog, UserPlus } from 'lucide-react';
+import { ShieldCheck, UserCog, UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { UI_PRESETS } from '@/lib/ui-presets';
 
-export type UserManagementTab = 'users-roles' | 'invitaciones' | 'permisos' | 'seguridad';
+export type AccessManagementTab = 'users-roles' | 'invitaciones' | 'permisos';
 
-type UserManagementTabsProps = {
-    activeTab: UserManagementTab;
-    onTabChange: (tab: UserManagementTab) => void;
+type AccessManagementTabsProps = {
+    activeTab: AccessManagementTab;
+    onTabChange: (tab: AccessManagementTab) => void;
 };
 
-export default function UserManagementTabs({ activeTab, onTabChange }: UserManagementTabsProps) {
+export default function AccessManagementTabs({ activeTab, onTabChange }: AccessManagementTabsProps) {
     return (
         <div className="flex flex-wrap items-end gap-1.5">
             <Button
@@ -43,17 +43,6 @@ export default function UserManagementTabs({ activeTab, onTabChange }: UserManag
             >
                 <ShieldCheck className="mr-1.5 size-4 shrink-0" />
                 Permisos
-            </Button>
-
-            <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className={`cursor-pointer ${UI_PRESETS.tabBase} ${activeTab === 'seguridad' ? UI_PRESETS.tabActive : UI_PRESETS.tabInactive}`}
-                onClick={() => onTabChange('seguridad')}
-            >
-                <KeyRound className="mr-1.5 size-4 shrink-0" />
-                Seguridad
             </Button>
         </div>
     );

@@ -1,5 +1,5 @@
 import { ShieldCheck, UsersRound } from 'lucide-react';
-import type { InvitationRow, InvitationStatus } from '@/types/domains/users';
+import type { InvitationRow, InvitationStatus } from '@/types/domains/access-permissions';
 
 export const roleLabels: Record<string, string> = {
     admin: 'ADMIN',
@@ -32,8 +32,8 @@ export const invitationStatusLabels: Record<InvitationStatus, string> = {
 
 export const permissionModuleLabels: Record<string, string> = {
     'education-centers': 'Centros Educativos',
-    'practice-tasks': 'Pr\u00e1cticas y tareas',
-    users: 'Staff y roles',
+    'practice-tasks': 'Prácticas y tareas',
+    users: 'Accesos y permisos',
 };
 
 export const invitationStatusBadgeClasses: Record<InvitationStatus, string> = {

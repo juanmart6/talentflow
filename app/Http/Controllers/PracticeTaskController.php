@@ -25,7 +25,7 @@ class PracticeTaskController extends Controller
 {
     public function index(): Response
     {
-        return Inertia::render('practice-tasks', [
+        return Inertia::render('practice-tasks/index', [
             'viewMode' => 'tutor',
             'interns' => $this->internOptions(),
             'trainingPrograms' => $this->trainingProgramOptions(),

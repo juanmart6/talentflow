@@ -1,8 +1,9 @@
 import { Head } from '@inertiajs/react';
 import AppearanceTabs from '@/components/appearance-tabs';
-import Heading from '@/components/heading';
+import { SectionIntro } from '@/components/form-ui';
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
+import { UI_PRESETS } from '@/lib/ui-presets';
 import { edit as editAppearance } from '@/routes/appearance';
 import type { BreadcrumbItem } from '@/types';
 
@@ -21,14 +22,14 @@ export default function Appearance() {
             <h1 className="sr-only">Configuración de apariencia</h1>
 
             <SettingsLayout>
-                <div className="space-y-6">
-                    <Heading
-                        variant="small"
-                        title="Configuración de apariencia"
-                        description="Actualiza la configuración de apariencia de tu cuenta"
-                    />
+                <SectionIntro
+                    title="Apariencia"
+                    description="Elige el modo visual que mejor encaje con tu forma de trabajo."
+                />
+
+                <section className={UI_PRESETS.sectionCard}>
                     <AppearanceTabs />
-                </div>
+                </section>
             </SettingsLayout>
         </AppLayout>
     );

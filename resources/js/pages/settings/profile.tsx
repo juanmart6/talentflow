@@ -1,20 +1,27 @@
-﻿import { Transition } from '@headlessui/react';
-import { Form, Head, usePage } from '@inertiajs/react';
+import { Transition } from '@headlessui/react';
+import { Form, Head, router, usePage } from '@inertiajs/react';
+import { Camera, Save, Trash2, Upload } from 'lucide-react';
+import type { ChangeEvent } from 'react';
+import { useRef, useState } from 'react';
+import { toast } from 'sonner';
 import ProfileController from '@/actions/App/Http/Controllers/Settings/ProfileController';
 import DeleteUser from '@/components/delete-user';
-import Heading from '@/components/heading';
+import { SectionIntro } from '@/components/form-ui';
 import InputError from '@/components/input-error';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useInitials } from '@/hooks/use-initials';
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
+import { UI_PRESETS } from '@/lib/ui-presets';
 import { edit } from '@/routes/profile';
 import type { BreadcrumbItem } from '@/types';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
-        title: 'Configuracion del perfil',
+        title: 'Configuración del perfil',
         href: edit(),
     },
 ];
@@ -26,106 +33,257 @@ export default function Profile({
     mustVerifyEmail: boolean;
     status?: string;
 }) {
-    const { auth } = usePage().props;
+    const { auth } = usePage<{
+        auth: {
+            user: {
+                name: string;
+                email: string;
+                avatar?: string | null;
+                email_verified_at: string | null;
+            };
+        };
+    }>().props;
+
+    const getInitials = useInitials();
+    const avatarInputRef = useRef<HTMLInputElement | null>(null);
+    const [avatarFile, setAvatarFile] = useState<File | null>(null);
+    const [isAvatarUploading, setIsAvatarUploading] = useState(false);
+    const [isAvatarRemoving, setIsAvatarRemoving] = useState(false);
+    const [avatarError, setAvatarError] = useState<string | null>(null);
+
+    const handleAvatarFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0] ?? null;
+        setAvatarFile(file);
+        setAvatarError(null);
+    };
+
+    const handleAvatarUpload = () => {
+        if (!avatarFile) {
+            setAvatarError('Selecciona una imagen antes de subirla.');
+            return;
+        }
+
+        setIsAvatarUploading(true);
+        setAvatarError(null);
+
+        router.post(
+            '/settings/profile/avatar',
+            { avatar: avatarFile },
+            {
+                preserveScroll: true,
+                forceFormData: true,
+                onError: (errors) => {
+                    const message = typeof errors.avatar === 'string'
+                        ? errors.avatar
+                        : 'No se pudo actualizar la foto de perfil.';
+                    setAvatarError(message);
+                    toast.error(message);
+                },
+                onSuccess: () => {
+                    setAvatarFile(null);
+                    if (avatarInputRef.current) {
+                        avatarInputRef.current.value = '';
+                    }
+                    toast.success('Foto de perfil actualizada correctamente.');
+                },
+                onFinish: () => setIsAvatarUploading(false),
+            },
+        );
+    };
+
+    const handleAvatarDelete = () => {
+        setIsAvatarRemoving(true);
+        setAvatarError(null);
+
+        router.delete('/settings/profile/avatar', {
+            preserveScroll: true,
+            onSuccess: () => {
+                toast.success('Foto de perfil eliminada correctamente.');
+            },
+            onError: () => {
+                toast.error('No se pudo eliminar la foto de perfil.');
+            },
+            onFinish: () => {
+                setAvatarFile(null);
+                if (avatarInputRef.current) {
+                    avatarInputRef.current.value = '';
+                }
+                setIsAvatarRemoving(false);
+            },
+        });
+    };
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Informacion del perfil" />
+            <Head title="Información del perfil" />
 
-            <h1 className="sr-only">Informacion del perfil</h1>
+            <h1 className="sr-only">Información del perfil</h1>
 
             <SettingsLayout>
-                <div className="space-y-6">
-                    <Heading
-                        variant="small"
-                        title="Informacion del perfil"
-                        description="Actualiza tu nombre y direccion de correo electronico"
-                    />
+                <SectionIntro
+                    title="Información del perfil"
+                    description="Ajusta tu foto, nombre y correo manteniendo la misma estructura visual del resto de módulos."
+                />
 
-                    <Form
-                        {...ProfileController.update.form()}
-                        options={{
-                            preserveScroll: true,
-                        }}
-                        className="space-y-6"
-                    >
-                        {({ processing, recentlySuccessful, errors }) => (
-                            <>
+                <section className={UI_PRESETS.sectionCard}>
+                    <div>
+                        <h3 className="text-base font-semibold">Foto de perfil</h3>
+                        <p className="text-sm text-muted-foreground">
+                            Esta imagen se mostrará en sidebar, becarios y accesos.
+                        </p>
+                    </div>
+
+                    <div className="mt-4 flex flex-col gap-4 md:flex-row md:items-center">
+                        <Avatar className="h-20 w-20 overflow-hidden rounded-full ring-2 ring-slate-200 dark:ring-slate-700">
+                            <AvatarImage src={auth.user.avatar ?? undefined} alt={auth.user.name} />
+                            <AvatarFallback className="rounded-full bg-neutral-200 text-sm font-semibold text-black dark:bg-neutral-700 dark:text-white">
+                                {getInitials(auth.user.name)}
+                            </AvatarFallback>
+                        </Avatar>
+
+                        <div className="flex-1 space-y-3">
+                            <input
+                                ref={avatarInputRef}
+                                id="avatar"
+                                type="file"
+                                accept="image/png,image/jpeg,image/webp"
+                                className="hidden"
+                                onChange={handleAvatarFileChange}
+                            />
+
+                            <div className="flex flex-wrap items-center gap-2">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    className={UI_PRESETS.iconActionButtonPrimary}
+                                    onClick={() => avatarInputRef.current?.click()}
+                                >
+                                    <Camera className="size-4" />
+                                    Seleccionar imagen
+                                </Button>
+
+                                <Button
+                                    type="button"
+                                    className="cursor-pointer"
+                                    onClick={handleAvatarUpload}
+                                    disabled={isAvatarUploading || !avatarFile}
+                                >
+                                    {isAvatarUploading ? (
+                                        <>
+                                            <Upload className="size-4 animate-pulse" />
+                                            Subiendo...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Save className="size-4" />
+                                            Guardar foto
+                                        </>
+                                    )}
+                                </Button>
+
+                                <Button
+                                    type="button"
+                                    variant="secondary"
+                                    className="cursor-pointer"
+                                    onClick={handleAvatarDelete}
+                                    disabled={isAvatarRemoving || !auth.user.avatar}
+                                >
+                                    <Trash2 className="size-4" />
+                                    {isAvatarRemoving ? 'Eliminando...' : 'Quitar foto'}
+                                </Button>
+                            </div>
+
+                            {avatarFile ? (
+                                <p className="text-sm text-muted-foreground">Imagen seleccionada: {avatarFile.name}</p>
+                            ) : (
+                                <p className="text-sm text-muted-foreground">Formatos: PNG, JPG o WEBP (max. 2 MB).</p>
+                            )}
+
+                            <InputError className="mt-1" message={avatarError ?? undefined} />
+                        </div>
+                    </div>
+                </section>
+
+                <Form
+                    {...ProfileController.update.form()}
+                    options={{
+                        preserveScroll: true,
+                    }}
+                    className={`${UI_PRESETS.sectionCard} space-y-5`}
+                >
+                    {({ processing, recentlySuccessful, errors }) => (
+                        <>
+                            <SectionIntro
+                                title="Datos de acceso"
+                                description="Mantener estos datos actualizados mejora la consistencia del sistema."
+                            />
+
+                            <div className="grid gap-4 md:grid-cols-2">
                                 <div className="grid gap-2">
                                     <Label htmlFor="name">Nombre</Label>
-
                                     <Input
                                         id="name"
-                                        className="mt-1 block w-full"
+                                        className={UI_PRESETS.simpleSearchInput}
                                         defaultValue={auth.user.name}
                                         name="name"
                                         required
                                         autoComplete="name"
                                         placeholder="Nombre completo"
                                     />
-
-                                    <InputError
-                                        className="mt-2"
-                                        message={errors.name}
-                                    />
+                                    <InputError className="mt-1" message={errors.name} />
                                 </div>
 
                                 <div className="grid gap-2">
-                                    <Label htmlFor="email">Correo electronico</Label>
-
+                                    <Label htmlFor="email">Correo electrónico</Label>
                                     <Input
                                         id="email"
                                         type="email"
-                                        className="mt-1 block w-full"
+                                        className={UI_PRESETS.simpleSearchInput}
                                         defaultValue={auth.user.email}
                                         name="email"
                                         required
                                         autoComplete="username"
-                                        placeholder="Correo electronico"
+                                        placeholder="Correo electrónico"
                                     />
-
-                                    <InputError
-                                        className="mt-2"
-                                        message={errors.email}
-                                    />
+                                    <InputError className="mt-1" message={errors.email} />
                                 </div>
+                            </div>
 
-                                {mustVerifyEmail && auth.user.email_verified_at === null ? (
-                                    <p className="-mt-4 text-sm text-muted-foreground">
-                                        La verificacion de correo esta desactivada en este entorno.
-                                    </p>
-                                ) : null}
+                            {mustVerifyEmail && auth.user.email_verified_at === null ? (
+                                <p className="text-sm text-muted-foreground">
+                                    La verificación de correo está desactivada en este entorno.
+                                </p>
+                            ) : null}
 
-                                {status === 'verification-link-sent' ? (
-                                    <div className="mt-2 text-sm font-medium text-green-600">
-                                        Se ha enviado un nuevo enlace de verificacion a tu direccion de correo electronico.
-                                    </div>
-                                ) : null}
-
-                                <div className="flex items-center gap-4">
-                                    <Button
-                                        disabled={processing}
-                                        data-test="update-profile-button"
-                                    >
-                                        Guardar
-                                    </Button>
-
-                                    <Transition
-                                        show={recentlySuccessful}
-                                        enter="transition ease-in-out"
-                                        enterFrom="opacity-0"
-                                        leave="transition ease-in-out"
-                                        leaveTo="opacity-0"
-                                    >
-                                        <p className="text-sm text-neutral-600">
-                                            Guardado
-                                        </p>
-                                    </Transition>
+                            {status === 'verification-link-sent' ? (
+                                <div className="text-sm font-medium text-green-600">
+                                    Se ha enviado un nuevo enlace de verificación a tu correo electrónico.
                                 </div>
-                            </>
-                        )}
-                    </Form>
-                </div>
+                            ) : null}
+
+                            <div className="flex items-center justify-end gap-3">
+                                <Button
+                                    disabled={processing}
+                                    className="cursor-pointer"
+                                    data-test="update-profile-button"
+                                >
+                                    <Save className="size-4" />
+                                    Guardar cambios
+                                </Button>
+
+                                <Transition
+                                    show={recentlySuccessful}
+                                    enter="transition ease-in-out"
+                                    enterFrom="opacity-0"
+                                    leave="transition ease-in-out"
+                                    leaveTo="opacity-0"
+                                >
+                                    <p className="text-sm text-neutral-600">Guardado</p>
+                                </Transition>
+                            </div>
+                        </>
+                    )}
+                </Form>
 
                 <DeleteUser />
             </SettingsLayout>

@@ -1,7 +1,8 @@
 import { Form } from '@inertiajs/react';
+import { AlertTriangle } from 'lucide-react';
 import { useRef } from 'react';
 import ProfileController from '@/actions/App/Http/Controllers/Settings/ProfileController';
-import Heading from '@/components/heading';
+import { SectionIntro } from '@/components/form-ui';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import {
@@ -15,42 +16,46 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { UI_PRESETS } from '@/lib/ui-presets';
 
 export default function DeleteUser() {
     const passwordInput = useRef<HTMLInputElement>(null);
 
     return (
-        <div className="space-y-6">
-            <Heading
-                variant="small"
-                title="Eliminar cuenta"
-                description="Elimina tu cuenta y toda la información asociada"
+        <section className={`${UI_PRESETS.sectionCard} space-y-4`}>
+            <SectionIntro
+                title="Desactivar cuenta"
+                description="Bloquea tu acceso a la plataforma. Los datos se conservan para trazabilidad interna."
             />
-            <div className="space-y-4 rounded-lg border border-red-100 bg-red-50 p-4 dark:border-red-200/10 dark:bg-red-700/10">
-                <div className="relative space-y-0.5 text-red-600 dark:text-red-100">
-                    <p className="font-medium">¡Cuidado!</p>
-                    <p className="text-sm">
-                        Por favor, procede con precaución, esto no se puede deshacer.
-                    </p>
+
+            <div className="space-y-4 rounded-lg border border-red-200/80 bg-red-50/80 p-4 dark:border-red-500/30 dark:bg-red-950/20">
+                <div className="flex items-start gap-3">
+                    <div className="mt-0.5 rounded-full bg-red-100 p-1.5 text-red-600 dark:bg-red-900/50 dark:text-red-300">
+                        <AlertTriangle className="size-4" />
+                    </div>
+                    <div className="space-y-1 text-red-700 dark:text-red-100">
+                        <p className="text-sm font-semibold">Acción sensible</p>
+                        <p className="text-sm">No podrás iniciar sesión de nuevo hasta que un administrador reactive tu acceso.</p>
+                    </div>
                 </div>
 
                 <Dialog>
                     <DialogTrigger asChild>
                         <Button
                             variant="destructive"
+                            className="cursor-pointer"
                             data-test="delete-user-button"
                         >
-                            Eliminar cuenta
+                            Desactivar cuenta
                         </Button>
                     </DialogTrigger>
                     <DialogContent>
                         <DialogTitle>
-                            ¿Estás seguro de que deseas eliminar tu cuenta?
+                            ¿Quieres desactivar tu cuenta?
                         </DialogTitle>
                         <DialogDescription>
-                            Una vez que tu cuenta sea eliminada, todos sus recursos
-                            y datos también se eliminarán de forma permanente. Por favor,
-                            ingresa tu contraseña para confirmar que deseas.
+                            Esta acción cerrará tu sesión y bloqueará futuros inicios de sesión.
+                            Introduce tu contraseña para confirmar.
                         </DialogDescription>
 
                         <Form
@@ -65,11 +70,8 @@ export default function DeleteUser() {
                             {({ resetAndClearErrors, processing, errors }) => (
                                 <>
                                     <div className="grid gap-2">
-                                        <Label
-                                            htmlFor="password"
-                                            className="sr-only"
-                                        >
-                                            Password
+                                        <Label htmlFor="password" className="sr-only">
+                                            Contraseña actual
                                         </Label>
 
                                         <Input
@@ -77,8 +79,9 @@ export default function DeleteUser() {
                                             type="password"
                                             name="password"
                                             ref={passwordInput}
-                                            placeholder="Contraseña"
+                                            placeholder="Contraseña actual"
                                             autoComplete="current-password"
+                                            className={UI_PRESETS.simpleSearchInput}
                                         />
 
                                         <InputError message={errors.password} />
@@ -88,9 +91,8 @@ export default function DeleteUser() {
                                         <DialogClose asChild>
                                             <Button
                                                 variant="secondary"
-                                                onClick={() =>
-                                                    resetAndClearErrors()
-                                                }
+                                                className="cursor-pointer"
+                                                onClick={() => resetAndClearErrors()}
                                             >
                                                 Cancelar
                                             </Button>
@@ -98,6 +100,7 @@ export default function DeleteUser() {
 
                                         <Button
                                             variant="destructive"
+                                            className="cursor-pointer"
                                             disabled={processing}
                                             asChild
                                         >
@@ -105,7 +108,7 @@ export default function DeleteUser() {
                                                 type="submit"
                                                 data-test="confirm-delete-user-button"
                                             >
-                                                Borrar cuenta
+                                                Confirmar desactivación
                                             </button>
                                         </Button>
                                     </DialogFooter>
@@ -115,6 +118,6 @@ export default function DeleteUser() {
                     </DialogContent>
                 </Dialog>
             </div>
-        </div>
+        </section>
     );
 }

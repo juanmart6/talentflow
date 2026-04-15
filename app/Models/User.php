@@ -8,6 +8,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Spatie\Permission\Traits\HasRoles;
 
@@ -25,6 +27,10 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'is_active',
+        'deactivated_at',
+        'deactivated_reason',
+        'avatar_path',
     ];
 
     /**
@@ -37,6 +43,16 @@ class User extends Authenticatable
         'two_factor_secret',
         'two_factor_recovery_codes',
         'remember_token',
+        'avatar_path',
+    ];
+
+    /**
+     * The accessors to append to the model's array form.
+     *
+     * @var list<string>
+     */
+    protected $appends = [
+        'avatar',
     ];
 
     /**
@@ -57,6 +73,8 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'two_factor_confirmed_at' => 'datetime',
+            'is_active' => 'boolean',
+            'deactivated_at' => 'datetime',
         ];
     }
 
@@ -73,5 +91,20 @@ class User extends Authenticatable
     public function sendPasswordResetNotification($token): void
     {
         $this->notify(new ResetPasswordNotification($token));
+    }
+
+    public function getAvatarAttribute(): ?string
+    {
+        $avatarPath = $this->avatar_path;
+
+        if (!is_string($avatarPath) || trim($avatarPath) === '') {
+            return null;
+        }
+
+        if (Str::startsWith($avatarPath, ['http://', 'https://'])) {
+            return $avatarPath;
+        }
+
+        return Storage::disk('public')->url($avatarPath);
     }
 }

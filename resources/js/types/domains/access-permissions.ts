@@ -1,3 +1,5 @@
+import type { Paginated } from '@/types/core/pagination';
+
 export type RoleRow = {
     id: number;
     name: string;
@@ -9,6 +11,7 @@ export type UserRow = {
     id: number;
     name: string;
     email: string;
+    avatar?: string | null;
     role: string | null;
     roles: string[];
     created_at: string | null;
@@ -26,11 +29,17 @@ export type InvitationRow = {
 
 export type InvitationStatus = 'pending' | 'accepted' | 'expired';
 
+export type UsersPagination = Paginated<UserRow>;
+export type InvitationsPagination = Paginated<InvitationRow>;
+export type InvitationStatusCounts = Record<'all' | InvitationStatus, number>;
+
 export type UsersPageProps = {
-    users: UserRow[];
+    users: UsersPagination;
     roles: RoleRow[];
     availableRoles: string[];
     permissions: string[];
     rolePermissions: RolePermissionsMap;
-    invitations: InvitationRow[];
+    invitations: InvitationsPagination;
+    invitationFilter: 'all' | InvitationStatus;
+    invitationStatusCounts: InvitationStatusCounts;
 };

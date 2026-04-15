@@ -1,6 +1,6 @@
 ﻿import { Link } from '@inertiajs/react';
 import { Eye, Pencil, Trash2 } from 'lucide-react';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { INTERN_STATUS_META } from '@/lib/interns/intern-status';
 import { UI_PRESETS, stripedRowClass } from '@/lib/ui-presets';
@@ -56,6 +56,7 @@ export default function InternsTable({ interns, hasRows, onDelete }: InternsTabl
                                 <td className={`${UI_PRESETS.tableCellCentered} w-40`}>
                                     <div className="flex items-center justify-center gap-3">
                                         <Avatar className="bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-50">
+                                            <AvatarImage src={intern.user_avatar ?? undefined} alt={`${intern.first_name} ${intern.last_name}`} />
                                             <AvatarFallback className="text-xs font-semibold">
                                                 {getInitials(intern)}
                                             </AvatarFallback>

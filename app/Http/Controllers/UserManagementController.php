@@ -19,24 +19,30 @@ use Illuminate\Support\Facades\Mail;
 
 class UserManagementController extends Controller
 {
-    public function index(): Response
+    public function index(Request $request): Response
     {
+        $invitationFilter = $request->string('invitation_filter')->toString();
+        if (!in_array($invitationFilter, ['all', 'pending', 'accepted', 'expired'], true)) {
+            $invitationFilter = 'all';
+        }
+
         $users = User::query()
-            ->with('roles:name')
+            ->with('roles:id,name')
             ->whereDoesntHave('roles', fn ($query) => $query->where('name', 'intern'))
             ->orderBy('name')
-            ->get()
-            ->map(function (User $user): array {
+            ->paginate(8, ['*'], 'users_page')
+            ->withQueryString()
+            ->through(function (User $user): array {
                 return [
                     'id' => $user->id,
                     'name' => $user->name,
                     'email' => $user->email,
+                    'avatar' => $user->avatar,
                     'role' => $user->roles->first()?->name,
                     'roles' => $user->roles->pluck('name')->values()->all(),
+                    'created_at' => $user->created_at?->toIso8601String(),
                 ];
-    })
-            ->values()
-            ->all();
+            });
 
         $roles = Role::query()
             ->where('name', '!=', 'intern')
@@ -67,31 +73,71 @@ class UserManagementController extends Controller
             ])
             ->all();
 
-        $invitations = UserInvitation::query()
+        $baseInvitationsQuery = UserInvitation::query()
             ->where('role', '!=', 'intern')
-            ->with('invitedBy:id,name')
+            ->with('invitedBy:id,name');
+
+        $invitationStatusCounts = [
+            'all' => (clone $baseInvitationsQuery)->count(),
+            'pending' => (clone $baseInvitationsQuery)
+                ->whereNull('accepted_at')
+                ->where('expires_at', '>', now())
+                ->count(),
+            'accepted' => (clone $baseInvitationsQuery)
+                ->whereNotNull('accepted_at')
+                ->count(),
+            'expired' => (clone $baseInvitationsQuery)
+                ->whereNull('accepted_at')
+                ->where(function ($query): void {
+                    $query
+                        ->whereNull('expires_at')
+                        ->orWhere('expires_at', '<=', now());
+                })
+                ->count(),
+        ];
+
+        $invitationsQuery = (clone $baseInvitationsQuery);
+
+        if ($invitationFilter === 'pending') {
+            $invitationsQuery
+                ->whereNull('accepted_at')
+                ->where('expires_at', '>', now());
+        } elseif ($invitationFilter === 'accepted') {
+            $invitationsQuery->whereNotNull('accepted_at');
+        } elseif ($invitationFilter === 'expired') {
+            $invitationsQuery
+                ->whereNull('accepted_at')
+                ->where(function ($query): void {
+                    $query
+                        ->whereNull('expires_at')
+                        ->orWhere('expires_at', '<=', now());
+                });
+        }
+
+        $invitations = $invitationsQuery
             ->latest('id')
-            ->get()
-            ->map(fn (UserInvitation $invitation): array => [
+            ->paginate(8, ['*'], 'invitations_page')
+            ->withQueryString()
+            ->through(fn (UserInvitation $invitation): array => [
                 'id' => $invitation->id,
                 'email' => $invitation->email,
                 'role' => $invitation->role,
                 'token' => $invitation->token,
-                'expires_at' => $invitation->expires_at?->toDateTimeString(),
-                'accepted_at' => $invitation->accepted_at?->toDateTimeString(),
+                'expires_at' => $invitation->expires_at?->toIso8601String(),
+                'accepted_at' => $invitation->accepted_at?->toIso8601String(),
                 'invited_by_name' => $invitation->invitedBy?->name ?? 'Sistema',
-                'created_at' => $invitation->created_at?->toDateTimeString(),
-            ])
-            ->values()
-            ->all();
+                'created_at' => $invitation->created_at?->toIso8601String(),
+            ]);
 
-        return Inertia::render('users/index', [
+        return Inertia::render('access-permissions/index', [
             'users' => $users,
             'roles' => $roles,
             'availableRoles' => $availableRoles,
             'permissions' => $permissions,
             'rolePermissions' => $rolePermissions,
             'invitations' => $invitations,
+            'invitationFilter' => $invitationFilter,
+            'invitationStatusCounts' => $invitationStatusCounts,
         ]);
     }
 
@@ -246,7 +292,7 @@ class UserManagementController extends Controller
             'token' => $invitation->token,
             'email' => $invitation->email,
             'role' => $invitation->role,
-            'expires_at' => $invitation->expires_at?->toDateTimeString(),
+            'expires_at' => $invitation->expires_at?->toIso8601String(),
             'display_name' => $this->resolveInvitationDisplayName($invitation),
             'intern_summary' => $intern ? [
                 'dni_nie' => $intern->dni_nie,
@@ -264,12 +310,36 @@ class UserManagementController extends Controller
             'password' => ['required', 'string', 'min:8', 'confirmed'],
         ]);
 
-        $user = User::query()->create([
-            'name' => $this->resolveInvitationDisplayName($invitation),
-            'email' => $invitation->email,
+        $invitationEmail = mb_strtolower(trim($invitation->email));
+        $displayName = $this->resolveInvitationDisplayName($invitation);
+        $invitation->loadMissing('intern.user');
+
+        $linkedInternUser = $invitation->role === 'intern'
+            ? $invitation->intern?->user
+            : null;
+
+        $existingUser = $linkedInternUser
+            ?? User::query()
+                ->whereRaw('LOWER(email) = ?', [$invitationEmail])
+                ->first();
+
+        if ($existingUser !== null && $existingUser->is_active) {
+            return redirect()
+                ->route('login')
+                ->with('error', 'Ya existe una cuenta activa para este correo.');
+        }
+
+        $user = $existingUser ?? new User();
+        $user->forceFill([
+            'name' => $displayName,
+            'email' => $invitationEmail,
             'password' => Hash::make($validated['password']),
             'email_verified_at' => now(),
+            'is_active' => true,
+            'deactivated_at' => null,
+            'deactivated_reason' => null,
         ]);
+        $user->save();
 
         $user->syncRoles([$invitation->role]);
         $this->linkInternProfileToUserIfNeeded($user, $invitation);

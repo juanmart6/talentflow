@@ -75,11 +75,11 @@ type Props = {
     mode: 'create' | 'edit' | 'show';
     intern: InternFormData | null;
     access: {
-        status: 'none' | 'pending' | 'accepted' | 'expired';
+        status: 'none' | 'pending' | 'accepted' | 'expired' | 'disabled';
         can_invite: boolean;
         history: Array<{
             id: string;
-            step: 'sent' | 'accepted' | 'expired';
+            step: 'sent' | 'accepted' | 'expired' | 'disabled';
             happened_at: string | null;
             by_name: string | null;
         }>;
@@ -177,6 +177,10 @@ const accessStatusMeta: Record<
         label: 'Invitación caducada',
         badgeClass: 'bg-red-100 text-red-700 ring-1 ring-red-300 dark:bg-red-900/30 dark:text-red-200 dark:ring-red-700/40',
     },
+    disabled: {
+        label: 'CUENTA ELIMINADA POR USUARIO',
+        badgeClass: 'bg-slate-200 text-slate-700 ring-1 ring-slate-400 dark:bg-slate-800 dark:text-slate-100 dark:ring-slate-600',
+    },
 };
 
 const accessHistoryStepMeta: Record<
@@ -194,6 +198,10 @@ const accessHistoryStepMeta: Record<
     expired: {
         label: 'Invitación caducada',
         badgeClass: 'bg-red-100 text-red-700 ring-1 ring-red-300 dark:bg-red-900/30 dark:text-red-200 dark:ring-red-700/40',
+    },
+    disabled: {
+        label: 'CUENTA ELIMINADA POR USUARIO',
+        badgeClass: 'bg-slate-200 text-slate-700 ring-1 ring-slate-400 dark:bg-slate-800 dark:text-slate-100 dark:ring-slate-600',
     },
 };
 
@@ -965,6 +973,8 @@ export default function InternFormPage({ mode, intern, access, educationCenters,
                                                 <MailPlus className="size-4" />
                                                 {isInvitingAccess
                                                     ? 'Enviando...'
+                                                    : accessStatus === 'disabled'
+                                                        ? 'Reenviar invitación'
                                                     : accessStatus === 'none'
                                                         ? 'Enviar acceso'
                                                         : 'Reenviar invitación'}
@@ -1036,3 +1046,4 @@ export default function InternFormPage({ mode, intern, access, educationCenters,
         </AppLayout>
     );
 }
+

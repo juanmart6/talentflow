@@ -18,9 +18,8 @@ import { dashboard } from '@/routes';
 import educationCenters from '@/routes/education-centers';
 import interns from '@/routes/interns';
 import practiceTasks from '@/routes/practice-tasks';
+import users from '@/routes/users';
 import type { Auth, NavItem } from '@/types';
-
-const STAFF_ACCESS_HREF = '/autenticacion-usuarios';
 
 const mainNavItems: NavItem[] = [
     {
@@ -93,13 +92,13 @@ export function AppSidebar() {
                         <SidebarMenuItem>
                             <SidebarMenuButton
                                 asChild
-                                isActive={isCurrentOrParentUrl(STAFF_ACCESS_HREF)}
+                                isActive={isCurrentOrParentUrl(users.index().url)}
                                 tooltip={{ children: 'Accesos y Permisos' }}
                                 className={cn(
                                     'h-10 rounded-xl border border-[#0f766e]/20 bg-gradient-to-r from-[#0f766e]/10 to-[#2563eb]/10 px-3 font-semibold text-slate-700 transition-all duration-200 hover:translate-x-0.5 hover:border-[#0f766e]/35 hover:from-[#0f766e]/14 hover:to-[#2563eb]/14 hover:text-[#0f3d68] hover:shadow-sm dark:border-[#14b8a6]/25 dark:from-[#0f766e]/20 dark:to-[#1e3a8a]/20 dark:text-slate-200 dark:hover:border-[#14b8a6]/40 dark:hover:from-[#0f766e]/30 dark:hover:to-[#1e40af]/30 dark:hover:text-sky-100 data-[active=true]:border-[#0f766e]/40 data-[active=true]:from-[#0f766e]/18 data-[active=true]:to-[#2563eb]/18 data-[active=true]:text-[#0f3d68] data-[active=true]:shadow-sm dark:data-[active=true]:border-[#14b8a6]/50 dark:data-[active=true]:from-[#0f766e]/35 dark:data-[active=true]:to-[#1e40af]/35 dark:data-[active=true]:text-sky-100 [&_svg]:text-[#0f766e] dark:[&_svg]:text-[#2dd4bf]',
                                 )}
                             >
-                                <Link href={STAFF_ACCESS_HREF} prefetch className="flex w-full items-center gap-2.5">
+                                <Link href={users.index().url} prefetch className="flex w-full items-center gap-2.5">
                                     <KeyRound />
                                     <span>Accesos y Permisos</span>
                                 </Link>

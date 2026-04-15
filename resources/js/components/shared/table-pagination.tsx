@@ -7,9 +7,16 @@ import type { PaginationLink } from '@/types/core/pagination';
 type TablePaginationProps = {
     summary: string;
     links: PaginationLink[];
+    preserveState?: boolean;
+    preserveScroll?: boolean;
 };
 
-export default function TablePagination({ summary, links }: TablePaginationProps) {
+export default function TablePagination({
+    summary,
+    links,
+    preserveState = false,
+    preserveScroll = false,
+}: TablePaginationProps) {
     return (
         <div className={UI_PRESETS.tablePagination}>
             <p className="text-sm text-muted-foreground">{summary}</p>
@@ -25,7 +32,9 @@ export default function TablePagination({ summary, links }: TablePaginationProps
                         asChild={Boolean(link.url)}
                     >
                         {link.url ? (
-                            <Link href={link.url}>{normalizePaginationLabel(link.label)}</Link>
+                            <Link href={link.url} preserveState={preserveState} preserveScroll={preserveScroll}>
+                                {normalizePaginationLabel(link.label)}
+                            </Link>
                         ) : (
                             <span>{normalizePaginationLabel(link.label)}</span>
                         )}

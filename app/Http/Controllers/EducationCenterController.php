@@ -80,7 +80,7 @@ class EducationCenterController extends Controller
             })
             ->withQueryString();
 
-        return Inertia::render('education-centers', [
+        return Inertia::render('education-centers/index', [
             'centers' => $centers,
             'summaryCounts' => $summaryCounts,
             'filters' => [

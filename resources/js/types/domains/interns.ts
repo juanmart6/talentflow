@@ -10,7 +10,8 @@ export type InternOption = {
 export type InternRow = {
     id: number;
     user_id: number | null;
-    access_status: 'none' | 'pending' | 'accepted' | 'expired';
+    user_avatar?: string | null;
+    access_status: 'none' | 'pending' | 'accepted' | 'expired' | 'disabled';
     first_name: string;
     last_name: string;
     dni_nie: string;

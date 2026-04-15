@@ -160,27 +160,27 @@ Route::middleware(['auth'])->group(function () {
 
         // Rutas para el módulo Usuarios y permisos:
 
-    Route::get('autenticacion-usuarios', [UserManagementController::class, 'index'])
+    Route::get('access-permissions', [UserManagementController::class, 'index'])
         ->middleware('role_or_permission:admin|users.manage')
         ->name('users.index');
 
-    Route::patch('autenticacion-usuarios/{user}/role', [UserManagementController::class, 'updateRole'])
+    Route::patch('access-permissions/{user}/role', [UserManagementController::class, 'updateRole'])
         ->middleware('role_or_permission:admin|users.manage')
         ->name('users.update-role');
 
-    Route::patch('autenticacion-usuarios/roles/{role}/permissions', [UserManagementController::class, 'updateRolePermissions'])
+    Route::patch('access-permissions/roles/{role}/permissions', [UserManagementController::class, 'updateRolePermissions'])
         ->middleware('role_or_permission:admin|users.manage')
         ->name('users.update-role-permissions');
 
-    Route::post('autenticacion-usuarios/invitaciones', [UserManagementController::class, 'storeInvitation'])
+    Route::post('access-permissions/invitaciones', [UserManagementController::class, 'storeInvitation'])
         ->middleware('role_or_permission:admin|users.manage')
         ->name('users.invitations.store');
 
-    Route::delete('autenticacion-usuarios/invitaciones/{invitation}', [UserManagementController::class, 'destroyInvitation'])
+    Route::delete('access-permissions/invitaciones/{invitation}', [UserManagementController::class, 'destroyInvitation'])
         ->middleware('role_or_permission:admin|users.manage')
         ->name('users.invitations.destroy');
 
-    Route::delete('autenticacion-usuarios/{user}', [UserManagementController::class, 'destroyUser'])
+    Route::delete('access-permissions/{user}', [UserManagementController::class, 'destroyUser'])
         ->middleware('role_or_permission:admin|users.manage')
         ->name('users.destroy');
 

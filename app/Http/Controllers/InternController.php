@@ -60,7 +60,7 @@ class InternController extends Controller
         $internsQuery = $this->applyStatusFilter(clone $baseQuery, $status);
 
         $interns = $internsQuery
-            ->with(['educationCenter', 'trainingProgram'])
+            ->with(['educationCenter', 'trainingProgram', 'user:id,is_active,deactivated_at,avatar_path'])
             ->orderBy('last_name')
             ->orderBy('first_name')
             ->paginate(10);
@@ -111,9 +111,10 @@ class InternController extends Controller
                     && ($invitation->expires_at === null || $invitation->expires_at->isPast()));
 
                 $accessStatus = 'none';
+                $linkedUser = $intern->user;
 
-                if ($intern->user_id !== null) {
-                    $accessStatus = 'accepted';
+                if ($linkedUser !== null) {
+                    $accessStatus = $linkedUser->is_active === false ? 'disabled' : 'accepted';
                 } elseif ($hasPendingInvitation) {
                     $accessStatus = 'pending';
                 } elseif ($hasExpiredInvitation) {
@@ -123,6 +124,7 @@ class InternController extends Controller
                 return [
                     'id' => $intern->id,
                     'user_id' => $intern->user_id,
+                    'user_avatar' => $linkedUser?->avatar,
                     'access_status' => $accessStatus,
                     'first_name' => $intern->first_name,
                     'last_name' => $intern->last_name,
@@ -151,7 +153,7 @@ class InternController extends Controller
 
         $interns->withQueryString();
 
-        return Inertia::render('interns', [
+        return Inertia::render('interns/index', [
             'interns' => $interns,
             'statusCounts' => $statusCounts,
             'filters' => [
@@ -477,8 +479,11 @@ class InternController extends Controller
 
     public function inviteAccess(Request $request, Intern $intern): RedirectResponse
     {
-        if ($intern->user_id !== null) {
-            return back()->with('error', 'Este becario ya tiene una cuenta vinculada.');
+        $linkedUser = $intern->user()
+            ->first(['id', 'email', 'is_active']);
+
+        if ($linkedUser !== null && $linkedUser->is_active) {
+            return back()->with('error', 'Este becario ya tiene una cuenta activa vinculada.');
         }
 
         $email = mb_strtolower(trim((string) $intern->email));
@@ -489,10 +494,13 @@ class InternController extends Controller
 
         $existingUser = User::query()
             ->whereRaw('LOWER(email) = ?', [$email])
-            ->exists();
+            ->first(['id', 'is_active']);
 
-        if ($existingUser) {
-            return back()->with('error', 'Ya existe una cuenta con ese correo. Revisa el email del becario antes de invitar.');
+        if (
+            $existingUser !== null
+            && ($linkedUser === null || $existingUser->id !== $linkedUser->id || $existingUser->is_active)
+        ) {
+            return back()->with('error', 'Ya existe otra cuenta con ese correo. Revisa el email del becario antes de invitar.');
         }
 
         $hadPendingInvitation = UserInvitation::query()
@@ -743,6 +751,7 @@ class InternController extends Controller
 
     private function buildInternAccessData(Intern $intern): array
     {
+        $intern->loadMissing('user:id,is_active,deactivated_at');
         $status = 'none';
         $invitations = UserInvitation::query()
             ->where(function ($query) use ($intern) {
@@ -764,7 +773,7 @@ class InternController extends Controller
                     $events[] = [
                         'id' => "{$invitation->id}-sent",
                         'step' => 'sent',
-                        'happened_at' => $invitation->created_at->toDateTimeString(),
+                        'happened_at' => $invitation->created_at->toIso8601String(),
                         'by_name' => $invitation->invitedBy?->name ?? 'Sistema',
                     ];
                 }
@@ -773,40 +782,55 @@ class InternController extends Controller
                     $events[] = [
                         'id' => "{$invitation->id}-accepted",
                         'step' => 'accepted',
-                        'happened_at' => $invitation->accepted_at->toDateTimeString(),
+                        'happened_at' => $invitation->accepted_at->toIso8601String(),
                         'by_name' => null,
                     ];
                 } elseif ($invitation->expires_at !== null && $invitation->expires_at->isPast()) {
                     $events[] = [
                         'id' => "{$invitation->id}-expired",
                         'step' => 'expired',
-                        'happened_at' => $invitation->expires_at->toDateTimeString(),
+                        'happened_at' => $invitation->expires_at->toIso8601String(),
                         'by_name' => null,
                     ];
                 }
 
                 return $events;
-            })
+            });
+
+        $linkedUser = $intern->user;
+
+        if ($linkedUser !== null && $linkedUser->is_active === false) {
+            $history->push([
+                'id' => "user-{$linkedUser->id}-disabled",
+                'step' => 'disabled',
+                'happened_at' => $linkedUser->deactivated_at?->toIso8601String(),
+                'by_name' => null,
+            ]);
+        }
+
+        $history = $history
             ->sortByDesc('happened_at')
             ->take(20)
             ->values()
             ->all();
 
-        if ($intern->user_id !== null) {
-            $status = 'accepted';
+        if ($linkedUser !== null) {
+            $status = $linkedUser->is_active === false ? 'disabled' : 'accepted';
         } elseif ($latestInvitation !== null) {
-            if ($latestInvitation->accepted_at !== null) {
-                $status = 'accepted';
-            } elseif ($latestInvitation->expires_at !== null && $latestInvitation->expires_at->isFuture()) {
+            if ($latestInvitation->accepted_at === null && $latestInvitation->expires_at !== null && $latestInvitation->expires_at->isFuture()) {
                 $status = 'pending';
-            } else {
+            } elseif ($latestInvitation->accepted_at === null) {
                 $status = 'expired';
+            } else {
+                // Invitation was accepted in the past, but account is no longer linked.
+                // Keep status as "none" so admins can invite again.
+                $status = 'none';
             }
         }
 
         return [
             'status' => $status,
-            'can_invite' => in_array($status, ['none', 'pending', 'expired'], true),
+            'can_invite' => in_array($status, ['none', 'pending', 'expired', 'disabled'], true),
             'history' => $history,
         ];
     }
