@@ -27,7 +27,7 @@ export default function CenterFiltersBar({
     hasActiveFilters,
 }: CenterFiltersBarProps) {
     return (
-        <form className={`${UI_PRESETS.filterBar} mb-2`} onSubmit={(event) => event.preventDefault()}>
+        <form className={`${UI_PRESETS.filterBarEmphasis} mb-2`} onSubmit={(event) => event.preventDefault()}>
             <div className="flex flex-col gap-3 md:flex-row md:items-center">
                 <div className="relative min-w-0 flex-1">
                     <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />

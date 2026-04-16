@@ -87,7 +87,7 @@ class FortifyServiceProvider extends ServiceProvider
 
             if ($user->is_active === false) {
                 throw ValidationException::withMessages([
-                    Fortify::username() => 'CUENTA ELIMINADA POR USUARIO. Contacta con un administrador.',
+                    Fortify::username() => 'Cuenta eliminada por el usuario. Contacta con un administrador.',
                 ]);
             }
 

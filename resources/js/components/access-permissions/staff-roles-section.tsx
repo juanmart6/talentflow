@@ -33,6 +33,8 @@ export default function StaffRolesSection({
     onDeleteUser,
 }: StaffRolesSectionProps) {
     const getInitials = useInitials();
+    const protectedAdminEmail = 'admin@talentflow.es';
+    const roleOptions = availableRoles.filter((role) => role === 'admin' || role === 'tutor');
 
     return (
         <div className="space-y-4">
@@ -63,7 +65,9 @@ export default function StaffRolesSection({
                             users.map((user, index) => {
                                 const RoleIcon = roleBadgeIconByRole[user.role ?? ''] ?? ShieldCheck;
                                 const isSelfUser = authUserId === user.id;
-                                const canDeleteUser = user.role !== 'admin' && !isSelfUser;
+                                const isProtectedAdminEmail =
+                                    user.email.trim().toLowerCase() === protectedAdminEmail;
+                                const canDeleteUser = user.role !== 'admin' && !isSelfUser && !isProtectedAdminEmail;
 
                                 return (
                                     <tr key={user.id} className={`h-20 border-t align-middle ${stripedRowClass(index)}`}>
@@ -100,7 +104,7 @@ export default function StaffRolesSection({
                                             <div className="grid place-items-center gap-1">
                                                 <Select
                                                     value={user.role ?? ''}
-                                                    disabled={user.role === 'admin'}
+                                                    disabled={isProtectedAdminEmail}
                                                     onValueChange={(value) => onRoleChange(user.id, value)}
                                                 >
                                                     <SelectTrigger
@@ -109,16 +113,14 @@ export default function StaffRolesSection({
                                                         <SelectValue placeholder="Seleccionar rol" />
                                                     </SelectTrigger>
                                                     <SelectContent>
-                                                        {availableRoles
-                                                            .filter((role) => user.role === 'admin' || role !== 'admin')
-                                                            .map((role) => (
-                                                                <SelectItem className={UI_PRESETS.selectItem} key={role} value={role}>
-                                                                    {roleLabels[role] ?? role.toUpperCase()}
-                                                                </SelectItem>
-                                                            ))}
+                                                        {roleOptions.map((role) => (
+                                                            <SelectItem className={UI_PRESETS.selectItem} key={role} value={role}>
+                                                                {roleLabels[role] ?? role.toUpperCase()}
+                                                            </SelectItem>
+                                                        ))}
                                                     </SelectContent>
                                                 </Select>
-                                                {user.role === 'admin' ? (
+                                                {isProtectedAdminEmail ? (
                                                     <span className="text-[11px] text-muted-foreground">Rol protegido</span>
                                                 ) : null}
                                             </div>
@@ -130,7 +132,9 @@ export default function StaffRolesSection({
                                                 onClick={() => onDeleteUser(user)}
                                                 disabled={!canDeleteUser}
                                                 title={
-                                                    user.role === 'admin'
+                                                    isProtectedAdminEmail
+                                                        ? 'La cuenta admin@talentflow.es está protegida'
+                                                        : user.role === 'admin'
                                                         ? 'No se puede eliminar un usuario admin'
                                                         : isSelfUser
                                                             ? 'No puedes eliminar tu propio usuario'

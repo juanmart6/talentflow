@@ -98,7 +98,7 @@ export default function PermissionsSection({
                     <div className="flex justify-end pt-1">
                         <button
                             type="button"
-                            className="inline-flex h-9 cursor-pointer items-center rounded-md bg-[#2563eb] px-4 text-sm font-medium text-white transition-colors hover:bg-[#1d4ed8] disabled:cursor-not-allowed disabled:opacity-60"
+                            className={`inline-flex h-9 cursor-pointer items-center rounded-md px-4 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${UI_PRESETS.saveButton}`}
                             onClick={onSave}
                             disabled={saveDisabled}
                         >

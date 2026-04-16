@@ -18,6 +18,8 @@ class User extends Authenticatable
     /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasFactory, Notifiable, TwoFactorAuthenticatable, HasRoles;
 
+    public const PROTECTED_ADMIN_EMAIL = 'admin@talentflow.es';
+
     /**
      * The attributes that are mass assignable.
      *
@@ -83,6 +85,26 @@ class User extends Authenticatable
         return $this->hasMany(PracticeTask::class, 'created_by_user_id');
     }
 
+    public function timeClockEntriesEntered(): HasMany
+    {
+        return $this->hasMany(TimeClockEntry::class, 'entered_by_user_id');
+    }
+
+    public function hourSchedulesCreated(): HasMany
+    {
+        return $this->hasMany(InternHourSchedule::class, 'created_by_user_id');
+    }
+
+    public function absenceRequestsCreated(): HasMany
+    {
+        return $this->hasMany(InternAbsenceRequest::class, 'requested_by_user_id');
+    }
+
+    public function absenceRequestsReviewed(): HasMany
+    {
+        return $this->hasMany(InternAbsenceRequest::class, 'reviewed_by_user_id');
+    }
+
     public function intern(): HasOne
     {
         return $this->hasOne(Intern::class);
@@ -106,5 +128,10 @@ class User extends Authenticatable
         }
 
         return Storage::disk('public')->url($avatarPath);
+    }
+
+    public function isDeletionProtected(): bool
+    {
+        return mb_strtolower(trim((string) $this->email)) === self::PROTECTED_ADMIN_EMAIL;
     }
 }

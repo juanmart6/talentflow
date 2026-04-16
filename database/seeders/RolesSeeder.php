@@ -32,6 +32,14 @@ class RolesSeeder extends Seeder
             'practice-tasks.update',
             'practice-tasks.delete',
 
+            // Control horario:
+            'time-control.view',
+            'time-control.update',
+            'time-control.manual-entry',
+            'time-control.manage-schedules',
+            'time-control.approve-absences',
+            'time-control.export',
+
             // Usuarios y roles:
             'users.manage',
         ];
@@ -65,6 +73,12 @@ class RolesSeeder extends Seeder
                     'practice-tasks.create',
                     'practice-tasks.update',
                     'practice-tasks.delete',
+                    'time-control.view',
+                    'time-control.update',
+                    'time-control.manual-entry',
+                    'time-control.manage-schedules',
+                    'time-control.approve-absences',
+                    'time-control.export',
                 ]);
             }
 
@@ -73,6 +87,9 @@ class RolesSeeder extends Seeder
                     'education-centers.view',
                     'interns.view',
                     'practice-tasks.view',
+                    'time-control.view',
+                    'time-control.update',
+                    'time-control.export',
                 ]);
             }
         }

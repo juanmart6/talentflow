@@ -9,6 +9,10 @@ export const UI_PRESETS = {
     simpleSearchInput: 'border-slate-300 bg-white focus-visible:border-slate-400 focus-visible:ring-0 focus-visible:ring-offset-0 dark:border-slate-600 dark:bg-slate-950',
     simpleSearchClearButton: 'bg-slate-100 text-slate-700 hover:bg-slate-200 focus-visible:ring-0 focus-visible:ring-offset-0 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700',
     filterBar: 'rounded-xl border border-sidebar-border/70 bg-muted/20 p-3 dark:border-sidebar-border',
+    filterBarEmphasis:
+        'rounded-xl border border-sidebar-border/70 bg-[linear-gradient(140deg,#eaf2ff_0%,#f7fbff_36%,#e9f9f2_100%)] p-3 shadow-[0_8px_20px_rgba(37,99,235,0.10)] dark:border-sidebar-border dark:bg-[linear-gradient(140deg,#0f1d34_0%,#11233f_48%,#0f2c2b_100%)]',
+    tabsHeaderEmphasis:
+        '-mx-4 -mt-4 rounded-t-xl border-b border-sidebar-border/70 bg-[linear-gradient(140deg,#eaf2ff_0%,#f7fbff_36%,#e9f9f2_100%)] px-4 pt-4 dark:border-sidebar-border dark:bg-[linear-gradient(140deg,#0f1d34_0%,#11233f_48%,#0f2c2b_100%)]',
     filterChipsRow: 'flex flex-wrap gap-2',
     filterChip: 'inline-flex cursor-pointer items-center rounded-full border px-3 py-1 text-xs font-semibold uppercase transition-colors',
     filterChipActive: 'border-primary bg-primary text-primary-foreground',
@@ -31,6 +35,7 @@ export const UI_PRESETS = {
     iconActionButtonPrimary: 'cursor-pointer border-[#2563eb]/25 text-[#1d4ed8] hover:border-[#2563eb]/40 hover:bg-[#2563eb]/6 hover:text-[#1e40af] dark:border-[#2563eb]/35 dark:text-sky-300 dark:hover:bg-[#2563eb]/12 dark:hover:text-sky-100',
     iconActionButtonSuccess: 'cursor-pointer border-[#10B981]/25 text-[#047857] hover:border-[#10B981]/40 hover:bg-[#10B981]/8 hover:text-[#065f46] dark:border-[#10B981]/35 dark:text-emerald-300 dark:hover:bg-[#10B981]/14 dark:hover:text-emerald-100',
     iconActionButtonDanger: 'cursor-pointer border-red-300/50 text-red-600 hover:border-red-400/65 hover:bg-red-500/8 hover:text-red-700 dark:border-red-500/40 dark:text-red-300 dark:hover:bg-red-500/14 dark:hover:text-red-100',
+    saveButton: 'bg-[#10B981] text-white shadow-sm shadow-[#10B981]/20 hover:bg-[#059669] hover:shadow-md hover:shadow-[#10B981]/25 dark:bg-emerald-500 dark:text-slate-950 dark:hover:bg-emerald-400',
     interactiveHover: 'hover:bg-[#2563eb]/8 hover:text-[#1d4ed8] dark:hover:bg-[#2563eb]/16 dark:hover:text-sky-100',
     copyableCell: 'cursor-pointer transition-colors hover:bg-slate-100/70 dark:hover:bg-slate-800/50',
     sectionCard: 'space-y-4 rounded-xl border border-sidebar-border/70 bg-white/70 p-4 dark:border-sidebar-border dark:bg-slate-900/20',

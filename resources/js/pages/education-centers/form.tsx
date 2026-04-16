@@ -189,7 +189,7 @@ export default function EducationCenterForm({ mode, center, trainingPrograms, ag
                         {({ processing, errors }) => (
                             <>
                                 <section className={UI_PRESETS.sectionCard}>
-                                    <div className="-mx-4 -mt-4 border-b border-sidebar-border/70 px-4 pt-4 dark:border-sidebar-border">
+                                    <div className={UI_PRESETS.tabsHeaderEmphasis}>
                                         <CenterFormTabs
                                             activeTab={activeTab}
                                             onTabChange={setActiveTab}
@@ -451,7 +451,7 @@ export default function EducationCenterForm({ mode, center, trainingPrograms, ag
                                             </Button>
                                         ) : (
                                             <>
-                                                <Button className="cursor-pointer disabled:cursor-not-allowed" disabled={processing}>
+                                                <Button className={`${UI_PRESETS.saveButton} cursor-pointer disabled:cursor-not-allowed`} disabled={processing}>
                                                     {processing ? 'Guardando...' : 'Guardar'}
                                                 </Button>
                                                 <Button type="button" variant="secondary" asChild>

@@ -2,10 +2,12 @@ import { Trash2 } from 'lucide-react';
 import { FieldLabel, SectionIntro } from '@/components/form-ui';
 import InputError from '@/components/input-error';
 import DatePicker from '@/components/shared/date-picker';
+import FileUploadField from '@/components/shared/file-upload-field';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { formatSpanishDate } from '@/lib/education-centers/education-centers';
 import { UI_PRESETS } from '@/lib/ui-presets';
+
 
 type AgreementHistoryItem = {
     id: number;
@@ -35,46 +37,6 @@ type CenterAgreementSectionProps = {
     errors: Record<string, string | undefined>;
 };
 
-type FileUploadFieldProps = {
-    id: string;
-    name: string;
-    label: string;
-    accept: string;
-    error?: string;
-    required?: boolean;
-    selectedFileName?: string | null;
-    onChange?: (fileName: string | null) => void;
-};
-
-function FileUploadField({ id, name, label, accept, error, required, selectedFileName, onChange }: FileUploadFieldProps) {
-    return (
-        <div className="grid gap-2">
-            <FieldLabel htmlFor={id}>{label}</FieldLabel>
-            <div className="flex min-h-9 items-center gap-3 text-sm">
-                <label
-                    htmlFor={id}
-                    className="inline-flex h-9 cursor-pointer items-center rounded-md border border-[#2563eb]/35 bg-white px-3 text-sm font-medium text-[#1d4ed8] shadow-xs transition-colors hover:border-[#2563eb]/60 hover:bg-[#2563eb]/10 dark:border-[#2563eb]/45 dark:bg-slate-950 dark:text-sky-300 dark:hover:bg-[#2563eb]/20"
-                >
-                    Seleccionar archivo
-                </label>
-                <span className="truncate text-muted-foreground">
-                    {selectedFileName ?? 'Ningún archivo seleccionado'}
-                </span>
-                <Input
-                    id={id}
-                    type="file"
-                    name={name}
-                    accept={accept}
-                    required={required}
-                    className="sr-only"
-                    onChange={(event) => onChange?.(event.target.files?.[0]?.name ?? null)}
-                />
-            </div>
-            <InputError message={error} />
-        </div>
-    );
-}
-
 export default function CenterAgreementSection({
     isCreate,
     isReadOnly,
@@ -89,7 +51,7 @@ export default function CenterAgreementSection({
     return (
         <section className="space-y-4 pt-4">
             <SectionIntro
-                title="Convenio de colaboración"
+                title="Convenio de colaboraci�n"
                 description="Fechas de vigencia, plazas acordadas y documento PDF del convenio."
             />
 
@@ -143,7 +105,7 @@ export default function CenterAgreementSection({
                         required={isCreate}
                         error={errors.agreement_pdf}
                         selectedFileName={selectedAgreementFileName}
-                        onChange={setSelectedAgreementFileName}
+                        onChange={(file) => setSelectedAgreementFileName(file?.name ?? null)}
                     />
                 </div>
             )}
@@ -232,3 +194,4 @@ export default function CenterAgreementSection({
         </section>
     );
 }
+

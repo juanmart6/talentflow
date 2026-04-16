@@ -69,45 +69,48 @@ export function AppSidebar() {
 
     return (
         <Sidebar collapsible="icon" variant="inset" className="group-data-[variant=inset]:p-3">
-            <SidebarHeader>
-                <div className="relative overflow-hidden rounded-2xl border border-sidebar-border/70 bg-sidebar/90 px-3 py-4 shadow-sm backdrop-blur">
-                    <div className="pointer-events-none absolute -top-10 right-0 h-24 w-24 rounded-full bg-sidebar-primary/20 blur-2xl" />
+            <SidebarHeader className="pb-1">
+                <div className="relative overflow-hidden rounded-xl border border-sidebar-border/70 bg-white/80 px-3 py-3 shadow-sm backdrop-blur dark:bg-slate-900/40">
+                    <div className="pointer-events-none absolute -top-8 right-0 h-16 w-16 rounded-full bg-sidebar-primary/20 blur-xl" />
                     <div className="flex items-center justify-center">
                         <img
                             src={logo}
                             alt="TalentFlow Logo"
-                            className="relative h-28 w-auto transition-all duration-200 group-data-[collapsible=icon]:h-10"
+                            className="relative h-16 w-auto transition-all duration-200 group-data-[collapsible=icon]:h-8"
                         />
                     </div>
                 </div>
             </SidebarHeader>
 
-            <SidebarContent>
+            <SidebarContent className="pt-1">
                 <NavMain items={visibleNavItems} />
             </SidebarContent>
 
-            <SidebarFooter>
-                {!isIntern && (canManageUsers || isAdmin) ? (
-                    <SidebarMenu className="mb-2 gap-1.5 border-b border-sidebar-border/70 px-2 pb-2 dark:border-sidebar-border">
-                        <SidebarMenuItem>
-                            <SidebarMenuButton
-                                asChild
-                                isActive={isCurrentOrParentUrl(users.index().url)}
-                                tooltip={{ children: 'Accesos y Permisos' }}
-                                className={cn(
-                                    'h-10 rounded-xl border border-[#0f766e]/20 bg-gradient-to-r from-[#0f766e]/10 to-[#2563eb]/10 px-3 font-semibold text-slate-700 transition-all duration-200 hover:translate-x-0.5 hover:border-[#0f766e]/35 hover:from-[#0f766e]/14 hover:to-[#2563eb]/14 hover:text-[#0f3d68] hover:shadow-sm dark:border-[#14b8a6]/25 dark:from-[#0f766e]/20 dark:to-[#1e3a8a]/20 dark:text-slate-200 dark:hover:border-[#14b8a6]/40 dark:hover:from-[#0f766e]/30 dark:hover:to-[#1e40af]/30 dark:hover:text-sky-100 data-[active=true]:border-[#0f766e]/40 data-[active=true]:from-[#0f766e]/18 data-[active=true]:to-[#2563eb]/18 data-[active=true]:text-[#0f3d68] data-[active=true]:shadow-sm dark:data-[active=true]:border-[#14b8a6]/50 dark:data-[active=true]:from-[#0f766e]/35 dark:data-[active=true]:to-[#1e40af]/35 dark:data-[active=true]:text-sky-100 [&_svg]:text-[#0f766e] dark:[&_svg]:text-[#2dd4bf]',
-                                )}
-                            >
-                                <Link href={users.index().url} prefetch className="flex w-full items-center gap-2.5">
-                                    <KeyRound />
-                                    <span>Accesos y Permisos</span>
-                                </Link>
-                            </SidebarMenuButton>
-                        </SidebarMenuItem>
-                    </SidebarMenu>
-                ) : null}
+            <SidebarFooter className="mt-auto gap-1.5 border-t border-sidebar-border/70 bg-sidebar/55 pt-2 pb-2 backdrop-blur group-data-[collapsible=icon]:border-t-0 group-data-[collapsible=icon]:bg-transparent">
+                <div className="flex items-center gap-1.5 px-1.5">
+                    <NavUser className="min-w-0 flex-1" />
 
-                <NavUser />
+                    {!isIntern && (canManageUsers || isAdmin) ? (
+                        <SidebarMenu className="w-auto shrink-0 gap-0 group-data-[collapsible=icon]:hidden">
+                            <SidebarMenuItem>
+                                <SidebarMenuButton
+                                    asChild
+                                    size="lg"
+                                    isActive={isCurrentOrParentUrl(users.index().url)}
+                                    tooltip={{ children: 'Accesos y Permisos' }}
+                                    className={cn(
+                                        '!h-11 !w-11 justify-center !rounded-xl border border-sidebar-border/70 bg-sidebar/70 !p-0 text-[#0f766e] shadow-sm transition-all duration-200 hover:border-[#0f766e]/45 hover:bg-[#0f766e]/10 hover:text-[#0f766e] focus-visible:ring-2 focus-visible:ring-[#0f766e]/35 focus-visible:ring-offset-1 focus-visible:ring-offset-sidebar dark:text-emerald-300 dark:hover:border-emerald-400/45 dark:hover:bg-emerald-500/15 dark:hover:text-emerald-200 dark:focus-visible:ring-emerald-400/45 dark:focus-visible:ring-offset-sidebar data-[active=true]:border-[#0f766e]/50 data-[active=true]:bg-[#0f766e]/14 data-[active=true]:text-[#0f766e] dark:data-[active=true]:border-emerald-400/55 dark:data-[active=true]:bg-emerald-500/20 dark:data-[active=true]:text-emerald-100',
+                                    )}
+                                >
+                                    <Link href={users.index().url} prefetch className="flex h-full w-full items-center justify-center">
+                                        <KeyRound className="size-4" />
+                                        <span className="sr-only">Accesos y Permisos</span>
+                                    </Link>
+                                </SidebarMenuButton>
+                            </SidebarMenuItem>
+                        </SidebarMenu>
+                    ) : null}
+                </div>
             </SidebarFooter>
         </Sidebar>
     );

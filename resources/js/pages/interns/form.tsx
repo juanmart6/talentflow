@@ -1,18 +1,20 @@
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
-import { Briefcase, FileText, MailPlus, Paperclip, User } from 'lucide-react';
-import type { FormEvent} from 'react';
+import { MailPlus } from 'lucide-react';
+import type { FormEvent } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { FieldLabel, FormPageHeader, SectionIntro } from '@/components/form-ui';
 import InputError from '@/components/input-error';
+import InternFormTabs from '@/components/interns/intern-form-tabs';
+import type { InternFormTab } from '@/components/interns/intern-form-tabs';
 import DatePicker from '@/components/shared/date-picker';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
 import { getFirstFormErrorMessage } from '@/lib/form-errors';
-import { INTERN_STATUS_META  } from '@/lib/interns/intern-status';
-import type {InternStatus} from '@/lib/interns/intern-status';
+import { INTERN_STATUS_META } from '@/lib/interns/intern-status';
+import type { InternStatus } from '@/lib/interns/intern-status';
 import { UI_PRESETS } from '@/lib/ui-presets';
 import interns from '@/routes/interns';
 import type { BreadcrumbItem } from '@/types';
@@ -87,8 +89,6 @@ type Props = {
     educationCenters: EducationCenterOption[];
     documentHistory: DocumentHistory;
 };
-
-type InternFormTab = 'personal' | 'academic' | 'documents' | 'general' | 'access';
 
 function toDateInput(value?: string | null): string {
     if (!value) {
@@ -178,7 +178,7 @@ const accessStatusMeta: Record<
         badgeClass: 'bg-red-100 text-red-700 ring-1 ring-red-300 dark:bg-red-900/30 dark:text-red-200 dark:ring-red-700/40',
     },
     disabled: {
-        label: 'CUENTA ELIMINADA POR USUARIO',
+        label: 'Cuenta eliminada por el usuario',
         badgeClass: 'bg-slate-200 text-slate-700 ring-1 ring-slate-400 dark:bg-slate-800 dark:text-slate-100 dark:ring-slate-600',
     },
 };
@@ -200,7 +200,7 @@ const accessHistoryStepMeta: Record<
         badgeClass: 'bg-red-100 text-red-700 ring-1 ring-red-300 dark:bg-red-900/30 dark:text-red-200 dark:ring-red-700/40',
     },
     disabled: {
-        label: 'CUENTA ELIMINADA POR USUARIO',
+        label: 'Cuenta eliminada por el usuario',
         badgeClass: 'bg-slate-200 text-slate-700 ring-1 ring-slate-400 dark:bg-slate-800 dark:text-slate-100 dark:ring-slate-600',
     },
 };
@@ -461,61 +461,12 @@ export default function InternFormPage({ mode, intern, access, educationCenters,
 
                     <form onSubmit={submit} className="space-y-2 [&_[data-slot=input-error]]:hidden">
                             <section className={UI_PRESETS.sectionCard}>
-                                <div className="-mx-4 -mt-4 border-b border-sidebar-border/70 px-4 pt-4 dark:border-sidebar-border">
-                                    <div className="flex flex-wrap items-end gap-1.5">
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="sm"
-                                            className={`${UI_PRESETS.tabBase} ${activeTab === 'personal' ? UI_PRESETS.tabActive : UI_PRESETS.tabInactive}`}
-                                            onClick={() => setActiveTab('personal')}
-                                        >
-                                            <User className="mr-1.5 size-4 shrink-0" />
-                                            Personales
-                                        </Button>
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="sm"
-                                            className={`${UI_PRESETS.tabBase} ${activeTab === 'academic' ? UI_PRESETS.tabActive : UI_PRESETS.tabInactive}`}
-                                            onClick={() => setActiveTab('academic')}
-                                        >
-                                            <Briefcase className="mr-1.5 size-4 shrink-0" />
-                                            Prácticas
-                                        </Button>
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="sm"
-                                            className={`${UI_PRESETS.tabBase} ${activeTab === 'documents' ? UI_PRESETS.tabActive : UI_PRESETS.tabInactive}`}
-                                            onClick={() => setActiveTab('documents')}
-                                        >
-                                            <Paperclip className="mr-1.5 size-4 shrink-0" />
-                                            Adjuntos
-                                        </Button>
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="sm"
-                                            className={`${UI_PRESETS.tabBase} ${activeTab === 'general' ? UI_PRESETS.tabActive : UI_PRESETS.tabInactive}`}
-                                            onClick={() => setActiveTab('general')}
-                                        >
-                                            <FileText className="mr-1.5 size-4 shrink-0" />
-                                            Notas
-                                        </Button>
-                                        {!isCreate ? (
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="sm"
-                                                className={`${UI_PRESETS.tabBase} ${activeTab === 'access' ? UI_PRESETS.tabActive : UI_PRESETS.tabInactive}`}
-                                                onClick={() => setActiveTab('access')}
-                                            >
-                                                <MailPlus className="mr-1.5 size-4 shrink-0" />
-                                                Acceso
-                                            </Button>
-                                        ) : null}
-                                    </div>
+                                <div className={UI_PRESETS.tabsHeaderEmphasis}>
+                                    <InternFormTabs
+                                        activeTab={activeTab}
+                                        onTabChange={setActiveTab}
+                                        showAccessTab={!isCreate}
+                                    />
                                 </div>
 
                             <fieldset
@@ -1031,7 +982,7 @@ export default function InternFormPage({ mode, intern, access, educationCenters,
                                     </Button>
                                 ) : (
                                     <>
-                                        <Button className="cursor-pointer disabled:cursor-not-allowed" disabled={processing || !hasEducationCenters}>
+                                        <Button className={`${UI_PRESETS.saveButton} cursor-pointer disabled:cursor-not-allowed`} disabled={processing || !hasEducationCenters}>
                                             {processing ? 'Guardando...' : 'Guardar'}
                                         </Button>
                                         <Button type="button" variant="secondary" asChild>
@@ -1046,4 +997,3 @@ export default function InternFormPage({ mode, intern, access, educationCenters,
         </AppLayout>
     );
 }
-

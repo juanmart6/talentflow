@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Intern extends Model
@@ -73,5 +74,20 @@ class Intern extends Model
     {
         return $this->belongsToMany(PracticeTask::class, 'practice_task_intern')
             ->withPivot('assigned_at');
+    }
+
+    public function timeClockEntries(): HasMany
+    {
+        return $this->hasMany(TimeClockEntry::class);
+    }
+
+    public function hourSchedules(): HasMany
+    {
+        return $this->hasMany(InternHourSchedule::class);
+    }
+
+    public function absenceRequests(): HasMany
+    {
+        return $this->hasMany(InternAbsenceRequest::class);
     }
 }

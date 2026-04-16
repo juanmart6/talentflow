@@ -359,7 +359,7 @@ export default function PracticeTasksFormPage({ interns, trainingPrograms, messa
 
                     <form onSubmit={handleSubmit} className="space-y-4">
                             <section className={UI_PRESETS.sectionCard}>
-                                <div className="-mx-4 -mt-4 border-b border-sidebar-border/70 px-4 pt-4 dark:border-sidebar-border">
+                                <div className={UI_PRESETS.tabsHeaderEmphasis}>
                                 <div className="flex flex-wrap items-end gap-1.5">
                                     <Button
                                         type="button"
@@ -994,7 +994,7 @@ export default function PracticeTasksFormPage({ interns, trainingPrograms, messa
                             </section>
 
                             <div className="flex flex-col gap-2 border-t border-sidebar-border/70 pt-4 md:flex-row md:items-center md:justify-end dark:border-sidebar-border">
-                                <Button disabled={processing}>{processing ? 'Guardando...' : (isEditing ? 'Guardar cambios' : 'Guardar')}</Button>
+                                <Button className={UI_PRESETS.saveButton} disabled={processing}>{processing ? 'Guardando...' : (isEditing ? 'Guardar cambios' : 'Guardar')}</Button>
                                 <Button type="button" variant="secondary" asChild>
                                     <Link href={practiceTasks.index().url}>Cancelar</Link>
                                 </Button>

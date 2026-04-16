@@ -3,6 +3,7 @@
 use App\Http\Controllers\EducationCenterController;
 use App\Http\Controllers\InternController;
 use App\Http\Controllers\PracticeTaskController;
+use App\Http\Controllers\TimeControlController;
 use App\Http\Controllers\UserManagementController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -157,6 +158,52 @@ Route::middleware(['auth'])->group(function () {
         ->middleware('permission:practice-tasks.delete')
         ->name('practice-tasks.destroy');
 
+
+    // Rutas para el modulo de control horario:
+
+    Route::get('control-horario', [TimeControlController::class, 'index'])
+        ->middleware('permission:time-control.view')
+        ->name('time-control.index');
+
+    Route::post('control-horario/clock-in', [TimeControlController::class, 'clockIn'])
+        ->middleware('permission:time-control.update')
+        ->name('time-control.clock-in');
+
+    Route::post('control-horario/start-break', [TimeControlController::class, 'startBreak'])
+        ->middleware('permission:time-control.update')
+        ->name('time-control.start-break');
+
+    Route::post('control-horario/end-break', [TimeControlController::class, 'endBreak'])
+        ->middleware('permission:time-control.update')
+        ->name('time-control.end-break');
+
+    Route::post('control-horario/clock-out', [TimeControlController::class, 'clockOut'])
+        ->middleware('permission:time-control.update')
+        ->name('time-control.clock-out');
+
+    Route::post('control-horario/manual-entry', [TimeControlController::class, 'storeManualEntry'])
+        ->middleware('permission:time-control.manual-entry')
+        ->name('time-control.manual-entry');
+
+    Route::post('control-horario/schedules', [TimeControlController::class, 'upsertSchedule'])
+        ->middleware('permission:time-control.manage-schedules')
+        ->name('time-control.schedules.upsert');
+
+    Route::delete('control-horario/schedules/{schedule}', [TimeControlController::class, 'destroySchedule'])
+        ->middleware('permission:time-control.manage-schedules')
+        ->name('time-control.schedules.destroy');
+
+    Route::post('control-horario/absences', [TimeControlController::class, 'storeAbsenceRequest'])
+        ->middleware('permission:time-control.update')
+        ->name('time-control.absences.store');
+
+    Route::patch('control-horario/absences/{absence}/review', [TimeControlController::class, 'reviewAbsenceRequest'])
+        ->middleware('permission:time-control.approve-absences')
+        ->name('time-control.absences.review');
+
+    Route::get('control-horario/export/pdf', [TimeControlController::class, 'exportPdf'])
+        ->middleware('permission:time-control.export')
+        ->name('time-control.export.pdf');
 
         // Rutas para el módulo Usuarios y permisos:
 

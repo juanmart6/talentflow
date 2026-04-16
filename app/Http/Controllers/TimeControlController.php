@@ -1,0 +1,1016 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Intern;
+use App\Models\InternAbsenceRequest;
+use App\Models\InternHourSchedule;
+use App\Models\TimeClockEntry;
+use App\Models\User;
+use Carbon\Carbon;
+use Carbon\CarbonInterface;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
+use Illuminate\Validation\Rule;
+use Inertia\Inertia;
+use Inertia\Response;
+use Spatie\LaravelPdf\Facades\Pdf;
+
+class TimeControlController extends Controller
+{
+    public function index(Request $request): Response
+    {
+        $user = $request->user();
+        abort_unless($user !== null, 403);
+
+        $isInternUser = $user->hasRole('intern');
+        $canManageTeam = $this->canManageTeam($user);
+        $range = $this->normalizeRange($request->string('range')->toString());
+        $monthCursor = $this->normalizeMonthCursor($request->string('month')->toString());
+
+        $interns = Intern::query()
+            ->when($isInternUser, fn ($query) => $query->where('user_id', $user->id))
+            ->orderBy('last_name')
+            ->orderBy('first_name')
+            ->get([
+                'id',
+                'user_id',
+                'first_name',
+                'last_name',
+                'email',
+                'required_hours',
+                'internship_start_date',
+                'internship_end_date',
+            ]);
+
+        $selectedIntern = $this->resolveSelectedIntern($request, $interns, $isInternUser, $user);
+
+        if ($selectedIntern === null) {
+            return Inertia::render('time-control/index', [
+                'interns' => [],
+                'selectedInternId' => null,
+                'selectedIntern' => null,
+                'isInternUser' => $isInternUser,
+                'canManageTeam' => $canManageTeam,
+                'clockState' => [
+                    'activeEntry' => null,
+                    'canManualEntry' => $canManageTeam,
+                ],
+                'timeEntries' => [],
+                'schedules' => [],
+                'absenceRequests' => [],
+                'pendingAbsenceRequests' => [],
+                'calendar' => [
+                    'monthCursor' => $monthCursor,
+                    'monthDays' => [],
+                    'weekDays' => [],
+                ],
+                'summary' => [
+                    'range' => [
+                        'label' => '',
+                        'start' => null,
+                        'end' => null,
+                        'worked_minutes' => 0,
+                        'worked_hours' => 0,
+                        'planned_minutes' => 0,
+                        'planned_hours' => 0,
+                        'compliance_percent' => 0,
+                        'delay_minutes' => 0,
+                    ],
+                    'progress' => [
+                        'required_hours' => 0,
+                        'total_worked_minutes' => 0,
+                        'total_worked_hours' => 0,
+                        'progress_percent' => 0,
+                        'expected_percent' => null,
+                    ],
+                    'alerts' => [],
+                ],
+                'filters' => [
+                    'range' => $range,
+                    'month' => $monthCursor,
+                ],
+            ]);
+        }
+
+        $rangeWindow = $this->resolveRangeWindow($range);
+        $monthStart = Carbon::createFromFormat('Y-m', $monthCursor)->startOfMonth();
+        $monthGridStart = $monthStart->copy()->startOfWeek(Carbon::MONDAY)->startOfDay();
+        $monthGridEnd = $monthStart->copy()->endOfMonth()->endOfWeek(Carbon::SUNDAY)->endOfDay();
+
+        $weekAnchor = $monthStart->isSameMonth(now())
+            ? now()
+            : $monthStart->copy();
+        $weekStart = $weekAnchor->copy()->startOfWeek(Carbon::MONDAY)->startOfDay();
+        $weekEnd = $weekAnchor->copy()->endOfWeek(Carbon::SUNDAY)->endOfDay();
+
+        $schedules = InternHourSchedule::query()
+            ->where('intern_id', $selectedIntern->id)
+            ->orderByDesc('starts_on')
+            ->get();
+
+        $activeEntry = TimeClockEntry::query()
+            ->where('intern_id', $selectedIntern->id)
+            ->whereNull('ended_at')
+            ->latest('started_at')
+            ->first();
+
+        $recentEntries = TimeClockEntry::query()
+            ->where('intern_id', $selectedIntern->id)
+            ->latest('started_at')
+            ->limit(20)
+            ->get();
+
+        $rangeEntries = TimeClockEntry::query()
+            ->where('intern_id', $selectedIntern->id)
+            ->whereBetween('started_at', [$rangeWindow['start'], $rangeWindow['end']])
+            ->orderBy('started_at')
+            ->get();
+
+        $allEntries = TimeClockEntry::query()
+            ->where('intern_id', $selectedIntern->id)
+            ->orderBy('started_at')
+            ->get();
+
+        $monthEntries = TimeClockEntry::query()
+            ->where('intern_id', $selectedIntern->id)
+            ->whereBetween('started_at', [$monthGridStart, $monthGridEnd])
+            ->get();
+
+        $weekEntries = TimeClockEntry::query()
+            ->where('intern_id', $selectedIntern->id)
+            ->whereBetween('started_at', [$weekStart, $weekEnd])
+            ->get();
+
+        $monthWorkedByDate = $this->buildWorkedMinutesByDate($monthEntries);
+        $weekWorkedByDate = $this->buildWorkedMinutesByDate($weekEntries);
+        $rangeWorkedByDate = $this->buildWorkedMinutesByDate($rangeEntries);
+
+        $monthDays = $this->buildDayRows($monthGridStart->copy(), $monthGridEnd->copy(), $monthWorkedByDate, $schedules);
+        $weekDays = $this->buildDayRows($weekStart->copy(), $weekEnd->copy(), $weekWorkedByDate, $schedules);
+        $rangeDays = $this->buildDayRows(
+            $rangeWindow['start']->copy()->startOfDay(),
+            $rangeWindow['end']->copy()->startOfDay(),
+            $rangeWorkedByDate,
+            $schedules,
+        );
+
+        $summary = $this->buildSummaryData($selectedIntern, $rangeWindow, $rangeDays, $allEntries);
+        $alerts = $this->buildAlerts($summary, $monthDays, $activeEntry);
+
+        $absenceRequests = InternAbsenceRequest::query()
+            ->where('intern_id', $selectedIntern->id)
+            ->with(['requestedBy:id,name', 'reviewedBy:id,name'])
+            ->orderByDesc('start_date')
+            ->limit(20)
+            ->get();
+
+        $pendingAbsenceRequests = $canManageTeam
+            ? InternAbsenceRequest::query()
+                ->where('status', 'pending')
+                ->with(['intern:id,first_name,last_name,email', 'requestedBy:id,name'])
+                ->orderBy('start_date')
+                ->limit(10)
+                ->get()
+            : collect();
+
+        return Inertia::render('time-control/index', [
+            'interns' => $interns
+                ->map(fn (Intern $intern): array => [
+                    'id' => $intern->id,
+                    'name' => trim($intern->first_name.' '.$intern->last_name),
+                    'email' => $intern->email,
+                    'required_hours' => (int) ($intern->required_hours ?? 0),
+                ])
+                ->values()
+                ->all(),
+            'selectedInternId' => $selectedIntern->id,
+            'selectedIntern' => [
+                'id' => $selectedIntern->id,
+                'name' => trim($selectedIntern->first_name.' '.$selectedIntern->last_name),
+                'email' => $selectedIntern->email,
+                'required_hours' => (int) ($selectedIntern->required_hours ?? 0),
+                'internship_start_date' => $selectedIntern->internship_start_date?->toDateString(),
+                'internship_end_date' => $selectedIntern->internship_end_date?->toDateString(),
+            ],
+            'isInternUser' => $isInternUser,
+            'canManageTeam' => $canManageTeam,
+            'clockState' => [
+                'activeEntry' => $activeEntry ? $this->mapEntry($activeEntry) : null,
+                'canManualEntry' => $canManageTeam,
+            ],
+            'timeEntries' => $recentEntries
+                ->map(fn (TimeClockEntry $entry): array => $this->mapEntry($entry))
+                ->values()
+                ->all(),
+            'schedules' => $schedules
+                ->map(fn (InternHourSchedule $schedule): array => $this->mapSchedule($schedule))
+                ->values()
+                ->all(),
+            'absenceRequests' => $absenceRequests
+                ->map(fn (InternAbsenceRequest $absence): array => $this->mapAbsence($absence))
+                ->values()
+                ->all(),
+            'pendingAbsenceRequests' => $pendingAbsenceRequests
+                ->map(fn (InternAbsenceRequest $absence): array => [
+                    ...$this->mapAbsence($absence),
+                    'intern' => $absence->intern ? [
+                        'id' => $absence->intern->id,
+                        'name' => trim($absence->intern->first_name.' '.$absence->intern->last_name),
+                        'email' => $absence->intern->email,
+                    ] : null,
+                ])
+                ->values()
+                ->all(),
+            'calendar' => [
+                'monthCursor' => $monthCursor,
+                'monthDays' => $monthDays,
+                'weekDays' => $weekDays,
+            ],
+            'summary' => [
+                ...$summary,
+                'alerts' => $alerts,
+            ],
+            'filters' => [
+                'range' => $range,
+                'month' => $monthCursor,
+            ],
+        ]);
+    }
+
+    public function clockIn(Request $request): RedirectResponse
+    {
+        $intern = $this->resolveActionIntern($request, true);
+        if ($intern === null) {
+            return back()->with('error', 'Selecciona un becario valido para fichar.');
+        }
+
+        $existingActiveEntry = TimeClockEntry::query()
+            ->where('intern_id', $intern->id)
+            ->whereNull('ended_at')
+            ->exists();
+
+        if ($existingActiveEntry) {
+            return back()->with('error', 'Ya existe un fichaje de entrada activo.');
+        }
+
+        TimeClockEntry::query()->create([
+            'intern_id' => $intern->id,
+            'entered_by_user_id' => $request->user()?->id,
+            'source' => 'self',
+            'started_at' => now(),
+            'break_minutes' => 0,
+        ]);
+
+        return back()->with('success', 'Entrada registrada correctamente.');
+    }
+
+    public function startBreak(Request $request): RedirectResponse
+    {
+        $intern = $this->resolveActionIntern($request, true);
+        if ($intern === null) {
+            return back()->with('error', 'Selecciona un becario valido para iniciar la pausa.');
+        }
+
+        $activeEntry = TimeClockEntry::query()
+            ->where('intern_id', $intern->id)
+            ->whereNull('ended_at')
+            ->latest('started_at')
+            ->first();
+
+        if ($activeEntry === null) {
+            return back()->with('error', 'No hay un fichaje activo para iniciar la pausa.');
+        }
+
+        if ($activeEntry->break_started_at !== null) {
+            return back()->with('error', 'La pausa ya esta iniciada.');
+        }
+
+        $activeEntry->update([
+            'break_started_at' => now(),
+        ]);
+
+        return back()->with('success', 'Pausa iniciada correctamente.');
+    }
+
+    public function endBreak(Request $request): RedirectResponse
+    {
+        $intern = $this->resolveActionIntern($request, true);
+        if ($intern === null) {
+            return back()->with('error', 'Selecciona un becario valido para finalizar la pausa.');
+        }
+
+        $activeEntry = TimeClockEntry::query()
+            ->where('intern_id', $intern->id)
+            ->whereNull('ended_at')
+            ->latest('started_at')
+            ->first();
+
+        if ($activeEntry === null || $activeEntry->break_started_at === null) {
+            return back()->with('error', 'No hay una pausa activa para finalizar.');
+        }
+
+        $newBreakMinutes = $activeEntry->break_minutes + max(0, $activeEntry->break_started_at->diffInMinutes(now()));
+
+        $activeEntry->update([
+            'break_started_at' => null,
+            'break_minutes' => $newBreakMinutes,
+        ]);
+
+        return back()->with('success', 'Pausa finalizada correctamente.');
+    }
+
+    public function clockOut(Request $request): RedirectResponse
+    {
+        $intern = $this->resolveActionIntern($request, true);
+        if ($intern === null) {
+            return back()->with('error', 'Selecciona un becario valido para fichar salida.');
+        }
+
+        $activeEntry = TimeClockEntry::query()
+            ->where('intern_id', $intern->id)
+            ->whereNull('ended_at')
+            ->latest('started_at')
+            ->first();
+
+        if ($activeEntry === null) {
+            return back()->with('error', 'No hay un fichaje activo para cerrar.');
+        }
+
+        $breakMinutes = (int) $activeEntry->break_minutes;
+
+        if ($activeEntry->break_started_at !== null) {
+            $breakMinutes += max(0, $activeEntry->break_started_at->diffInMinutes(now()));
+        }
+
+        $activeEntry->update([
+            'ended_at' => now(),
+            'break_started_at' => null,
+            'break_minutes' => $breakMinutes,
+        ]);
+
+        return back()->with('success', 'Salida registrada correctamente.');
+    }
+
+    public function storeManualEntry(Request $request): RedirectResponse
+    {
+        if (!$this->canManageTeam($request->user())) {
+            return back()->with('error', 'No tienes permisos para registrar fichajes manuales.');
+        }
+
+        $validated = $request->validate([
+            'intern_id' => ['required', 'integer', Rule::exists('interns', 'id')],
+            'started_at' => ['required', 'date'],
+            'ended_at' => ['required', 'date', 'after:started_at'],
+            'break_minutes' => ['nullable', 'integer', 'min:0', 'max:720'],
+            'manual_reason' => ['required', 'string', 'max:500'],
+        ]);
+
+        TimeClockEntry::query()->create([
+            'intern_id' => (int) $validated['intern_id'],
+            'entered_by_user_id' => $request->user()?->id,
+            'source' => 'tutor_manual',
+            'started_at' => Carbon::parse((string) $validated['started_at']),
+            'ended_at' => Carbon::parse((string) $validated['ended_at']),
+            'break_minutes' => (int) ($validated['break_minutes'] ?? 0),
+            'manual_reason' => trim((string) $validated['manual_reason']),
+        ]);
+
+        return back()->with('success', 'Fichaje manual registrado correctamente.');
+    }
+
+    public function upsertSchedule(Request $request): RedirectResponse
+    {
+        if (!$this->canManageTeam($request->user())) {
+            return back()->with('error', 'No tienes permisos para gestionar horarios.');
+        }
+
+        $validated = $request->validate([
+            'schedule_id' => ['nullable', 'integer', Rule::exists('intern_hour_schedules', 'id')],
+            'intern_id' => ['required', 'integer', Rule::exists('interns', 'id')],
+            'season_name' => ['nullable', 'string', 'max:120'],
+            'starts_on' => ['required', 'date'],
+            'ends_on' => ['nullable', 'date', 'after_or_equal:starts_on'],
+            'is_active' => ['nullable', 'boolean'],
+            'monday_minutes' => ['required', 'integer', 'min:0', 'max:1440'],
+            'tuesday_minutes' => ['required', 'integer', 'min:0', 'max:1440'],
+            'wednesday_minutes' => ['required', 'integer', 'min:0', 'max:1440'],
+            'thursday_minutes' => ['required', 'integer', 'min:0', 'max:1440'],
+            'friday_minutes' => ['required', 'integer', 'min:0', 'max:1440'],
+            'saturday_minutes' => ['required', 'integer', 'min:0', 'max:1440'],
+            'sunday_minutes' => ['required', 'integer', 'min:0', 'max:1440'],
+            'notes' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $schedule = null;
+        if (!empty($validated['schedule_id'])) {
+            $schedule = InternHourSchedule::query()
+                ->where('intern_id', (int) $validated['intern_id'])
+                ->find($validated['schedule_id']);
+        }
+
+        $payload = [
+            'intern_id' => (int) $validated['intern_id'],
+            'created_by_user_id' => $request->user()?->id,
+            'season_name' => trim((string) ($validated['season_name'] ?? '')) ?: null,
+            'starts_on' => Carbon::parse((string) $validated['starts_on'])->toDateString(),
+            'ends_on' => !empty($validated['ends_on'])
+                ? Carbon::parse((string) $validated['ends_on'])->toDateString()
+                : null,
+            'is_active' => (bool) ($validated['is_active'] ?? true),
+            'monday_minutes' => (int) $validated['monday_minutes'],
+            'tuesday_minutes' => (int) $validated['tuesday_minutes'],
+            'wednesday_minutes' => (int) $validated['wednesday_minutes'],
+            'thursday_minutes' => (int) $validated['thursday_minutes'],
+            'friday_minutes' => (int) $validated['friday_minutes'],
+            'saturday_minutes' => (int) $validated['saturday_minutes'],
+            'sunday_minutes' => (int) $validated['sunday_minutes'],
+            'notes' => trim((string) ($validated['notes'] ?? '')) ?: null,
+        ];
+
+        if ($schedule !== null) {
+            $schedule->update($payload);
+
+            return back()->with('success', 'Horario actualizado correctamente.');
+        }
+
+        InternHourSchedule::query()->create($payload);
+
+        return back()->with('success', 'Horario creado correctamente.');
+    }
+
+    public function destroySchedule(InternHourSchedule $schedule): RedirectResponse
+    {
+        if (!$this->canManageTeam(request()->user())) {
+            return back()->with('error', 'No tienes permisos para eliminar horarios.');
+        }
+
+        $schedule->delete();
+
+        return back()->with('success', 'Horario eliminado correctamente.');
+    }
+
+    public function storeAbsenceRequest(Request $request): RedirectResponse
+    {
+        $intern = $this->resolveActionIntern($request, true);
+        if ($intern === null) {
+            return back()->with('error', 'Selecciona un becario valido para registrar la ausencia.');
+        }
+
+        $validated = $request->validate([
+            'start_date' => ['required', 'date'],
+            'end_date' => ['required', 'date', 'after_or_equal:start_date'],
+            'reason' => ['required', 'string', 'max:500'],
+            'attachment' => ['nullable', 'file', 'max:5120', 'mimes:pdf,png,jpg,jpeg,webp'],
+        ]);
+
+        $attachmentPath = null;
+        if ($request->hasFile('attachment')) {
+            $attachmentPath = $request->file('attachment')->store("time-control/absence/{$intern->id}", 'public');
+        }
+
+        InternAbsenceRequest::query()->create([
+            'intern_id' => $intern->id,
+            'requested_by_user_id' => $request->user()?->id,
+            'start_date' => Carbon::parse((string) $validated['start_date'])->toDateString(),
+            'end_date' => Carbon::parse((string) $validated['end_date'])->toDateString(),
+            'reason' => trim((string) $validated['reason']),
+            'attachment_path' => $attachmentPath,
+            'status' => 'pending',
+        ]);
+
+        return back()->with('success', 'Ausencia registrada correctamente.');
+    }
+
+    public function reviewAbsenceRequest(Request $request, InternAbsenceRequest $absence): RedirectResponse
+    {
+        if (!$this->canManageTeam($request->user())) {
+            return back()->with('error', 'No tienes permisos para revisar ausencias.');
+        }
+
+        $validated = $request->validate([
+            'status' => ['required', Rule::in(['approved', 'rejected'])],
+            'review_note' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $absence->update([
+            'status' => $validated['status'],
+            'review_note' => trim((string) ($validated['review_note'] ?? '')) ?: null,
+            'reviewed_by_user_id' => $request->user()?->id,
+            'reviewed_at' => now(),
+        ]);
+
+        return back()->with('success', 'Ausencia revisada correctamente.');
+    }
+
+    public function exportPdf(Request $request)
+    {
+        $intern = $this->resolveActionIntern($request, true);
+        if ($intern === null) {
+            return back()->with('error', 'Selecciona un becario valido para exportar el parte.');
+        }
+
+        $range = $this->normalizeRange($request->string('range')->toString());
+        $rangeWindow = $this->resolveRangeWindow($range);
+        $schedules = InternHourSchedule::query()
+            ->where('intern_id', $intern->id)
+            ->orderByDesc('starts_on')
+            ->get();
+
+        $entries = TimeClockEntry::query()
+            ->where('intern_id', $intern->id)
+            ->whereBetween('started_at', [$rangeWindow['start'], $rangeWindow['end']])
+            ->orderBy('started_at')
+            ->get();
+
+        $allEntries = TimeClockEntry::query()
+            ->where('intern_id', $intern->id)
+            ->orderBy('started_at')
+            ->get();
+
+        $workedByDate = $this->buildWorkedMinutesByDate($entries);
+        $days = $this->buildDayRows(
+            $rangeWindow['start']->copy()->startOfDay(),
+            $rangeWindow['end']->copy()->startOfDay(),
+            $workedByDate,
+            $schedules,
+        );
+        $summary = $this->buildSummaryData($intern, $rangeWindow, $days, $allEntries);
+
+        $filename = 'parte-horas-'.$intern->id.'-'.$rangeWindow['start']->format('Ymd').'-'.$rangeWindow['end']->format('Ymd').'.pdf';
+
+        return Pdf::view('pdf.time-control-report', [
+            'intern' => [
+                'name' => trim($intern->first_name.' '.$intern->last_name),
+                'email' => $intern->email,
+            ],
+            'generatedAt' => now()->format('d/m/Y H:i'),
+            'range' => $summary['range'],
+            'days' => $days,
+            'summary' => $summary,
+        ])->name($filename)->download();
+    }
+
+    private function resolveSelectedIntern(Request $request, Collection $interns, bool $isInternUser, User $user): ?Intern
+    {
+        if ($isInternUser) {
+            return $interns->firstWhere('user_id', $user->id);
+        }
+
+        $selectedInternId = $request->integer('intern_id');
+        if ($selectedInternId > 0) {
+            $selected = $interns->firstWhere('id', $selectedInternId);
+
+            if ($selected instanceof Intern) {
+                return $selected;
+            }
+        }
+
+        $firstIntern = $interns->first();
+
+        return $firstIntern instanceof Intern ? $firstIntern : null;
+    }
+
+    private function resolveActionIntern(Request $request, bool $requireForStaff): ?Intern
+    {
+        $user = $request->user();
+        if ($user === null) {
+            return null;
+        }
+
+        if ($user->hasRole('intern')) {
+            return $user->intern()->first();
+        }
+
+        $internId = $request->integer('intern_id');
+        if ($internId > 0) {
+            return Intern::query()->find($internId);
+        }
+
+        if ($requireForStaff) {
+            return null;
+        }
+
+        return Intern::query()
+            ->orderBy('last_name')
+            ->orderBy('first_name')
+            ->first();
+    }
+
+    private function canManageTeam(?User $user): bool
+    {
+        if ($user === null) {
+            return false;
+        }
+
+        return $user->hasAnyRole(['admin', 'tutor']);
+    }
+
+    private function normalizeRange(string $range): string
+    {
+        if (in_array($range, ['week', 'biweekly', 'month'], true)) {
+            return $range;
+        }
+
+        return 'month';
+    }
+
+    private function normalizeMonthCursor(string $monthCursor): string
+    {
+        if (preg_match('/^\d{4}\-\d{2}$/', $monthCursor) === 1) {
+            try {
+                return Carbon::createFromFormat('Y-m', $monthCursor)->format('Y-m');
+            } catch (\Throwable) {
+                return now()->format('Y-m');
+            }
+        }
+
+        return now()->format('Y-m');
+    }
+
+    /**
+     * @return array{start: CarbonInterface, end: CarbonInterface, label: string}
+     */
+    private function resolveRangeWindow(string $range): array
+    {
+        $today = now();
+
+        if ($range === 'week') {
+            return [
+                'start' => $today->copy()->startOfWeek(Carbon::MONDAY)->startOfDay(),
+                'end' => $today->copy()->endOfWeek(Carbon::SUNDAY)->endOfDay(),
+                'label' => 'Semanal',
+            ];
+        }
+
+        if ($range === 'biweekly') {
+            return [
+                'start' => $today->copy()->subDays(13)->startOfDay(),
+                'end' => $today->copy()->endOfDay(),
+                'label' => 'Quincenal',
+            ];
+        }
+
+        return [
+            'start' => $today->copy()->startOfMonth()->startOfDay(),
+            'end' => $today->copy()->endOfMonth()->endOfDay(),
+            'label' => 'Mensual',
+        ];
+    }
+
+    /**
+     * @return array<string, int>
+     */
+    private function buildWorkedMinutesByDate(Collection $entries): array
+    {
+        $workedByDate = [];
+
+        foreach ($entries as $entry) {
+            if (!$entry instanceof TimeClockEntry || !$entry->started_at) {
+                continue;
+            }
+
+            $dateKey = $entry->started_at->toDateString();
+            $workedByDate[$dateKey] = ($workedByDate[$dateKey] ?? 0) + $this->effectiveMinutesForEntry($entry);
+        }
+
+        return $workedByDate;
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function buildDayRows(CarbonInterface $start, CarbonInterface $end, array $workedByDate, Collection $schedules): array
+    {
+        $rows = [];
+        $today = now()->startOfDay();
+        $cursor = $start->copy()->startOfDay();
+
+        while ($cursor->lte($end)) {
+            $dateKey = $cursor->toDateString();
+            $workedMinutes = (int) ($workedByDate[$dateKey] ?? 0);
+            $plannedMinutes = $this->plannedMinutesForDate($cursor, $schedules);
+            $status = $this->resolveDayStatus($cursor, $workedMinutes, $plannedMinutes);
+
+            $rows[] = [
+                'date' => $dateKey,
+                'label' => $cursor->format('d/m'),
+                'weekday' => $this->weekdayLabel($cursor),
+                'worked_minutes' => $workedMinutes,
+                'planned_minutes' => $plannedMinutes,
+                'worked_hours' => $this->minutesToHours($workedMinutes),
+                'planned_hours' => $this->minutesToHours($plannedMinutes),
+                'status' => $status,
+                'is_today' => $cursor->equalTo($today),
+                'is_past' => $cursor->lt($today),
+            ];
+
+            $cursor = $cursor->addDay();
+        }
+
+        return $rows;
+    }
+
+    /**
+     * @return array{range: array<string, mixed>, progress: array<string, mixed>}
+     */
+    private function buildSummaryData(Intern $intern, array $rangeWindow, array $rangeDays, Collection $allEntries): array
+    {
+        $rangeWorkedMinutes = (int) collect($rangeDays)->sum('worked_minutes');
+        $rangePlannedMinutes = (int) collect($rangeDays)->sum('planned_minutes');
+        $rangeCompliancePercent = $rangePlannedMinutes > 0
+            ? round(($rangeWorkedMinutes / $rangePlannedMinutes) * 100, 1)
+            : 0;
+
+        $totalWorkedMinutes = (int) $allEntries->sum(fn ($entry) => $entry instanceof TimeClockEntry
+            ? $this->effectiveMinutesForEntry($entry)
+            : 0);
+        $requiredHours = (int) ($intern->required_hours ?? 0);
+        $requiredMinutes = max(0, $requiredHours * 60);
+        $progressPercent = $requiredMinutes > 0
+            ? min(100, round(($totalWorkedMinutes / $requiredMinutes) * 100, 1))
+            : 0;
+        $expectedPercent = $this->expectedProgressPercent($intern);
+
+        return [
+            'range' => [
+                'label' => (string) ($rangeWindow['label'] ?? 'Mensual'),
+                'start' => ($rangeWindow['start'] ?? now())->toDateString(),
+                'end' => ($rangeWindow['end'] ?? now())->toDateString(),
+                'worked_minutes' => $rangeWorkedMinutes,
+                'worked_hours' => $this->minutesToHours($rangeWorkedMinutes),
+                'planned_minutes' => $rangePlannedMinutes,
+                'planned_hours' => $this->minutesToHours($rangePlannedMinutes),
+                'compliance_percent' => $rangeCompliancePercent,
+                'delay_minutes' => max(0, $rangePlannedMinutes - $rangeWorkedMinutes),
+            ],
+            'progress' => [
+                'required_hours' => $requiredHours,
+                'total_worked_minutes' => $totalWorkedMinutes,
+                'total_worked_hours' => $this->minutesToHours($totalWorkedMinutes),
+                'progress_percent' => $progressPercent,
+                'expected_percent' => $expectedPercent,
+            ],
+        ];
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $monthDays
+     * @return array<int, array<string, string>>
+     */
+    private function buildAlerts(array $summary, array $monthDays, ?TimeClockEntry $activeEntry): array
+    {
+        $alerts = [];
+        $today = now()->toDateString();
+        $lastWeekStart = now()->subDays(6)->toDateString();
+        $daysWithoutClocking = collect($monthDays)
+            ->filter(function (array $day) use ($lastWeekStart, $today): bool {
+                $date = (string) ($day['date'] ?? '');
+                $plannedMinutes = (int) ($day['planned_minutes'] ?? 0);
+                $workedMinutes = (int) ($day['worked_minutes'] ?? 0);
+
+                return $date >= $lastWeekStart
+                    && $date <= $today
+                    && $plannedMinutes > 0
+                    && $workedMinutes === 0;
+            })
+            ->count();
+
+        if ($daysWithoutClocking >= 2) {
+            $alerts[] = [
+                'level' => 'warning',
+                'title' => 'Dias sin fichaje',
+                'message' => "Se han detectado {$daysWithoutClocking} dias recientes sin fichaje.",
+            ];
+        }
+
+        $delayMinutes = (int) data_get($summary, 'range.delay_minutes', 0);
+        if ($delayMinutes >= 120) {
+            $alerts[] = [
+                'level' => 'warning',
+                'title' => 'Retraso acumulado',
+                'message' => 'Existe un desfase relevante entre horas planificadas y horas trabajadas.',
+            ];
+        }
+
+        if ($activeEntry !== null && $activeEntry->started_at?->lt(now()->subHours(12))) {
+            $alerts[] = [
+                'level' => 'info',
+                'title' => 'Fichaje abierto',
+                'message' => 'Hay un fichaje abierto con una duracion superior a 12 horas.',
+            ];
+        }
+
+        $expectedPercent = data_get($summary, 'progress.expected_percent');
+        $realPercent = (float) data_get($summary, 'progress.progress_percent', 0);
+
+        if (is_numeric($expectedPercent) && $realPercent + 5 < (float) $expectedPercent) {
+            $alerts[] = [
+                'level' => 'warning',
+                'title' => 'Desfase respecto al objetivo',
+                'message' => 'El avance real esta por debajo del esperado en esta fase de las practicas.',
+            ];
+        }
+
+        if (empty($alerts)) {
+            $alerts[] = [
+                'level' => 'success',
+                'title' => 'Sin incidencias',
+                'message' => 'No se detectaron alertas relevantes en el periodo revisado.',
+            ];
+        }
+
+        return $alerts;
+    }
+
+    private function expectedProgressPercent(Intern $intern): ?float
+    {
+        if ($intern->internship_start_date === null || $intern->internship_end_date === null) {
+            return null;
+        }
+
+        $start = Carbon::parse($intern->internship_start_date)->startOfDay();
+        $end = Carbon::parse($intern->internship_end_date)->endOfDay();
+        $today = now();
+
+        if ($today->lte($start)) {
+            return 0;
+        }
+
+        if ($today->gte($end)) {
+            return 100;
+        }
+
+        $totalDays = max(1, $start->diffInDays($end));
+        $elapsedDays = max(0, $start->diffInDays($today));
+
+        return round(($elapsedDays / $totalDays) * 100, 1);
+    }
+
+    private function plannedMinutesForDate(CarbonInterface $date, Collection $schedules): int
+    {
+        foreach ($schedules as $schedule) {
+            if (!$schedule instanceof InternHourSchedule || !$schedule->is_active || !$schedule->starts_on) {
+                continue;
+            }
+
+            $startsOn = Carbon::parse($schedule->starts_on)->startOfDay();
+            $endsOn = $schedule->ends_on ? Carbon::parse($schedule->ends_on)->endOfDay() : null;
+
+            if ($date->lt($startsOn)) {
+                continue;
+            }
+
+            if ($endsOn !== null && $date->gt($endsOn)) {
+                continue;
+            }
+
+            return match ($date->dayOfWeekIso) {
+                1 => (int) $schedule->monday_minutes,
+                2 => (int) $schedule->tuesday_minutes,
+                3 => (int) $schedule->wednesday_minutes,
+                4 => (int) $schedule->thursday_minutes,
+                5 => (int) $schedule->friday_minutes,
+                6 => (int) $schedule->saturday_minutes,
+                7 => (int) $schedule->sunday_minutes,
+                default => 0,
+            };
+        }
+
+        return 0;
+    }
+
+    private function resolveDayStatus(CarbonInterface $date, int $workedMinutes, int $plannedMinutes): string
+    {
+        if ($plannedMinutes === 0 && $workedMinutes === 0) {
+            return 'off';
+        }
+
+        if ($plannedMinutes > 0 && $workedMinutes === 0) {
+            return $date->isFuture() ? 'scheduled' : 'missing';
+        }
+
+        if ($plannedMinutes > 0 && $workedMinutes < $plannedMinutes) {
+            return 'partial';
+        }
+
+        if ($workedMinutes > $plannedMinutes + 30) {
+            return 'overtime';
+        }
+
+        return 'complete';
+    }
+
+    private function effectiveMinutesForEntry(TimeClockEntry $entry): int
+    {
+        if ($entry->started_at === null) {
+            return 0;
+        }
+
+        $endedAt = $entry->ended_at ?? now();
+        $grossMinutes = max(0, $entry->started_at->diffInMinutes($endedAt));
+        $breakMinutes = max(0, (int) $entry->break_minutes);
+
+        if ($entry->ended_at === null && $entry->break_started_at !== null) {
+            $breakMinutes += max(0, $entry->break_started_at->diffInMinutes(now()));
+        }
+
+        return max(0, $grossMinutes - $breakMinutes);
+    }
+
+    private function minutesToHours(int $minutes): float
+    {
+        return round($minutes / 60, 2);
+    }
+
+    private function weekdayLabel(CarbonInterface $date): string
+    {
+        return match ($date->dayOfWeekIso) {
+            1 => 'Lun',
+            2 => 'Mar',
+            3 => 'Mie',
+            4 => 'Jue',
+            5 => 'Vie',
+            6 => 'Sab',
+            7 => 'Dom',
+            default => '',
+        };
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function mapEntry(TimeClockEntry $entry): array
+    {
+        $effectiveMinutes = $this->effectiveMinutesForEntry($entry);
+
+        return [
+            'id' => $entry->id,
+            'source' => $entry->source,
+            'started_at' => $entry->started_at?->toIso8601String(),
+            'ended_at' => $entry->ended_at?->toIso8601String(),
+            'break_minutes' => (int) $entry->break_minutes,
+            'manual_reason' => $entry->manual_reason,
+            'is_on_break' => $entry->break_started_at !== null,
+            'effective_minutes' => $effectiveMinutes,
+            'effective_hours' => $this->minutesToHours($effectiveMinutes),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function mapSchedule(InternHourSchedule $schedule): array
+    {
+        $weeklyTotal = (int) (
+            $schedule->monday_minutes
+            + $schedule->tuesday_minutes
+            + $schedule->wednesday_minutes
+            + $schedule->thursday_minutes
+            + $schedule->friday_minutes
+            + $schedule->saturday_minutes
+            + $schedule->sunday_minutes
+        );
+
+        return [
+            'id' => $schedule->id,
+            'season_name' => $schedule->season_name,
+            'starts_on' => $schedule->starts_on?->toDateString(),
+            'ends_on' => $schedule->ends_on?->toDateString(),
+            'is_active' => (bool) $schedule->is_active,
+            'notes' => $schedule->notes,
+            'weekly_total_minutes' => $weeklyTotal,
+            'weekly_total_hours' => $this->minutesToHours($weeklyTotal),
+            'days' => [
+                'monday' => (int) $schedule->monday_minutes,
+                'tuesday' => (int) $schedule->tuesday_minutes,
+                'wednesday' => (int) $schedule->wednesday_minutes,
+                'thursday' => (int) $schedule->thursday_minutes,
+                'friday' => (int) $schedule->friday_minutes,
+                'saturday' => (int) $schedule->saturday_minutes,
+                'sunday' => (int) $schedule->sunday_minutes,
+            ],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function mapAbsence(InternAbsenceRequest $absence): array
+    {
+        return [
+            'id' => $absence->id,
+            'start_date' => $absence->start_date?->toDateString(),
+            'end_date' => $absence->end_date?->toDateString(),
+            'reason' => $absence->reason,
+            'status' => $absence->status,
+            'attachment_url' => $absence->attachment_url,
+            'review_note' => $absence->review_note,
+            'reviewed_at' => $absence->reviewed_at?->toIso8601String(),
+            'requested_by_name' => $absence->requestedBy?->name,
+            'reviewed_by_name' => $absence->reviewedBy?->name,
+            'created_at' => $absence->created_at?->toIso8601String(),
+        ];
+    }
+}

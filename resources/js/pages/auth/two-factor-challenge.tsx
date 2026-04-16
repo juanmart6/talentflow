@@ -24,18 +24,18 @@ export default function TwoFactorChallenge() {
     }>(() => {
         if (showRecoveryInput) {
             return {
-                title: 'Codigo de recuperacion',
+                title: 'Codigo de recuperación',
                 description:
-                    'Confirma el acceso a tu cuenta introduciendo uno de tus codigos de recuperacion.',
-                toggleText: 'iniciar sesion con un codigo de autenticacion',
+                    'Confirma el acceso a tu cuenta introduciendo uno de tus codigos de recuperación.',
+                toggleText: 'iniciar sesión con un codigo de autenticación',
             };
         }
 
         return {
-            title: 'Codigo de autenticacion',
+            title: 'Codigo de autenticación',
             description:
-                'Introduce el codigo generado por tu aplicacion autenticadora.',
-            toggleText: 'iniciar sesion con un codigo de recuperacion',
+                'Introduce el codigo generado por tu aplicación autenticadora.',
+            toggleText: 'iniciar sesión con un codigo de recuperación',
         };
     }, [showRecoveryInput]);
 
@@ -50,7 +50,7 @@ export default function TwoFactorChallenge() {
             title={authConfigContent.title}
             description={authConfigContent.description}
         >
-            <Head title="Autenticacion en dos pasos" />
+            <Head title="Autenticación en dos pasos" />
 
             <div className="space-y-6">
                 <Form
@@ -66,7 +66,7 @@ export default function TwoFactorChallenge() {
                                     <Input
                                         name="recovery_code"
                                         type="text"
-                                        placeholder="Introduce el codigo de recuperacion"
+                                        placeholder="Introduce el codigo de recuperación"
                                         autoFocus={showRecoveryInput}
                                         required
                                     />

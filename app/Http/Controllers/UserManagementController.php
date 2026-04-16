@@ -147,30 +147,23 @@ class UserManagementController extends Controller
             'role' => [
                 'required',
                 'string',
-                Rule::exists('roles', 'name')->where(fn ($query) => $query->where('name', '!=', 'intern')),
+                Rule::in(['admin', 'tutor']),
             ],
         ]);
 
         $newRole = $validated['role'];
-        $isAdminUser = $user->hasRole('admin');
         $isInternUser = $user->hasRole('intern');
 
         if ($isInternUser || $newRole === 'intern') {
             return redirect()
                 ->back()
-                ->with('error', 'Los becarios se gestionan desde GestiÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n de Becarios.');
+                ->with('error', 'Los becarios se gestionan desde Gestión de Becarios.');
         }
 
-        if ($isAdminUser && $newRole !== 'admin') {
+        if ($user->isDeletionProtected() && $newRole !== 'admin') {
             return redirect()
                 ->back()
-                ->with('error', 'No se puede modificar el rol de una cuenta administradora.');
-        }
-
-        if (!$isAdminUser && $newRole === 'admin') {
-            return redirect()
-                ->back()
-                ->with('error', 'No se puede asignar el rol administrador desde esta pantalla.');
+                ->with('error', 'La cuenta admin@talentflow.es esta protegida y no se puede cambiar su rol.');
         }
 
         $user->syncRoles([$newRole]);
@@ -247,7 +240,7 @@ class UserManagementController extends Controller
             ->exists();
 
         if ($hasPendingInvitation) {
-            return back()->with('error', 'Ya existe una invitaciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n activa para ese correo.');
+            return back()->with('error', 'Ya existe una invitación activa para ese correo.');
         }
 
         $invitation = UserInvitation::create([
@@ -265,20 +258,20 @@ class UserManagementController extends Controller
             new UserInvitationMail($invitation, $acceptUrl)
         );
 
-        return back()->with('success', 'InvitaciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n de staff creada correctamente.');
+        return back()->with('success', 'Invitación de staff creada correctamente.');
     }
 
     public function destroyInvitation(UserInvitation $invitation): RedirectResponse
     {
         if ($invitation->accepted_at !== null) {
-            return back()->with('error', 'No se puede cancelar una invitaciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n ya aceptada.');
+            return back()->with('error', 'No se puede cancelar una invitación ya aceptada.');
         }
 
         $invitation->forceFill([
             'expires_at' => now()->subSecond(),
         ])->save();
 
-        return back()->with('info', 'InvitaciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n cancelada correctamente.');
+        return back()->with('info', 'Invitación cancelada correctamente.');
     }
 
     public function showInvitation(string $token): Response
@@ -360,15 +353,15 @@ class UserManagementController extends Controller
             ->first();
 
         if (!$invitation) {
-            abort(404, 'InvitaciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n no encontrada.');
+            abort(404, 'Invitación no encontrada.');
         }
 
         if ($invitation->accepted_at !== null) {
-            abort(410, 'Esta invitaciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n ya fue aceptada.');
+            abort(410, 'Esta invitación ya fue aceptada.');
         }
 
         if ($invitation->expires_at === null || $invitation->expires_at->isPast()) {
-            abort(410, 'Esta invitaciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n ha caducado.');
+            abort(410, 'Esta invitación ha caducado.');
         }
 
         return $invitation;
@@ -376,6 +369,10 @@ class UserManagementController extends Controller
 
     public function destroyUser(User $user): RedirectResponse
     {
+        if ($user->isDeletionProtected()) {
+            return back()->with('error', 'La cuenta admin@talentflow.es está protegida y no se puede eliminar.');
+        }
+
         if (request()->user()?->id === $user->id) {
             return back()->with('error', 'No puedes eliminar tu propio usuario.');
         }
@@ -445,4 +442,3 @@ class UserManagementController extends Controller
         return 'Usuario';
     }
 }
-

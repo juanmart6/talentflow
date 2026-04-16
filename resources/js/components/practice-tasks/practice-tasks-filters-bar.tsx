@@ -112,7 +112,7 @@ export default function PracticeTasksFiltersBar(props: PracticeTasksFiltersBarPr
     }, []);
 
     return (
-        <form className={`${UI_PRESETS.filterBar} mb-2`} onSubmit={(event) => event.preventDefault()}>
+        <form className={`${UI_PRESETS.filterBarEmphasis} mb-2`} onSubmit={(event) => event.preventDefault()}>
             <div className="flex flex-col gap-3">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
                     <div className="relative min-w-0 flex-1">
@@ -288,5 +288,4 @@ export default function PracticeTasksFiltersBar(props: PracticeTasksFiltersBarPr
         </form>
     );
 }
-
 

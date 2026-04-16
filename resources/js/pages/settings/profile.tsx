@@ -1,4 +1,3 @@
-import { Transition } from '@headlessui/react';
 import { Form, Head, router, usePage } from '@inertiajs/react';
 import { Camera, Save, Trash2, Upload } from 'lucide-react';
 import type { ChangeEvent } from 'react';
@@ -46,6 +45,7 @@ export default function Profile({
 
     const getInitials = useInitials();
     const avatarInputRef = useRef<HTMLInputElement | null>(null);
+    const profileHasChangesRef = useRef(false);
     const [avatarFile, setAvatarFile] = useState<File | null>(null);
     const [isAvatarUploading, setIsAvatarUploading] = useState(false);
     const [isAvatarRemoving, setIsAvatarRemoving] = useState(false);
@@ -162,49 +162,57 @@ export default function Profile({
                                 <Button
                                     type="button"
                                     variant="outline"
+                                    size="icon"
                                     className={
                                         UI_PRESETS.iconActionButtonPrimary
                                     }
                                     onClick={() =>
                                         avatarInputRef.current?.click()
                                     }
+                                    aria-label="Seleccionar imagen"
+                                    title="Seleccionar imagen"
                                 >
                                     <Camera className="size-4" />
-                                    Seleccionar imagen
                                 </Button>
 
                                 <Button
                                     type="button"
-                                    className="cursor-pointer"
+                                    variant="outline"
+                                    size="icon"
+                                    className={UI_PRESETS.iconActionButtonSuccess}
                                     onClick={handleAvatarUpload}
                                     disabled={isAvatarUploading || !avatarFile}
+                                    aria-label={
+                                        isAvatarUploading
+                                            ? 'Subiendo foto'
+                                            : 'Guardar foto'
+                                    }
+                                    title={
+                                        isAvatarUploading
+                                            ? 'Subiendo foto'
+                                            : 'Guardar foto'
+                                    }
                                 >
                                     {isAvatarUploading ? (
-                                        <>
-                                            <Upload className="size-4 animate-pulse" />
-                                            Subiendo...
-                                        </>
+                                        <Upload className="size-4 animate-pulse" />
                                     ) : (
-                                        <>
-                                            <Save className="size-4" />
-                                            Guardar foto
-                                        </>
+                                        <Save className="size-4" />
                                     )}
                                 </Button>
 
                                 <Button
                                     type="button"
-                                    variant="secondary"
-                                    className="cursor-pointer"
+                                    variant="outline"
+                                    size="icon"
+                                    className={UI_PRESETS.iconActionButtonDanger}
                                     onClick={handleAvatarDelete}
                                     disabled={
                                         isAvatarRemoving || !auth.user.avatar
                                     }
+                                    aria-label="Quitar foto"
+                                    title="Quitar foto"
                                 >
                                     <Trash2 className="size-4" />
-                                    {isAvatarRemoving
-                                        ? 'Eliminando...'
-                                        : 'Quitar foto'}
                                 </Button>
                             </div>
 
@@ -231,9 +239,29 @@ export default function Profile({
                     options={{
                         preserveScroll: true,
                     }}
+                    onSubmit={(event) => {
+                        const formData = new FormData(event.currentTarget);
+                        const incomingName = String(formData.get('name') ?? '').trim();
+                        const incomingEmail = String(formData.get('email') ?? '').trim().toLowerCase();
+                        const currentName = auth.user.name.trim();
+                        const currentEmail = auth.user.email.trim().toLowerCase();
+
+                        profileHasChangesRef.current =
+                            incomingName !== currentName || incomingEmail !== currentEmail;
+                    }}
+                    onSuccess={() => {
+                        if (profileHasChangesRef.current) {
+                            toast.success('Información actualizada correctamente.');
+                        }
+
+                        profileHasChangesRef.current = false;
+                    }}
+                    onError={() => {
+                        profileHasChangesRef.current = false;
+                    }}
                     className={`${UI_PRESETS.sectionCard} space-y-5`}
                 >
-                    {({ processing, recentlySuccessful, errors }) => (
+                    {({ processing, errors }) => (
                         <>
                             <SectionIntro
                                 title="Datos de acceso"
@@ -281,24 +309,14 @@ export default function Profile({
                                 <div className="flex items-center justify-end gap-3 lg:self-end">
                                     <Button
                                         disabled={processing}
-                                        className="cursor-pointer whitespace-nowrap"
+                                        size="icon"
+                                        className={`${UI_PRESETS.saveButton} cursor-pointer`}
                                         data-test="update-profile-button"
+                                        aria-label="Guardar cambios de perfil"
+                                        title="Guardar cambios de perfil"
                                     >
                                         <Save className="size-4" />
-                                        Guardar cambios
                                     </Button>
-
-                                    <Transition
-                                        show={recentlySuccessful}
-                                        enter="transition ease-in-out"
-                                        enterFrom="opacity-0"
-                                        leave="transition ease-in-out"
-                                        leaveTo="opacity-0"
-                                    >
-                                        <p className="text-sm text-neutral-600">
-                                            Guardado
-                                        </p>
-                                    </Transition>
                                 </div>
                             </div>
 

@@ -127,6 +127,11 @@ class ProfileController extends Controller
     public function destroy(ProfileDeleteRequest $request): RedirectResponse
     {
         $user = $request->user();
+
+        if ($user->isDeletionProtected()) {
+            return back()->with('error', 'La cuenta admin@talentflow.es está protegida y no se puede desactivar.');
+        }
+
         DB::transaction(function () use ($user): void {
             if (Schema::hasTable('sessions') && Schema::hasColumn('sessions', 'user_id')) {
                 DB::table('sessions')
@@ -149,6 +154,6 @@ class ProfileController extends Controller
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        return redirect('/')->with('success', 'CUENTA ELIMINADA POR USUARIO');
+        return redirect('/')->with('success', 'Cuenta eliminada por el usuario.');
     }
 }

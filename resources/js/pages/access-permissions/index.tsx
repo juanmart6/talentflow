@@ -107,11 +107,12 @@ export default function UsersIndexPage({
 
         return `Mostrando ${invitations.from} - ${invitations.to} de ${invitations.total} invitaciones`;
     }, [invitations.from, invitations.to, invitations.total]);
+    const flash = page.props.flash;
 
     useEffect(() => {
-        const successMessage = page.props.flash?.success;
-        const errorMessage = page.props.flash?.error;
-        const infoMessage = page.props.flash?.info;
+        const successMessage = flash?.success;
+        const errorMessage = flash?.error;
+        const infoMessage = flash?.info;
 
         if (successMessage) {
             toast.success(successMessage);
@@ -124,7 +125,7 @@ export default function UsersIndexPage({
         if (infoMessage) {
             toast.info(infoMessage);
         }
-    }, [page.props.flash?.success, page.props.flash?.error, page.props.flash?.info]);
+    }, [flash]);
 
     const handleRoleChange = (userId: number, role: string) => {
         router.patch(
@@ -265,7 +266,7 @@ export default function UsersIndexPage({
 
                 <div className={UI_PRESETS.pageSection}>
                     <section className={UI_PRESETS.sectionCard}>
-                        <div className="-mx-4 -mt-4 border-b border-sidebar-border/70 px-4 pt-4 dark:border-sidebar-border">
+                        <div className={UI_PRESETS.tabsHeaderEmphasis}>
                             <AccessManagementTabs activeTab={activeTab} onTabChange={setActiveTab} />
                         </div>
 

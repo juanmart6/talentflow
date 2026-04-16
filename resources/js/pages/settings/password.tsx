@@ -117,7 +117,7 @@ export default function Password() {
                                     <Button
                                         disabled={processing}
                                         size="icon"
-                                        className="cursor-pointer"
+                                        className={`${UI_PRESETS.saveButton} cursor-pointer`}
                                         data-test="update-password-button"
                                         aria-label="Guardar contraseña"
                                         title="Guardar contraseña"

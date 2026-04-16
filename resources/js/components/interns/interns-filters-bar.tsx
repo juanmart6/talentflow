@@ -68,7 +68,7 @@ export default function InternsFiltersBar({
     trainingPrograms,
 }: InternsFiltersBarProps) {
     return (
-        <form onSubmit={(event) => event.preventDefault()} className={`${UI_PRESETS.filterBar} mb-2`}>
+        <form onSubmit={(event) => event.preventDefault()} className={`${UI_PRESETS.filterBarEmphasis} mb-2`}>
             <div className="flex flex-col gap-3">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
                     <div className="relative min-w-0 flex-1">

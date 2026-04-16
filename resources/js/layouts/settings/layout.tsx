@@ -44,7 +44,7 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
                 />
 
                 <section className={UI_PRESETS.sectionCard}>
-                    <div className="-mx-4 -mt-4 border-b border-sidebar-border/70 px-4 pt-4 dark:border-sidebar-border">
+                    <div className={UI_PRESETS.tabsHeaderEmphasis}>
                         <div className="flex flex-wrap items-end gap-1.5">
                             {settingsTabs.map((item, index) => (
                                 <Button
