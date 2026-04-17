@@ -1,6 +1,7 @@
-﻿import { Head, router, usePage } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
+import usersRoutes from '@/actions/App/Http/Controllers/UserManagementController';
 import AccessManagementTabs from '@/components/access-permissions/access-management-tabs';
 import type { AccessManagementTab } from '@/components/access-permissions/access-management-tabs';
 import InvitationsSection from '@/components/access-permissions/invitations-section';
@@ -11,7 +12,6 @@ import TablePagination from '@/components/shared/table-pagination';
 import AppLayout from '@/layouts/app-layout';
 import { permissionModuleLabels } from '@/lib/access-permissions/access-permissions';
 import { UI_PRESETS } from '@/lib/ui-presets';
-import usersRoutes from '@/routes/users';
 import type { BreadcrumbItem } from '@/types';
 import type { InvitationRow, UserRow, UsersPageProps } from '@/types/domains/access-permissions';
 
@@ -339,8 +339,8 @@ export default function UsersIndexPage({
             </div>
             <ConfirmDeleteDialog
                 open={userToDelete !== null}
-                title="Confirmar eliminación"
-                description="Esta acción eliminará el usuario seleccionado."
+                title="Confirmar eliminaci�n"
+                description="Esta acci�n eliminar� el usuario seleccionado."
                 entityLabel="Usuario"
                 entityName={userToDelete?.name}
                 isLoading={isDeletingUser}
@@ -349,9 +349,9 @@ export default function UsersIndexPage({
             />
             <ConfirmDeleteDialog
                 open={invitationToDelete !== null}
-                title="Confirmar cancelación"
-                description="Esta acción cancelará la invitación seleccionada."
-                entityLabel="Invitación"
+                title="Confirmar cancelaci�n"
+                description="Esta acci�n cancelar� la invitaci�n seleccionada."
+                entityLabel="Invitaci�n"
                 entityName={invitationToDelete?.email}
                 isLoading={isDeletingInvitation}
                 onCancel={() => setInvitationToDelete(null)}
@@ -360,3 +360,4 @@ export default function UsersIndexPage({
         </AppLayout>
     );
 }
+

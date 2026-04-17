@@ -24,7 +24,7 @@ export default function FileUploadField({
     required,
     error,
     selectedFileName,
-    emptyText = 'Ningún archivo seleccionado',
+    emptyText = 'NingÃºn archivo seleccionado',
     buttonText = 'Seleccionar archivo',
     onChange,
     buttonClassName,

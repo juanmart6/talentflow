@@ -1,7 +1,7 @@
-﻿import { Link } from '@inertiajs/react';
+import { Link } from '@inertiajs/react';
+import interns from '@/actions/App/Http/Controllers/InternController';
 import { formatSpanishDate, internStatusBadgeClass, internStatusLabel } from '@/lib/education-centers/education-centers';
 import { UI_PRESETS, stripedRowClass } from '@/lib/ui-presets';
-import interns from '@/routes/interns';
 
 type InternHistoryItem = {
     id: number;
@@ -24,8 +24,8 @@ export default function CenterInternsHistory({ internsHistory }: CenterInternsHi
     return (
         <section className="space-y-4 pt-4">
             <div>
-                <h2 className="text-lg font-bold tracking-tight">Histórico de becarios</h2>
-                <p className="text-sm text-muted-foreground">Relación de estudiantes del centro.</p>
+                <h2 className="text-lg font-bold tracking-tight">Hist�rico de becarios</h2>
+                <p className="text-sm text-muted-foreground">Relaci�n de estudiantes del centro.</p>
             </div>
 
             {internsHistory.length === 0 ? (
@@ -87,3 +87,4 @@ export default function CenterInternsHistory({ internsHistory }: CenterInternsHi
         </section>
     );
 }
+

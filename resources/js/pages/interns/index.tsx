@@ -1,13 +1,13 @@
-﻿import { Head, router, usePage } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import interns from '@/actions/App/Http/Controllers/InternController';
 import InternsFiltersBar from '@/components/interns/interns-filters-bar';
 import InternsTable from '@/components/interns/interns-table';
 import ConfirmDeleteDialog from '@/components/shared/confirm-delete-dialog';
 import TablePagination from '@/components/shared/table-pagination';
 import AppLayout from '@/layouts/app-layout';
 import { UI_PRESETS } from '@/lib/ui-presets';
-import interns from '@/routes/interns';
 import type { BreadcrumbItem } from '@/types';
 import type {
     InternRow,
@@ -24,15 +24,15 @@ type Props = {
     filters: InternFilters;
 };
 
-// Definición de breadcrumbs para la navegación:
+// Definici�n de breadcrumbs para la navegaci�n:
 const breadcrumbs: BreadcrumbItem[] = [
     {
-        title: 'Gestión de Becarios',
+        title: 'Gesti�n de Becarios',
         href: interns.index().url,
     },
 ];
 
-// Contiene toda la lógica de la vista:
+// Contiene toda la l�gica de la vista:
 export default function InternsPage({ interns: internPagination, filters, educationCenters, trainingPrograms }: Props) {
     const page = usePage<{ flash?: { success?: string; error?: string; info?: string } }>();
     const lastFlashRef = useRef<string | null>(null);
@@ -107,7 +107,7 @@ export default function InternsPage({ interns: internPagination, filters, educat
         }
     }, [page.props.flash?.success, page.props.flash?.error, page.props.flash?.info]);
 
-    // Efecto para manejar la búsqueda con debounce y sincronización de filtros:
+    // Efecto para manejar la b�squeda con debounce y sincronizaci�n de filtros:
     useEffect(() => {
         const normalizedSearch = search.trim();
         const normalizedFilter = (filters.search ?? '').trim();
@@ -135,7 +135,7 @@ export default function InternsPage({ interns: internPagination, filters, educat
             return;
         }
 
-        // Utilizamos un timeout para implementar debounce, evitando hacer una petición en cada pulsación del usuario. Si el usuario sigue escribiendo o cambiando filtros, el timeout se reiniciará.
+        // Utilizamos un timeout para implementar debounce, evitando hacer una petici�n en cada pulsaci�n del usuario. Si el usuario sigue escribiendo o cambiando filtros, el timeout se reiniciar�.
         const timeoutId = window.setTimeout(() => {
             router.get(
                 interns.index().url,
@@ -178,7 +178,7 @@ export default function InternsPage({ interns: internPagination, filters, educat
         hasInvalidDateRange,
     ]);
 
-    // Función para confirmar eliminación de un becario, mostrando un diálogo de confirmación y manejando la petición de eliminación a través de Inertia.js. Si la eliminación es exitosa, se cierra el diálogo y se muestra un mensaje flash.
+    // Funci�n para confirmar eliminaci�n de un becario, mostrando un di�logo de confirmaci�n y manejando la petici�n de eliminaci�n a trav�s de Inertia.js. Si la eliminaci�n es exitosa, se cierra el di�logo y se muestra un mensaje flash.
     const confirmDelete = () => {
         if (!internToDelete) {
             return;
@@ -195,7 +195,7 @@ export default function InternsPage({ interns: internPagination, filters, educat
         });
     };
 
-    // Función para manejar exportación de becarios, generando un archivo Excel con los filtros aplicados.
+    // Funci�n para manejar exportaci�n de becarios, generando un archivo Excel con los filtros aplicados.
     const handleExport = () => {
         if (hasInvalidDateRange) {
             return;
@@ -238,14 +238,14 @@ export default function InternsPage({ interns: internPagination, filters, educat
     // Renderizado de la vista:
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Gestión de Becarios" />
+            <Head title="Gesti�n de Becarios" />
 
             <div className={UI_PRESETS.pageContent}>
                 <div className="flex flex-col gap-4">
                     <div>
-                        <h1 className="text-2xl font-bold">Gestión de Becarios</h1>
+                        <h1 className="text-2xl font-bold">Gesti�n de Becarios</h1>
                         <p className="text-sm text-muted-foreground">
-                            Gestiona datos personales, estado y período de prácticas.
+                            Gestiona datos personales, estado y per�odo de pr�cticas.
                         </p>
                     </div>
                 </div>
@@ -287,8 +287,8 @@ export default function InternsPage({ interns: internPagination, filters, educat
             </div>
             <ConfirmDeleteDialog
                 open={internToDelete !== null}
-                title="Confirmar eliminación"
-                description="Esta acción eliminará el becario seleccionado."
+                title="Confirmar eliminaci�n"
+                description="Esta acci�n eliminar� el becario seleccionado."
                 entityLabel="Becario"
                 entityName={internToDelete ? `${internToDelete.first_name} ${internToDelete.last_name}` : ''}
                 isLoading={isDeleting}
@@ -298,3 +298,4 @@ export default function InternsPage({ interns: internPagination, filters, educat
         </AppLayout>
     );
 }
+

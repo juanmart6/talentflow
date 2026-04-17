@@ -1,12 +1,12 @@
 import { Link } from '@inertiajs/react';
 import { CirclePlus, FilterX, Search, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import practiceTasks from '@/actions/App/Http/Controllers/PracticeTaskController';
 import DatePicker from '@/components/shared/date-picker';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { UI_PRESETS } from '@/lib/ui-presets';
-import practiceTasks from '@/routes/practice-tasks';
 import type { InternOption } from '@/types';
 import type { DueStateFilter, TrainingProgramOption } from '@/types/domains/practice-tasks';
 
@@ -138,18 +138,20 @@ export default function PracticeTasksFiltersBar(props: PracticeTasksFiltersBarPr
                         >
                             <FilterX />
                         </Button>
-                        <Button
-                            variant="outline"
-                            size="icon"
-                            className={UI_PRESETS.iconActionButtonPrimary}
-                            title="Nueva Tarea"
-                            aria-label="Nueva Tarea"
-                            asChild
-                        >
-                            <Link href={practiceTasks.create().url}>
-                                <CirclePlus />
-                            </Link>
-                        </Button>
+                        {viewMode === 'tutor' ? (
+                            <Button
+                                variant="outline"
+                                size="icon"
+                                className={UI_PRESETS.iconActionButtonPrimary}
+                                title="Nueva Tarea"
+                                aria-label="Nueva Tarea"
+                                asChild
+                            >
+                                <Link href={practiceTasks.create().url}>
+                                    <CirclePlus />
+                                </Link>
+                            </Button>
+                        ) : null}
                     </div>
                 </div>
 
@@ -218,26 +220,28 @@ export default function PracticeTasksFiltersBar(props: PracticeTasksFiltersBarPr
                     </div>
                 ) : null}
 
-                <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+                <div className={`grid gap-2 md:grid-cols-2 ${viewMode === 'tutor' ? 'xl:grid-cols-4' : 'xl:grid-cols-3'}`}>
 
-                    <div className="flex flex-col gap-1">
-                        <span className="text-xs font-medium text-muted-foreground">Grado formativo</span>
-                        <Select value={trainingProgramFilter} onValueChange={onTrainingProgramFilterChange}>
-                            <SelectTrigger className={`${UI_PRESETS.selectTrigger} w-full`}>
-                                <SelectValue placeholder="Grado formativo" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem className={UI_PRESETS.selectItem} value="all">
-                                    Todos los grados
-                                </SelectItem>
-                                {trainingPrograms.map((program) => (
-                                    <SelectItem className={UI_PRESETS.selectItem} key={program.id} value={program.id}>
-                                        {program.name}
+                    {viewMode === 'tutor' ? (
+                        <div className="flex flex-col gap-1">
+                            <span className="text-xs font-medium text-muted-foreground">Grado formativo</span>
+                            <Select value={trainingProgramFilter} onValueChange={onTrainingProgramFilterChange}>
+                                <SelectTrigger className={`${UI_PRESETS.selectTrigger} w-full`}>
+                                    <SelectValue placeholder="Grado formativo" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem className={UI_PRESETS.selectItem} value="all">
+                                        Todos los grados
                                     </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
+                                    {trainingPrograms.map((program) => (
+                                        <SelectItem className={UI_PRESETS.selectItem} key={program.id} value={program.id}>
+                                            {program.name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    ) : null}
 
                     <div className="flex flex-col gap-1">
                         <span className="text-xs font-medium text-muted-foreground">Desde</span>
@@ -283,9 +287,9 @@ export default function PracticeTasksFiltersBar(props: PracticeTasksFiltersBarPr
                             </SelectContent>
                         </Select>
                     </div>
+
                 </div>
             </div>
         </form>
     );
 }
-

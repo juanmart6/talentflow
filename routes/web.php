@@ -130,6 +130,10 @@ Route::middleware(['auth'])->group(function () {
         ->middleware('permission:practice-tasks.update')
         ->name('practice-tasks.reorder');
 
+    Route::get('practice-tasks/{practice_task}', [PracticeTaskController::class, 'show'])
+        ->middleware('permission:practice-tasks.view')
+        ->name('practice-tasks.show');
+
     Route::get('practice-tasks/{practice_task}/edit', [PracticeTaskController::class, 'edit'])
         ->middleware('permission:practice-tasks.update')
         ->name('practice-tasks.edit');
@@ -139,15 +143,19 @@ Route::middleware(['auth'])->group(function () {
         ->name('practice-tasks.update');
 
     Route::patch('practice-tasks/{practice_task}/status', [PracticeTaskController::class, 'updateStatus'])
-        ->middleware('permission:practice-tasks.update')
+        ->middleware('permission:practice-tasks.view')
         ->name('practice-tasks.update-status');
 
+    Route::get('practice-tasks/{practice_task}/messages', [PracticeTaskController::class, 'messages'])
+        ->middleware('permission:practice-tasks.view|practice-tasks.update')
+        ->name('practice-tasks.messages.index');
+
     Route::post('practice-tasks/{practice_task}/messages', [PracticeTaskController::class, 'storeMessage'])
-        ->middleware('permission:practice-tasks.update')
+        ->middleware('permission:practice-tasks.view|practice-tasks.update')
         ->name('practice-tasks.messages.store');
 
     Route::post('practice-tasks/{practice_task}/attachments', [PracticeTaskController::class, 'storeTaskAttachment'])
-        ->middleware('permission:practice-tasks.update')
+        ->middleware('permission:practice-tasks.view')
         ->name('practice-tasks.attachments.store');
 
     Route::delete('practice-tasks/{practice_task}/attachments/{practice_task_attachment}', [PracticeTaskController::class, 'destroyTaskAttachment'])

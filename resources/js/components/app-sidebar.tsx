@@ -1,5 +1,8 @@
-﻿import { Link, usePage } from '@inertiajs/react';
+import { Link, usePage } from '@inertiajs/react';
 import { Award, Clock9, GraduationCap, KeyRound, LayoutGrid, NotebookPen, School } from 'lucide-react';
+import interns from '@/actions/App/Http/Controllers/InternController';
+import practiceTasks from '@/actions/App/Http/Controllers/PracticeTaskController';
+import users from '@/actions/App/Http/Controllers/UserManagementController';
 import logo from '@/assets/TF_logo.svg';
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
@@ -16,9 +19,6 @@ import { useCurrentUrl } from '@/hooks/use-current-url';
 import { cn } from '@/lib/utils';
 import { dashboard } from '@/routes';
 import educationCenters from '@/routes/education-centers';
-import interns from '@/routes/interns';
-import practiceTasks from '@/routes/practice-tasks';
-import users from '@/routes/users';
 import type { Auth, NavItem } from '@/types';
 
 const mainNavItems: NavItem[] = [
@@ -33,12 +33,12 @@ const mainNavItems: NavItem[] = [
         icon: School,
     },
     {
-        title: 'Gestión de Becarios',
+        title: 'Gesti�n de Becarios',
         href: interns.index().url,
         icon: GraduationCap,
     },
     {
-        title: 'Prácticas y Tareas',
+        title: 'Pr�cticas y Tareas',
         href: practiceTasks.index().url,
         icon: NotebookPen,
     },
@@ -48,7 +48,7 @@ const mainNavItems: NavItem[] = [
         icon: Clock9,
     },
     {
-        title: 'Evaluación y Notas',
+        title: 'Evaluaci�n y Notas',
         href: '/evaluacion-notas',
         icon: Award,
     },
@@ -63,7 +63,7 @@ export function AppSidebar() {
 
     const visibleNavItems = isIntern
         ? mainNavItems.filter((item) =>
-              ['Prácticas y Tareas', 'Control Horario', 'Evaluación y Notas'].includes(item.title),
+              ['Pr�cticas y Tareas', 'Control Horario', 'Evaluaci�n y Notas'].includes(item.title),
           )
         : mainNavItems;
 
@@ -115,3 +115,5 @@ export function AppSidebar() {
         </Sidebar>
     );
 }
+
+

@@ -1,24 +1,24 @@
 import { Link } from '@inertiajs/react';
 import type { PropsWithChildren } from 'react';
+import PasswordController from '@/actions/App/Http/Controllers/Settings/PasswordController';
+import ProfileController from '@/actions/App/Http/Controllers/Settings/ProfileController';
 import { FormPageHeader } from '@/components/form-ui';
 import { Button } from '@/components/ui/button';
 import { useCurrentUrl } from '@/hooks/use-current-url';
 import { UI_PRESETS } from '@/lib/ui-presets';
 import { cn, toUrl } from '@/lib/utils';
-import { edit } from '@/routes/profile';
 import { show } from '@/routes/two-factor';
-import { edit as editPassword } from '@/routes/user-password';
 import type { NavItem } from '@/types';
 
 const settingsTabs: NavItem[] = [
     {
         title: 'Perfil',
-        href: edit(),
+        href: ProfileController.edit().url,
         icon: null,
     },
     {
         title: 'Contraseña',
-        href: editPassword(),
+        href: PasswordController.edit().url,
         icon: null,
     },
     {
@@ -72,3 +72,4 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
         </div>
     );
 }
+

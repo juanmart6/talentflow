@@ -10,6 +10,8 @@ use App\Models\PracticeTaskMessage;
 use App\Models\PracticeTask;
 use App\Models\PracticeTaskStatusLog;
 use App\Models\TrainingProgram;
+use App\Models\User;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -23,13 +25,24 @@ use Throwable;
 
 class PracticeTaskController extends Controller
 {
-    public function index(): Response
+    public function index(Request $request): Response
     {
+        $user = $request->user();
+        $isInternView = (bool) $user?->hasRole('intern');
+        $viewerInternId = $this->resolveViewerInternId($user);
+
+        $trainingPrograms = $isInternView && $viewerInternId === null
+            ? collect()
+            : $this->trainingProgramOptions($viewerInternId);
+        $tasks = $isInternView && $viewerInternId === null
+            ? collect()
+            : $this->taskCards($viewerInternId);
+
         return Inertia::render('practice-tasks/index', [
-            'viewMode' => 'tutor',
-            'interns' => $this->internOptions(),
-            'trainingPrograms' => $this->trainingProgramOptions(),
-            'tasks' => $this->taskCards(),
+            'viewMode' => $isInternView ? 'intern' : 'tutor',
+            'interns' => $isInternView ? [] : $this->internOptions(),
+            'trainingPrograms' => $trainingPrograms,
+            'tasks' => $tasks,
         ]);
     }
 
@@ -44,8 +57,9 @@ class PracticeTaskController extends Controller
         ]);
     }
 
-    public function edit(PracticeTask $practiceTask): Response
+    public function show(Request $request, PracticeTask $practiceTask): Response
     {
+        $this->ensureTaskCanBeViewedByUser($request->user(), $practiceTask);
         $practiceTask->load(['interns:id', 'createdBy:id,name']);
 
         return Inertia::render('practice-tasks/form', [
@@ -55,6 +69,23 @@ class PracticeTaskController extends Controller
             'messages' => $this->taskMessages($practiceTask),
             'taskAttachments' => $this->taskAttachments($practiceTask),
             'statusLogs' => $this->taskStatusLogs($practiceTask),
+            'readOnly' => true,
+        ]);
+    }
+
+    public function edit(Request $request, PracticeTask $practiceTask): Response
+    {
+        $this->ensureTaskCanBeViewedByUser($request->user(), $practiceTask);
+        $practiceTask->load(['interns:id', 'createdBy:id,name']);
+
+        return Inertia::render('practice-tasks/form', [
+            'interns' => $this->internOptions(),
+            'trainingPrograms' => $this->trainingProgramOptions(),
+            'task' => $this->taskFormData($practiceTask),
+            'messages' => $this->taskMessages($practiceTask),
+            'taskAttachments' => $this->taskAttachments($practiceTask),
+            'statusLogs' => $this->taskStatusLogs($practiceTask),
+            'readOnly' => false,
         ]);
     }
 
@@ -169,6 +200,8 @@ class PracticeTaskController extends Controller
 
     public function updateStatus(Request $request, PracticeTask $practiceTask): RedirectResponse
     {
+        $this->ensureTaskCanBeViewedByUser($request->user(), $practiceTask);
+
         $validated = $request->validate([
             'status' => ['required', Rule::in(['pending', 'in_progress', 'in_review', 'completed'])],
         ]);
@@ -241,6 +274,8 @@ class PracticeTaskController extends Controller
 
     public function storeMessage(Request $request, PracticeTask $practiceTask): RedirectResponse
     {
+        $this->ensureTaskCanBeViewedByUser($request->user(), $practiceTask);
+
         $validated = $request->validate([
             'body' => ['required', 'string', 'max:2000'],
         ]);
@@ -259,12 +294,30 @@ class PracticeTaskController extends Controller
             ->with('success', 'Mensaje enviado correctamente.');
     }
 
+    public function messages(Request $request, PracticeTask $practiceTask): JsonResponse
+    {
+        $this->ensureTaskCanBeViewedByUser($request->user(), $practiceTask);
+
+        return response()->json([
+            'messages' => $this->taskMessages($practiceTask),
+        ]);
+    }
+
     public function storeTaskAttachment(Request $request, PracticeTask $practiceTask): RedirectResponse
     {
+        $this->ensureTaskCanBeViewedByUser($request->user(), $practiceTask);
+
         $validated = $request->validate([
             'category' => ['required', Rule::in(['tutor_spec', 'intern_deliverable'])],
             'file' => ['required', 'file', 'max:10240', 'mimes:pdf,jpeg,jpg,png,doc,docx,xls,xlsx,ppt,pptx,txt,zip,rar'],
         ]);
+
+        $canUpdateTask = (bool) $request->user()?->can('practice-tasks.update');
+        if (! $canUpdateTask && $validated['category'] !== 'intern_deliverable') {
+            return redirect()
+                ->back()
+                ->with('error', 'No tienes permiso para subir especificaciones del tutor.');
+        }
 
         /** @var UploadedFile $uploadedFile */
         $uploadedFile = $validated['file'];
@@ -316,11 +369,18 @@ class PracticeTaskController extends Controller
             ->values();
     }
 
-    private function trainingProgramOptions()
+    private function trainingProgramOptions(?int $viewerInternId = null)
     {
-        return TrainingProgram::query()
+        $query = TrainingProgram::query()
             ->orderBy('name')
-            ->get(['id', 'name'])
+            ->select(['id', 'name']);
+
+        if ($viewerInternId !== null) {
+            $query->whereHas('interns', fn ($builder) => $builder->where('interns.id', $viewerInternId));
+        }
+
+        return $query
+            ->get()
             ->map(fn (TrainingProgram $trainingProgram): array => [
                 'id' => (string) $trainingProgram->id,
                 'name' => $trainingProgram->name,
@@ -328,9 +388,9 @@ class PracticeTaskController extends Controller
             ->values();
     }
 
-    private function taskCards()
+    private function taskCards(?int $viewerInternId = null)
     {
-        return PracticeTask::query()
+        $query = PracticeTask::query()
             ->with([
                 'interns:id,first_name,last_name',
                 'trainingProgram:id,name',
@@ -342,7 +402,13 @@ class PracticeTaskController extends Controller
                         'practice_task_status_logs.changed_at',
                     ])->with('changedByUser:id,name');
                 },
-            ])
+            ]);
+
+        if ($viewerInternId !== null) {
+            $query->whereHas('interns', fn ($builder) => $builder->where('interns.id', $viewerInternId));
+        }
+
+        return $query
             ->orderBy('sort_order')
             ->orderByDesc('id')
             ->get(['id', 'title', 'description', 'status', 'sort_order', 'assignment_mode', 'training_program_id', 'due_at'])
@@ -374,6 +440,31 @@ class PracticeTaskController extends Controller
                 ];
             })
             ->values();
+    }
+
+    private function resolveViewerInternId(?User $user): ?int
+    {
+        if (! $user || ! $user->hasRole('intern')) {
+            return null;
+        }
+
+        return $user->intern?->id;
+    }
+
+    private function ensureTaskCanBeViewedByUser(?User $user, PracticeTask $practiceTask): void
+    {
+        if (! $user || ! $user->hasRole('intern')) {
+            return;
+        }
+
+        $viewerInternId = $this->resolveViewerInternId($user);
+        abort_if($viewerInternId === null, 403, 'No se encontró el becario asociado al usuario.');
+
+        $hasAccess = $practiceTask->interns()
+            ->where('interns.id', $viewerInternId)
+            ->exists();
+
+        abort_unless($hasAccess, 403, 'No tienes acceso a esta tarea.');
     }
 
     private function taskFormData(PracticeTask $task): array
@@ -427,6 +518,7 @@ class PracticeTaskController extends Controller
                 'mime' => $attachment->mime,
                 'size' => $attachment->size,
                 'uploader_name' => $attachment->uploader?->name ?? 'Usuario',
+                'uploader_role' => $attachment->uploader?->hasRole('intern') ? 'intern' : 'tutor',
                 'created_at' => $attachment->created_at?->toDateTimeString(),
             ])
             ->values()

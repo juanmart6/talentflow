@@ -1,5 +1,6 @@
 import { Link } from '@inertiajs/react';
 import { CirclePlus, FileSpreadsheet, FilterX, Search } from 'lucide-react';
+import internsRoutes from '@/actions/App/Http/Controllers/InternController';
 import DatePicker from '@/components/shared/date-picker';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,7 +12,6 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { UI_PRESETS } from '@/lib/ui-presets';
-import internsRoutes from '@/routes/interns';
 import type { EducationCenterOption, TrainingProgramOption } from '@/types/domains/interns';
 
 type InternsFiltersBarProps = {
@@ -233,3 +233,4 @@ export default function InternsFiltersBar({
         </form>
     );
 }
+

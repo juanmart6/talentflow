@@ -15,13 +15,12 @@ import { useInitials } from '@/hooks/use-initials';
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
 import { UI_PRESETS } from '@/lib/ui-presets';
-import { edit } from '@/routes/profile';
 import type { BreadcrumbItem } from '@/types';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
         title: 'Configuración del perfil',
-        href: edit(),
+        href: ProfileController.edit().url,
     },
 ];
 
@@ -343,3 +342,4 @@ export default function Profile({
         </AppLayout>
     );
 }
+

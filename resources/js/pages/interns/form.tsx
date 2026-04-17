@@ -3,11 +3,13 @@ import { MailPlus } from 'lucide-react';
 import type { FormEvent } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import interns from '@/actions/App/Http/Controllers/InternController';
 import { FieldLabel, FormPageHeader, SectionIntro } from '@/components/form-ui';
 import InputError from '@/components/input-error';
 import InternFormTabs from '@/components/interns/intern-form-tabs';
 import type { InternFormTab } from '@/components/interns/intern-form-tabs';
 import DatePicker from '@/components/shared/date-picker';
+import FileUploadField from '@/components/shared/file-upload-field';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -16,7 +18,6 @@ import { getFirstFormErrorMessage } from '@/lib/form-errors';
 import { INTERN_STATUS_META } from '@/lib/interns/intern-status';
 import type { InternStatus } from '@/lib/interns/intern-status';
 import { UI_PRESETS } from '@/lib/ui-presets';
-import interns from '@/routes/interns';
 import type { BreadcrumbItem } from '@/types';
 
 type EducationCenterOption = {
@@ -119,42 +120,6 @@ function documentTypeLabel(documentType: keyof DocumentHistory): string {
     };
 
     return labels[documentType];
-}
-
-type FileUploadFieldProps = {
-    id: string;
-    label: string;
-    accept: string;
-    file: File | null;
-    error?: string;
-    onChange: (file: File | null) => void;
-};
-
-function FileUploadField({ id, label, accept, file, error, onChange }: FileUploadFieldProps) {
-    return (
-        <div className="grid gap-2">
-            <FieldLabel htmlFor={id}>{label}</FieldLabel>
-            <div className="flex min-h-9 min-w-0 items-center gap-3 text-sm">
-                <label
-                    htmlFor={id}
-                    className="inline-flex h-9 shrink-0 cursor-pointer items-center whitespace-nowrap rounded-md border border-[#2563eb]/35 bg-white px-4 text-sm font-medium text-[#1d4ed8] shadow-xs transition-colors hover:border-[#2563eb]/60 hover:bg-[#2563eb]/10 dark:border-[#2563eb]/45 dark:bg-slate-950 dark:text-sky-300 dark:hover:bg-[#2563eb]/20"
-                >
-                    Seleccionar archivo
-                </label>
-                <span className={`${file ? 'min-w-0 flex-1 truncate text-slate-700 dark:text-slate-200' : 'min-w-0 flex-1 truncate text-muted-foreground'}`}>
-                    {file?.name ?? 'Ningún archivo seleccionado'}
-                </span>
-                <Input
-                    id={id}
-                    type="file"
-                    accept={accept}
-                    className="sr-only"
-                    onChange={(e) => onChange(e.target.files?.[0] ?? null)}
-                />
-            </div>
-            <InputError message={error} />
-        </div>
-    );
 }
 
 const accessStatusMeta: Record<
@@ -793,9 +758,33 @@ export default function InternFormPage({ mode, intern, access, educationCenters,
 
                                     {!isReadOnly && (
                                         <div className="grid gap-4 md:grid-cols-3">
-                                            <FileUploadField id="collaboration_agreement_document" label="Convenio" accept=".pdf,.jpg,.jpeg,.png" file={data.collaboration_agreement_document} error={errors.collaboration_agreement_document} onChange={(file) => setData('collaboration_agreement_document', file)} />
-                                            <FileUploadField id="insurance_policy_document" label="Seguro" accept=".pdf,.jpg,.jpeg,.png" file={data.insurance_policy_document} error={errors.insurance_policy_document} onChange={(file) => setData('insurance_policy_document', file)} />
-                                            <FileUploadField id="dni_scan_document" label="DNI escaneado" accept=".pdf,.jpg,.jpeg,.png" file={data.dni_scan_document} error={errors.dni_scan_document} onChange={(file) => setData('dni_scan_document', file)} />
+                                            <FileUploadField
+                                                id="collaboration_agreement_document"
+                                                name="collaboration_agreement_document"
+                                                label="Convenio"
+                                                accept=".pdf,.jpg,.jpeg,.png"
+                                                selectedFileName={data.collaboration_agreement_document?.name ?? null}
+                                                error={errors.collaboration_agreement_document}
+                                                onChange={(file) => setData('collaboration_agreement_document', file)}
+                                            />
+                                            <FileUploadField
+                                                id="insurance_policy_document"
+                                                name="insurance_policy_document"
+                                                label="Seguro"
+                                                accept=".pdf,.jpg,.jpeg,.png"
+                                                selectedFileName={data.insurance_policy_document?.name ?? null}
+                                                error={errors.insurance_policy_document}
+                                                onChange={(file) => setData('insurance_policy_document', file)}
+                                            />
+                                            <FileUploadField
+                                                id="dni_scan_document"
+                                                name="dni_scan_document"
+                                                label="DNI escaneado"
+                                                accept=".pdf,.jpg,.jpeg,.png"
+                                                selectedFileName={data.dni_scan_document?.name ?? null}
+                                                error={errors.dni_scan_document}
+                                                onChange={(file) => setData('dni_scan_document', file)}
+                                            />
                                         </div>
                                     )}
 
@@ -997,3 +986,4 @@ export default function InternFormPage({ mode, intern, access, educationCenters,
         </AppLayout>
     );
 }
+

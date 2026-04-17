@@ -1,9 +1,9 @@
 ﻿import { Link, router } from '@inertiajs/react';
 import { CirclePlus, GraduationCap, GripVertical, Trash2, User } from 'lucide-react';
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
+import practiceTasks from '@/actions/App/Http/Controllers/PracticeTaskController';
 import { Button } from '@/components/ui/button';
 import { UI_PRESETS } from '@/lib/ui-presets';
-import practiceTasks from '@/routes/practice-tasks';
 import type { TaskCard, TaskStatus } from '@/types/domains/practice-tasks';
 
 const STATUS_COLUMNS: Array<{ status: TaskStatus; label: string; className: string }> = [
@@ -35,6 +35,7 @@ const STATUS_COLUMN_ACCENT_CLASS: Record<TaskStatus, string> = {
 };
 
 type PracticeTasksBoardProps = {
+    isTutorView: boolean;
     filteredTasks: TaskCard[];
     boardTasks: TaskCard[];
     draggedTask: TaskCard | null;
@@ -66,6 +67,7 @@ type PracticeTasksBoardProps = {
 
 export default function PracticeTasksBoard(props: PracticeTasksBoardProps) {
     const {
+        isTutorView,
         filteredTasks,
         boardTasks,
         draggedTask,
@@ -127,7 +129,7 @@ export default function PracticeTasksBoard(props: PracticeTasksBoardProps) {
                                 <div className={`mb-3 flex items-center justify-between border-b border-l-4 border-slate-200/70 pb-2 pl-2 dark:border-slate-700/70 ${STATUS_COLUMN_ACCENT_CLASS[column.status]}`}>
                                     <h2 className="text-sm font-semibold tracking-tight">{column.label}</h2>
                                     <div className="flex items-center gap-1.5">
-                                        {column.status === 'pending' ? (
+                                        {column.status === 'pending' && isTutorView ? (
                                             <Button
                                                 variant="outline"
                                                 size="icon"
@@ -151,6 +153,9 @@ export default function PracticeTasksBoard(props: PracticeTasksBoardProps) {
                                     {tasksInColumn.length > 0 ? (
                                         tasksInColumn.map((task) => {
                                             const dueMeta = task.dueAt !== '' ? dueIndicatorMeta(task.dueAt) : null;
+                                            const detailHref = isTutorView
+                                                ? practiceTasks.edit(task.id).url
+                                                : practiceTasks.show(task.id).url;
 
                                             return (
                                                 <div key={task.id} className="space-y-1.5">
@@ -161,7 +166,7 @@ export default function PracticeTasksBoard(props: PracticeTasksBoardProps) {
                                                     <article
                                                         className={`cursor-pointer space-y-2.5 rounded-xl border border-slate-200/90 border-l-4 bg-white p-3 text-sm shadow-sm transition-all hover:shadow-md dark:border-slate-700 dark:bg-slate-950 ${draggedTask ? 'hover:translate-y-0' : 'hover:-translate-y-0.5'} ${STATUS_ACCENT_BORDER_CLASS[task.status]} ${STATUS_CARD_HOVER_CLASS[task.status]} ${draggedTask?.id === task.id ? 'opacity-60' : ''}`}
                                                         draggable
-                                                        onClick={() => router.get(practiceTasks.edit(task.id).url)}
+                                                        onClick={() => router.get(detailHref)}
                                                         onDragStart={(event) => {
                                                             event.dataTransfer.effectAllowed = 'move';
                                                             event.dataTransfer.setData('text/plain', task.id);
@@ -174,6 +179,9 @@ export default function PracticeTasksBoard(props: PracticeTasksBoardProps) {
                                                             setHoveredEndStatus(null);
                                                         }}
                                                         onDragOver={(event) => {
+                                                            if (!isTutorView) {
+                                                                return;
+                                                            }
                                                             if (!draggedTask) {
                                                                 return;
                                                             }
@@ -206,7 +214,7 @@ export default function PracticeTasksBoard(props: PracticeTasksBoardProps) {
                                                             const startStatus = dragStartStatusRef.current;
                                                             const wasReordered = reorderedInCurrentDragRef.current;
 
-                                                            if (startStatus && wasReordered) {
+                                                            if (isTutorView && startStatus && wasReordered) {
                                                                 const currentOrder = boardTasks
                                                                     .filter((candidate) => candidate.status === startStatus)
                                                                     .map((candidate) => candidate.id);
@@ -249,19 +257,21 @@ export default function PracticeTasksBoard(props: PracticeTasksBoardProps) {
                                                                 <h3 className="line-clamp-2 text-sm font-semibold leading-[1.3] text-slate-800 dark:text-slate-100">{task.title}</h3>
                                                             </div>
                                                             <div className="flex items-start gap-1">
-                                                                <Button
-                                                                    type="button"
-                                                                    variant="ghost"
-                                                                    size="icon"
-                                                                    className="h-7 w-7 rounded-md text-slate-400 hover:bg-red-50 hover:text-destructive dark:text-slate-500 dark:hover:bg-red-950/30"
-                                                                    onClick={(event) => {
-                                                                        event.stopPropagation();
-                                                                        setTaskToDelete(task);
-                                                                    }}
-                                                                    aria-label="Eliminar tarea"
-                                                                >
-                                                                    <Trash2 className="size-3.5" />
-                                                                </Button>
+                                                                {isTutorView ? (
+                                                                    <Button
+                                                                        type="button"
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        className="h-7 w-7 rounded-md text-slate-400 hover:bg-red-50 hover:text-destructive dark:text-slate-500 dark:hover:bg-red-950/30"
+                                                                        onClick={(event) => {
+                                                                            event.stopPropagation();
+                                                                            setTaskToDelete(task);
+                                                                        }}
+                                                                        aria-label="Eliminar tarea"
+                                                                    >
+                                                                        <Trash2 className="size-3.5" />
+                                                                    </Button>
+                                                                ) : null}
                                                             </div>
                                                         </div>
                                                         <div className="space-y-1.5">
@@ -307,7 +317,7 @@ export default function PracticeTasksBoard(props: PracticeTasksBoardProps) {
                                     )}
                                 </div>
 
-                                {tasksInColumn.length > 0 && draggedTask && draggedTask.status === column.status ? (
+                                {isTutorView && tasksInColumn.length > 0 && draggedTask && draggedTask.status === column.status ? (
                                     <div
                                         className={`mt-1 rounded-md border border-dashed px-2 py-1.5 text-center text-[11px] font-medium transition-colors ${
                                             hoveredEndStatus === column.status

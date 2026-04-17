@@ -1,11 +1,11 @@
-﻿import { Link } from '@inertiajs/react';
+import { Link } from '@inertiajs/react';
 import { Eye, Pencil, Trash2 } from 'lucide-react';
+import internsRoutes from '@/actions/App/Http/Controllers/InternController';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { INTERN_STATUS_META } from '@/lib/interns/intern-status';
 import { UI_PRESETS, stripedRowClass } from '@/lib/ui-presets';
 import educationCentersRoutes from '@/routes/education-centers';
-import internsRoutes from '@/routes/interns';
 import type { InternRow } from '@/types/domains/interns';
 
 type InternsTableProps = {
@@ -44,7 +44,7 @@ export default function InternsTable({ interns, hasRows, onDelete }: InternsTabl
                         <th className="w-40 px-4 py-3 text-center font-semibold">Becario</th>
                         <th className="w-40 px-4 py-3 text-center font-semibold">Centro</th>
                         <th className="w-40 px-4 py-3 text-center font-semibold">Ciclo formativo</th>
-                        <th className="w-40 px-4 py-3 text-center font-semibold">Prácticas</th>
+                        <th className="w-40 px-4 py-3 text-center font-semibold">Pr�cticas</th>
                         <th className="w-40 px-4 py-3 text-center font-semibold">Estado</th>
                         <th className="w-40 px-4 py-3 text-center font-semibold">Acciones</th>
                     </tr>
@@ -154,3 +154,4 @@ export default function InternsTable({ interns, hasRows, onDelete }: InternsTabl
         </div>
     );
 }
+

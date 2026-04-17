@@ -1,8 +1,8 @@
 import { Link } from '@inertiajs/react';
-import { GraduationCap, Pencil, Trash2, User } from 'lucide-react';
+import { Eye, GraduationCap, Pencil, Trash2, User } from 'lucide-react';
+import practiceTasks from '@/actions/App/Http/Controllers/PracticeTaskController';
 import { Button } from '@/components/ui/button';
 import { UI_PRESETS } from '@/lib/ui-presets';
-import practiceTasks from '@/routes/practice-tasks';
 import type { TaskCard, TaskStatus } from '@/types/domains/practice-tasks';
 
 const STATUS_LABELS: Record<TaskStatus, string> = {
@@ -20,12 +20,13 @@ const STATUS_BADGE_CLASS: Record<TaskStatus, string> = {
 };
 
 type PracticeTasksListProps = {
+    viewMode: 'tutor' | 'intern';
     tasks: TaskCard[];
     dueIndicatorMeta: (dueAt: string) => { dotClass: string; text: string } | null;
     setTaskToDelete: (task: TaskCard) => void;
 };
 
-export default function PracticeTasksList({ tasks, dueIndicatorMeta, setTaskToDelete }: PracticeTasksListProps) {
+export default function PracticeTasksList({ viewMode, tasks, dueIndicatorMeta, setTaskToDelete }: PracticeTasksListProps) {
     return (
         <div className={UI_PRESETS.sectionCard}>
             <div className={UI_PRESETS.tableContainer}>
@@ -37,19 +38,22 @@ export default function PracticeTasksList({ tasks, dueIndicatorMeta, setTaskToDe
                             <th className={UI_PRESETS.tableCellCentered}>Becario(s)</th>
                             <th className={UI_PRESETS.tableCellCentered}>Entrega</th>
                             <th className={UI_PRESETS.tableCellCentered}>Plazo</th>
-                            <th className={UI_PRESETS.tableCellCentered}>Acciones</th>
+                            <th className={UI_PRESETS.tableCellCentered}>{viewMode === 'tutor' ? 'Acciones' : 'Ver'}</th>
                         </tr>
                     </thead>
                     <tbody>
                         {tasks.length > 0 ? (
                             tasks.map((task, index) => {
                                 const dueMeta = task.dueAt !== '' ? dueIndicatorMeta(task.dueAt) : null;
+                                const detailHref = viewMode === 'tutor'
+                                    ? practiceTasks.edit(task.id).url
+                                    : practiceTasks.show(task.id).url;
 
                                 return (
                                     <tr key={task.id} className={index % 2 === 0 ? 'bg-white/60 dark:bg-transparent' : 'bg-slate-50/60 dark:bg-slate-900/20'}>
                                         <td className={UI_PRESETS.tableCellCentered}>
                                             <Link
-                                                href={practiceTasks.edit(task.id).url}
+                                                href={detailHref}
                                                 className="mx-auto block line-clamp-1 max-w-[22ch] font-semibold text-slate-800 underline-offset-2 hover:underline dark:text-slate-100"
                                             >
                                                 {task.title}
@@ -94,22 +98,32 @@ export default function PracticeTasksList({ tasks, dueIndicatorMeta, setTaskToDe
                                         </td>
                                         <td className={UI_PRESETS.tableCellCentered}>
                                             <div className="flex items-center justify-center gap-1.5">
-                                                <Button type="button" variant="outline" size="icon" className={UI_PRESETS.iconActionButton} asChild>
-                                                    <Link href={practiceTasks.edit(task.id).url} title="Editar tarea" aria-label="Editar tarea">
-                                                        <Pencil />
-                                                    </Link>
-                                                </Button>
-                                                <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    size="icon"
-                                                    className={UI_PRESETS.iconActionButtonDanger}
-                                                    title="Eliminar tarea"
-                                                    aria-label="Eliminar tarea"
-                                                    onClick={() => setTaskToDelete(task)}
-                                                >
-                                                    <Trash2 />
-                                                </Button>
+                                                {viewMode === 'tutor' ? (
+                                                    <>
+                                                        <Button type="button" variant="outline" size="icon" className={UI_PRESETS.iconActionButton} asChild>
+                                                            <Link href={detailHref} title="Editar tarea" aria-label="Editar tarea">
+                                                                <Pencil />
+                                                            </Link>
+                                                        </Button>
+                                                        <Button
+                                                            type="button"
+                                                            variant="outline"
+                                                            size="icon"
+                                                            className={UI_PRESETS.iconActionButtonDanger}
+                                                            title="Eliminar tarea"
+                                                            aria-label="Eliminar tarea"
+                                                            onClick={() => setTaskToDelete(task)}
+                                                        >
+                                                            <Trash2 />
+                                                        </Button>
+                                                    </>
+                                                ) : (
+                                                    <Button type="button" variant="outline" size="icon" className={UI_PRESETS.iconActionButton} asChild>
+                                                        <Link href={detailHref} title="Ver tarea" aria-label="Ver tarea">
+                                                            <Eye />
+                                                        </Link>
+                                                    </Button>
+                                                )}
                                             </div>
                                         </td>
                                     </tr>

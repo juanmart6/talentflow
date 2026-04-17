@@ -1,6 +1,7 @@
 ﻿import { Head, router, usePage } from '@inertiajs/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import practiceTasks from '@/actions/App/Http/Controllers/PracticeTaskController';
 import PracticeTasksBoard from '@/components/practice-tasks/practice-tasks-board';
 import PracticeTasksFiltersBar from '@/components/practice-tasks/practice-tasks-filters-bar';
 import PracticeTasksList from '@/components/practice-tasks/practice-tasks-list';
@@ -10,7 +11,6 @@ import AppLayout from '@/layouts/app-layout';
 import { moveTaskInStatus, moveTaskToEndInStatus } from '@/lib/practice-tasks/practice-task-board';
 import { parseDueDate, dueDaysFromToday, dueIndicatorMeta } from '@/lib/practice-tasks/practice-task-dates';
 import { UI_PRESETS } from '@/lib/ui-presets';
-import practiceTasks from '@/routes/practice-tasks';
 import type { BreadcrumbItem } from '@/types';
 import type { DueStateFilter, PracticeTasksProps, TaskCard, TaskStatus } from '@/types/domains/practice-tasks';
 
@@ -23,6 +23,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 export default function PracticeTasksPage({ viewMode, interns, trainingPrograms, tasks }: PracticeTasksProps) {
+    const isTutorView = viewMode === 'tutor';
     const page = usePage<{ flash?: { success?: string; error?: string } }>();
     const lastFlashRef = useRef<string | null>(null);
     const [search, setSearch] = useState('');
@@ -199,6 +200,10 @@ export default function PracticeTasksPage({ viewMode, interns, trainingPrograms,
     };
 
     const confirmDeleteTask = () => {
+        if (!isTutorView) {
+            return;
+        }
+
         if (!taskToDelete) {
             return;
         }
@@ -233,14 +238,16 @@ export default function PracticeTasksPage({ viewMode, interns, trainingPrograms,
                         <div>
                             <h1 className="text-2xl font-bold">Prácticas y Tareas</h1>
                             <p className="text-sm text-muted-foreground">
-                                Gestiona tareas y su seguimiento operativo.
+                                {isTutorView
+                                    ? 'Gestiona tareas y su seguimiento operativo.'
+                                    : 'Consulta tus tareas asignadas y su seguimiento.'}
                             </p>
                         </div>
                         <PracticeTasksViewToggle view={tasksView} onViewChange={setTasksView} />
                     </div>
                 </div>
 
-                <div className={`${UI_PRESETS.pageSection} max-w-[1400px]`}>
+                <div className="mx-auto w-full max-w-[1360px]">
                     <PracticeTasksFiltersBar
                         viewMode={viewMode}
                         search={search}
@@ -268,6 +275,7 @@ export default function PracticeTasksPage({ viewMode, interns, trainingPrograms,
 
                     {tasksView === 'kanban' ? (
                         <PracticeTasksBoard
+                            isTutorView={isTutorView}
                             filteredTasks={filteredTasks}
                             boardTasks={boardTasks}
                             draggedTask={draggedTask}
@@ -292,6 +300,7 @@ export default function PracticeTasksPage({ viewMode, interns, trainingPrograms,
                         />
                     ) : (
                         <PracticeTasksList
+                            viewMode={viewMode}
                             tasks={filteredTasks}
                             dueIndicatorMeta={dueIndicatorMeta}
                             setTaskToDelete={setTaskToDelete}
@@ -300,16 +309,18 @@ export default function PracticeTasksPage({ viewMode, interns, trainingPrograms,
                 </div>
             </div>
 
-            <ConfirmDeleteDialog
-                open={taskToDelete !== null}
-                title="Eliminar tarea"
-                description="Confirma si quieres eliminar esta tarea."
-                entityLabel="Tarea"
-                entityName={taskToDelete?.title ?? null}
-                isLoading={isDeleting}
-                onCancel={() => setTaskToDelete(null)}
-                onConfirm={confirmDeleteTask}
-            />
+            {isTutorView ? (
+                <ConfirmDeleteDialog
+                    open={taskToDelete !== null}
+                    title="Eliminar tarea"
+                    description="Confirma si quieres eliminar esta tarea."
+                    entityLabel="Tarea"
+                    entityName={taskToDelete?.title ?? null}
+                    isLoading={isDeleting}
+                    onCancel={() => setTaskToDelete(null)}
+                    onConfirm={confirmDeleteTask}
+                />
+            ) : null}
         </AppLayout>
     );
 }
