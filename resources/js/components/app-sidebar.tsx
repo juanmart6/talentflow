@@ -33,12 +33,12 @@ const mainNavItems: NavItem[] = [
         icon: School,
     },
     {
-        title: 'Gesti�n de Becarios',
+        title: 'Gestión de Becarios',
         href: interns.index().url,
         icon: GraduationCap,
     },
     {
-        title: 'Pr�cticas y Tareas',
+        title: 'Prácticas y Tareas',
         href: practiceTasks.index().url,
         icon: NotebookPen,
     },
@@ -48,7 +48,7 @@ const mainNavItems: NavItem[] = [
         icon: Clock9,
     },
     {
-        title: 'Evaluaci�n y Notas',
+        title: 'Evaluación y Notas',
         href: '/evaluacion-notas',
         icon: Award,
     },
@@ -63,7 +63,7 @@ export function AppSidebar() {
 
     const visibleNavItems = isIntern
         ? mainNavItems.filter((item) =>
-              ['Pr�cticas y Tareas', 'Control Horario', 'Evaluaci�n y Notas'].includes(item.title),
+              ['Prácticas y Tareas', 'Control Horario', 'Evaluación y Notas'].includes(item.title),
           )
         : mainNavItems;
 
@@ -115,5 +115,4 @@ export function AppSidebar() {
         </Sidebar>
     );
 }
-
 

@@ -24,8 +24,8 @@ export default function CenterInternsHistory({ internsHistory }: CenterInternsHi
     return (
         <section className="space-y-4 pt-4">
             <div>
-                <h2 className="text-lg font-bold tracking-tight">Hist�rico de becarios</h2>
-                <p className="text-sm text-muted-foreground">Relaci�n de estudiantes del centro.</p>
+                <h2 className="text-lg font-bold tracking-tight">Histórico de becarios</h2>
+                <p className="text-sm text-muted-foreground">Relación de estudiantes del centro.</p>
             </div>
 
             {internsHistory.length === 0 ? (

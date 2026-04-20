@@ -178,7 +178,7 @@ export default function UsersIndexPage({
         }
 
         router.post(
-            usersRoutes.invitations.store.url(),
+            usersRoutes.storeInvitation.url(),
             {
                 email: invitationEmail.trim(),
                 role: invitationRole,
@@ -202,7 +202,7 @@ export default function UsersIndexPage({
 
         setIsDeletingInvitation(true);
 
-        router.delete(usersRoutes.invitations.destroy.url({ invitation: invitationToDelete.id }), {
+        router.delete(usersRoutes.destroyInvitation.url({ invitation: invitationToDelete.id }), {
             preserveScroll: true,
             preserveState: true,
             onFinish: () => {
@@ -223,7 +223,7 @@ export default function UsersIndexPage({
 
         setIsDeletingUser(true);
 
-        router.delete(usersRoutes.destroy.url({ user: userToDelete.id }), {
+        router.delete(usersRoutes.destroyUser.url({ user: userToDelete.id }), {
             preserveScroll: true,
             preserveState: true,
             onFinish: () => {
@@ -339,8 +339,8 @@ export default function UsersIndexPage({
             </div>
             <ConfirmDeleteDialog
                 open={userToDelete !== null}
-                title="Confirmar eliminaci�n"
-                description="Esta acci�n eliminar� el usuario seleccionado."
+                title="Confirmar eliminación"
+                description="Esta acción eliminará el usuario seleccionado."
                 entityLabel="Usuario"
                 entityName={userToDelete?.name}
                 isLoading={isDeletingUser}
@@ -349,9 +349,9 @@ export default function UsersIndexPage({
             />
             <ConfirmDeleteDialog
                 open={invitationToDelete !== null}
-                title="Confirmar cancelaci�n"
-                description="Esta acci�n cancelar� la invitaci�n seleccionada."
-                entityLabel="Invitaci�n"
+                title="Confirmar cancelación"
+                description="Esta acción cancelará la invitación seleccionada."
+                entityLabel="Invitación"
                 entityName={invitationToDelete?.email}
                 isLoading={isDeletingInvitation}
                 onCancel={() => setInvitationToDelete(null)}

@@ -328,9 +328,13 @@ class PracticeTaskController extends Controller
             uploaderId: $request->user()?->id,
         );
 
+        $successMessage = $validated['category'] === 'intern_deliverable'
+            ? 'Entregable subido correctamente.'
+            : 'Archivo subido correctamente.';
+
         return redirect()
             ->back()
-            ->with('success', 'Archivo subido correctamente.');
+            ->with('success', $successMessage);
     }
 
     public function destroyTaskAttachment(PracticeTask $practiceTask, PracticeTaskAttachment $practiceTaskAttachment): RedirectResponse

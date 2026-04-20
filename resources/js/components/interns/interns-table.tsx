@@ -44,7 +44,7 @@ export default function InternsTable({ interns, hasRows, onDelete }: InternsTabl
                         <th className="w-40 px-4 py-3 text-center font-semibold">Becario</th>
                         <th className="w-40 px-4 py-3 text-center font-semibold">Centro</th>
                         <th className="w-40 px-4 py-3 text-center font-semibold">Ciclo formativo</th>
-                        <th className="w-40 px-4 py-3 text-center font-semibold">Pr�cticas</th>
+                        <th className="w-40 px-4 py-3 text-center font-semibold">Prácticas</th>
                         <th className="w-40 px-4 py-3 text-center font-semibold">Estado</th>
                         <th className="w-40 px-4 py-3 text-center font-semibold">Acciones</th>
                     </tr>

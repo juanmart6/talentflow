@@ -118,11 +118,11 @@ export default function PracticeTasksPage({ viewMode, interns, trainingPrograms,
         lastFlashRef.current = flashKey;
 
         if (successMessage) {
-            toast.success(successMessage);
+            toast.success(successMessage, { id: flashKey });
         }
 
         if (errorMessage) {
-            toast.error(errorMessage);
+            toast.error(errorMessage, { id: flashKey });
         }
     }, [page.props.flash?.success, page.props.flash?.error]);
 
@@ -176,16 +176,6 @@ export default function PracticeTasksPage({ viewMode, interns, trainingPrograms,
 
         router.patch(practiceTasks.updateStatus(draggedTask.id).url, { status }, {
             preserveScroll: true,
-            onSuccess: (responsePage) => {
-                const flashSuccess = (
-                    responsePage.props as { flash?: { success?: string } } | undefined
-                )?.flash?.success;
-                toast.success(
-                    typeof flashSuccess === 'string' && flashSuccess.trim() !== ''
-                        ? flashSuccess
-                        : 'Estado de la tarea actualizado.',
-                );
-            },
             onError: () => {
                 toast.error('No se pudo actualizar el estado de la tarea.');
             },

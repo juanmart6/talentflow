@@ -1,5 +1,5 @@
-﻿import { Head, Link, router, useForm } from '@inertiajs/react';
-import { FileText, History, MessageSquare, Paperclip, Trash2, Upload, Users, X } from 'lucide-react';
+﻿import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
+import { FileText, History, MessageSquare, Paperclip, RefreshCw, Trash2, Upload, Users, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState  } from 'react';
 import type {FormEvent} from 'react';
 import { toast } from 'sonner';
@@ -179,6 +179,7 @@ const getInitials = (name: string): string => {
 };
 
 export default function PracticeTasksFormPage({ interns, trainingPrograms, messages = [], taskAttachments = [], statusLogs = [], task, readOnly = false }: Props) {
+    const page = usePage<{ flash?: { success?: string; error?: string; info?: string } }>();
     const isEditing = Boolean(task);
     const isReadOnly = readOnly === true;
     const viewerRole: 'tutor' | 'intern' = isReadOnly ? 'intern' : 'tutor';
@@ -275,13 +276,19 @@ export default function PracticeTasksFormPage({ interns, trainingPrograms, messa
         () => (isReadOnly ? internDeliverables.filter((attachment) => attachment.uploader_role !== 'tutor') : internDeliverables),
         [isReadOnly, internDeliverables],
     );
+    const tutorViewInternDeliverables = useMemo(
+        () => internDeliverables.filter((attachment) => attachment.uploader_role !== 'tutor'),
+        [internDeliverables],
+    );
     const latestInternDeliverableCreatedAt = useMemo(
         () => getLatestCreatedAt(visibleInternDeliverables),
         [visibleInternDeliverables],
     );
-    const summaryBlockClass = 'rounded-xl border border-slate-300 bg-slate-100/90 p-4 dark:border-slate-700 dark:bg-slate-900/60';
-    const summaryControlClass = 'border-slate-300 bg-slate-100/90 text-slate-800 focus-visible:border-slate-300 focus-visible:ring-0 focus-visible:ring-offset-0 disabled:opacity-100 disabled:bg-slate-100/90 disabled:text-slate-800 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-100 dark:disabled:bg-slate-900/60 dark:disabled:text-slate-100';
-    const summaryTextareaClass = 'min-h-28 w-full rounded-xl border border-slate-300 bg-slate-100/90 px-3 py-2 text-sm text-slate-800 shadow-xs outline-none transition focus:border-slate-300 disabled:opacity-100 disabled:bg-slate-100/90 disabled:text-slate-800 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-100 dark:disabled:bg-slate-900/60 dark:disabled:text-slate-100';
+    const latestTutorViewInternDeliverableCreatedAt = useMemo(
+        () => getLatestCreatedAt(tutorViewInternDeliverables),
+        [tutorViewInternDeliverables],
+    );
+    const summaryFormTextareaClass = 'min-h-[140px] w-full resize-y rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm leading-relaxed shadow-xs transition-colors focus:border-[#2563eb] focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20 dark:border-slate-600 dark:bg-slate-950';
     const summaryReadOnlyRowClass = 'grid gap-1 px-4 py-3 md:grid-cols-[220px_1fr] md:gap-3';
     const summaryStatusLabel = STATUS_OPTIONS.find((option) => option.value === data.status)?.label ?? '-';
     const summaryAssignmentLabel = data.assignment_mode === 'training_program' ? 'Grado formativo' : 'Becario';
@@ -290,6 +297,8 @@ export default function PracticeTasksFormPage({ interns, trainingPrograms, messa
         : selectedInterns.length > 0
             ? `${selectedInterns[0].name}${selectedInterns.length > 1 ? ` (+${selectedInterns.length - 1} más)` : ''}`
             : '-';
+    const summaryInternNameForTutor = selectedInterns[0]?.name ?? null;
+    const showInternInTutorContext = !isReadOnly && data.assignment_mode === 'training_program' && summaryInternNameForTutor !== null;
     const attachmentsCardClass = 'grid gap-3 rounded-xl border border-slate-200 bg-slate-50/70 p-3 dark:border-slate-700 dark:bg-slate-900/50';
     const disableCurrentTabFields = isReadOnly && activeTab !== 'adjuntos' && activeTab !== 'entregas' && activeTab !== 'chat';
 
@@ -343,7 +352,27 @@ export default function PracticeTasksFormPage({ interns, trainingPrograms, messa
             }
         }
     }, [isEditing, task?.id]);
+    useEffect(() => {
+        const successMessage = page.props.flash?.success;
+        const errorMessage = page.props.flash?.error;
+        const infoMessage = page.props.flash?.info;
 
+        if (!successMessage && !errorMessage && !infoMessage) {
+            return;
+        }
+
+        if (successMessage && !(isReadOnly && successMessage === 'Entregable subido correctamente.')) {
+            toast.success(successMessage);
+        }
+
+        if (errorMessage) {
+            toast.error(errorMessage);
+        }
+
+        if (infoMessage) {
+            toast.info(infoMessage);
+        }
+    }, [isReadOnly, page.props.flash]);
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (!internComboboxRef.current) {
@@ -472,6 +501,18 @@ export default function PracticeTasksFormPage({ interns, trainingPrograms, messa
                 } else {
                     setDeliverableFile(null);
                 }
+
+                if (category === 'intern_deliverable' && isReadOnly) {
+                    toast.success('Entregable subido correctamente.');
+                }
+            },
+            onError: () => {
+                if (category === 'intern_deliverable' && isReadOnly) {
+                    toast.error('No se pudo subir el entregable. Inténtalo de nuevo.');
+                    return;
+                }
+
+                toast.error('No se pudo subir el archivo.');
             },
             onFinish: () => setUploadingCategory(null),
         });
@@ -592,21 +633,29 @@ export default function PracticeTasksFormPage({ interns, trainingPrograms, messa
                                 />
 
                                 {isEditing && task && !isReadOnly ? (
-                                    <div className={`${summaryBlockClass} grid gap-3`}>
-                                        <p className="text-xs font-semibold tracking-wide text-muted-foreground">CONTEXTO DE LA TAREA</p>
-                                        <div className="grid gap-1 text-sm">
-                                            <p>
-                                                <span className="font-semibold">Becario:</span>{' '}
-                                                {selectedInterns[0]?.name ?? 'No definido'}
-                                            </p>
-                                            {data.assignment_mode === 'interns' && selectedInterns.length > 1 ? (
-                                                <p className="text-muted-foreground">
-                                                    +{selectedInterns.length - 1} becario(s) adicional(es)
+                                    <div className="overflow-hidden rounded-xl border border-slate-200/80 dark:border-slate-700/80">
+                                        <div className={summaryReadOnlyRowClass}>
+                                            <p className={UI_PRESETS.readOnlyFieldLabel}>Contexto de la tarea</p>
+                                            <div className={`${UI_PRESETS.readOnlyFieldValue} space-y-1`}>
+                                                <p>
+                                                    <span className="font-semibold">{summaryAssignmentLabel}:</span>{' '}
+                                                    {summaryAssignmentValue}
                                                 </p>
-                                            ) : null}
-                                            <p><span className="font-semibold">Creada por:</span> {task.created_by_name}</p>
-                                            <p><span className="font-semibold">Fecha creación:</span> {formatDateTime(task.created_at)}</p>
-                                            <p><span className="font-semibold">ID:</span> #{task.id}</p>
+                                                {showInternInTutorContext ? (
+                                                    <p>
+                                                        <span className="font-semibold">Becario:</span>{' '}
+                                                        {summaryInternNameForTutor}
+                                                    </p>
+                                                ) : null}
+                                                {data.assignment_mode === 'interns' && selectedInterns.length > 1 ? (
+                                                    <p className="text-sm font-medium text-muted-foreground">
+                                                        +{selectedInterns.length - 1} becario(s) adicional(es)
+                                                    </p>
+                                                ) : null}
+                                                <p><span className="font-semibold">Creada por:</span> {task.created_by_name}</p>
+                                                <p><span className="font-semibold">Fecha creación:</span> {formatDateTime(task.created_at)}</p>
+                                                <p><span className="font-semibold">ID:</span> #{task.id}</p>
+                                            </div>
                                         </div>
                                     </div>
                                 ) : null}
@@ -642,59 +691,57 @@ export default function PracticeTasksFormPage({ interns, trainingPrograms, messa
                                         </dl>
                                     </div>
                                 ) : (
-                                    <div className="grid gap-4 md:grid-cols-3">
-                                        <div className={`${summaryBlockClass} grid gap-2 md:col-span-3`}>
+                                    <div className="grid gap-4 md:grid-cols-2">
+                                        <div className="grid gap-2 md:col-span-2">
                                             <FieldLabel htmlFor="title">Título</FieldLabel>
                                             <Input
                                                 id="title"
                                                 value={data.title}
                                                 onChange={(event) => setData('title', event.target.value)}
-                                                className={summaryControlClass}
+                                                className={UI_PRESETS.simpleSearchInput}
                                                 required
                                             />
                                             <InputError message={errors.title} />
                                         </div>
 
-                                        <div className={`${summaryBlockClass} grid gap-2 md:col-span-3`}>
+                                        <div className="grid gap-2 md:col-span-2">
                                             <FieldLabel htmlFor="description">Descripción</FieldLabel>
                                             <textarea
                                                 id="description"
                                                 value={data.description}
                                                 onChange={(event) => setData('description', event.target.value)}
-                                                className={summaryTextareaClass}
+                                                className={summaryFormTextareaClass}
                                             />
                                             <InputError message={errors.description} />
                                         </div>
 
-                                        <div className="grid gap-4 md:col-span-3 md:grid-cols-2">
-                                            <div className={`${summaryBlockClass} grid gap-2`}>
-                                                <FieldLabel htmlFor="status">Estado</FieldLabel>
-                                                <Select value={data.status} onValueChange={(value) => setData('status', value as TaskStatus)}>
-                                                    <SelectTrigger id="status" className={`${summaryControlClass} w-full`}>
-                                                        <SelectValue />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        {STATUS_OPTIONS.map((option) => (
-                                                            <SelectItem key={option.value} value={option.value} className={UI_PRESETS.selectItem}>
-                                                                {option.label}
-                                                            </SelectItem>
-                                                        ))}
-                                                    </SelectContent>
-                                                </Select>
-                                                <InputError message={errors.status} />
-                                            </div>
+                                        <div className="grid gap-2">
+                                            <FieldLabel htmlFor="status">Estado</FieldLabel>
+                                            <Select value={data.status} onValueChange={(value) => setData('status', value as TaskStatus)}>
+                                                <SelectTrigger id="status" className={`${UI_PRESETS.selectTrigger} w-full`}>
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {STATUS_OPTIONS.map((option) => (
+                                                        <SelectItem key={option.value} value={option.value} className={UI_PRESETS.selectItem}>
+                                                            {option.label}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                            <InputError message={errors.status} />
+                                        </div>
 
-                                            <div className={`${summaryBlockClass} grid gap-2`}>
-                                                <FieldLabel htmlFor="due_at">Fecha de entrega</FieldLabel>
-                                                <DatePicker
-                                                    id="due_at"
-                                                    value={data.due_at}
-                                                    onChange={(value) => setData('due_at', value)}
-                                                    placeholder="Seleccionar fecha"
-                                                    className={`${summaryControlClass} w-full`}
-                                                />
-                                                <InputError message={errors.due_at} />
-                                            </div>
+                                        <div className="grid gap-2">
+                                            <FieldLabel htmlFor="due_at">Fecha de entrega</FieldLabel>
+                                            <DatePicker
+                                                id="due_at"
+                                                value={data.due_at}
+                                                onChange={(value) => setData('due_at', value)}
+                                                placeholder="Seleccionar fecha"
+                                                className={`${UI_PRESETS.selectTrigger} w-full`}
+                                            />
+                                            <InputError message={errors.due_at} />
                                         </div>
                                     </div>
                                 )}
@@ -706,58 +753,46 @@ export default function PracticeTasksFormPage({ interns, trainingPrograms, messa
                                 <SectionIntro
                                     title={data.assignment_mode === 'interns' ? 'Becarios asignados' : 'Asignación por grado'}
                                     description={
-                                        data.assignment_mode === 'interns'
-                                            ? 'Selecciona uno o varios becarios. Se creará una tarea individual por cada seleccionado.'
-                                            : 'Se creará una tarea individual para cada becario disponible del grado seleccionado.'
+                                        isEditing
+                                            ? data.assignment_mode === 'training_program'
+                                                ? 'La tarea está asignada por grado formativo.\nLa asignación se definió al crear la tarea.'
+                                                : 'Aquí puedes ver a qué becarios se les ha asignado esta tarea.\nLa asignación se hizo al crear la tarea.'
+                                            : data.assignment_mode === 'interns'
+                                                ? 'Selecciona uno o varios becarios. Se crearán tareas individuales por cada seleccionado.'
+                                                : 'Se crearán tareas individuales para cada becario disponible del grado seleccionado.'
                                     }
                                 />
 
                                 <div className="grid gap-4">
                                     {isEditing ? (
-                                        <>
-                                            <div className="grid gap-3 rounded-xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-700 dark:bg-slate-900/50">
-                                                <div className="grid gap-1">
-                                                    <p className="text-xs font-semibold tracking-wide text-muted-foreground">MODO DE ASIGNACIÓN</p>
-                                                    <p className="text-sm font-semibold">{ASSIGNMENT_MODE_LABELS[data.assignment_mode]}</p>
+                                        <div className="overflow-hidden rounded-xl border border-slate-200/80 dark:border-slate-700/80">
+                                            <dl className="divide-y divide-slate-200/80 dark:divide-slate-700/80">
+                                                <div className={summaryReadOnlyRowClass}>
+                                                    <dt className={UI_PRESETS.readOnlyFieldLabel}>Modo de asignación</dt>
+                                                    <dd className={UI_PRESETS.readOnlyFieldValue}>{ASSIGNMENT_MODE_LABELS[data.assignment_mode]}</dd>
                                                 </div>
 
                                                 {data.assignment_mode === 'interns' ? (
-                                                    <div className="grid gap-2">
-                                                        <p className="text-xs font-semibold tracking-wide text-muted-foreground">BECARIO(S) ASIGNADO(S)</p>
-                                                        {selectedInterns.length > 0 ? (
-                                                            <div className="flex flex-wrap gap-2">
-                                                                {selectedInterns.map((intern) => (
-                                                                    <span
-                                                                        key={intern.id}
-                                                                        className="inline-flex items-center rounded-full border border-slate-300 bg-white px-3 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-950"
-                                                                    >
-                                                                        {intern.name}
-                                                                    </span>
-                                                                ))}
-                                                            </div>
-                                                        ) : (
-                                                            <p className="text-sm text-muted-foreground">Sin becarios asignados.</p>
-                                                        )}
-                                                    </div>
+                                                    <>
+                                                        <div className={summaryReadOnlyRowClass}>
+                                                            <dt className={UI_PRESETS.readOnlyFieldLabel}>Becarios asignados</dt>
+                                                            <dd className={UI_PRESETS.readOnlyFieldValue}>
+                                                                {selectedInterns.length > 0
+                                                                    ? selectedInterns.map((intern) => intern.name).join(', ')
+                                                                    : '-'}
+                                                            </dd>
+                                                        </div>
+                                                    </>
                                                 ) : (
-                                                    <div className="grid gap-1">
-                                                        <p className="text-xs font-semibold tracking-wide text-muted-foreground">GRADO FORMATIVO</p>
-                                                        <p className="text-sm font-semibold">{selectedTrainingProgramName ?? 'No definido'}</p>
-                                                    </div>
+                                                    <>
+                                                        <div className={summaryReadOnlyRowClass}>
+                                                            <dt className={UI_PRESETS.readOnlyFieldLabel}>Grado formativo</dt>
+                                                            <dd className={UI_PRESETS.readOnlyFieldValue}>{selectedTrainingProgramName ?? '-'}</dd>
+                                                        </div>
+                                                    </>
                                                 )}
-                                            </div>
-
-                                            <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/50 p-3 dark:border-slate-700 dark:bg-slate-900/30">
-                                                <p className="text-sm text-muted-foreground">
-                                                    La asignación se define al crear la tarea y no se puede modificar en edición.
-                                                </p>
-                                                <div className="mt-3">
-                                                    <Button type="button" variant="outline" asChild>
-                                                        <Link href={practiceTasks.create().url}>Crear nueva tarea con otra asignación</Link>
-                                                    </Button>
-                                                </div>
-                                            </div>
-                                        </>
+                                            </dl>
+                                        </div>
                                     ) : (
                                         <>
                                             <div className="grid gap-2">
@@ -919,32 +954,51 @@ export default function PracticeTasksFormPage({ interns, trainingPrograms, messa
                             {activeTab === 'chat' ? (
                             <section className="space-y-5 pt-4">
                                 <SectionIntro
-                                    title="Chat"
-                                    description="Conversación entre tutor y becario vinculada a esta tarea."
+                                    title={isReadOnly ? 'Chat con tutor' : 'Chat con becario'}
+                                    description={
+                                        isReadOnly
+                                            ? 'Comenta dudas o avances de esta tarea con tu tutor.'
+                                            : 'Usa este canal para resolver dudas con el becario y dejar seguimiento de la tarea.'
+                                    }
                                 />
 
                                 {!isEditing || !task ? (
                                     <p className="text-sm text-muted-foreground">
-                                        Guarda la tarea para habilitar la comunicación.
+                                        {isReadOnly
+                                            ? 'Guarda la tarea para habilitar la comunicación con tu tutor.'
+                                            : 'Guarda la tarea para habilitar la comunicación con el becario.'}
                                     </p>
                                 ) : (
                                     <div className="space-y-3">
-                                        <div className="flex flex-wrap items-center gap-2">
-                                            <Badge variant="outline" className="text-[11px] uppercase tracking-wide">
-                                                Tarea #{task.id}
-                                            </Badge>
-                                            <Badge variant="outline" className="text-[11px]">
-                                                {summaryAssignmentLabel}: {summaryAssignmentValue}
-                                            </Badge>
+                                        <div className="flex flex-wrap items-center justify-between gap-2">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <Badge variant="outline" className="text-[11px] uppercase tracking-wide">
+                                                    Tarea #{task.id}
+                                                </Badge>
+                                                {(isReadOnly
+                                                    ? summaryAssignmentLabel !== 'Becario'
+                                                    : summaryAssignmentLabel !== 'Grado formativo') ? (
+                                                    <Badge variant="outline" className="text-[11px]">
+                                                        {summaryAssignmentLabel}: {summaryAssignmentValue}
+                                                    </Badge>
+                                                ) : null}
+                                                {showInternInTutorContext ? (
+                                                    <Badge variant="outline" className="text-[11px]">
+                                                        Becario: {summaryInternNameForTutor}
+                                                    </Badge>
+                                                ) : null}
+                                            </div>
                                             <Button
                                                 type="button"
                                                 variant="outline"
-                                                size="sm"
-                                                className="h-7 px-2.5 text-xs"
+                                                size="icon"
+                                                className={`${UI_PRESETS.iconActionButton} h-7 w-7`}
                                                 onClick={() => refreshMessages(true)}
                                                 disabled={isRefreshingMessages}
+                                                title="Actualizar chat"
+                                                aria-label="Actualizar chat"
                                             >
-                                                {isRefreshingMessages ? 'Actualizando...' : 'Actualizar'}
+                                                <RefreshCw className={`size-3.5 ${isRefreshingMessages ? 'animate-spin' : ''}`} />
                                             </Button>
                                         </div>
 
@@ -954,6 +1008,7 @@ export default function PracticeTasksFormPage({ interns, trainingPrograms, messa
                                                 {chatMessages.map((message) => {
                                                     const isOwnMessage = message.author_role === viewerRole;
                                                     const roleLabel = message.author_role === 'tutor' ? 'Tutor' : 'Becario';
+                                                    const showRoleBadge = !(isReadOnly && message.author_role === 'intern');
 
                                                     return (
                                                         <article key={message.id} className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'}`}>
@@ -975,9 +1030,11 @@ export default function PracticeTasksFormPage({ interns, trainingPrograms, messa
                                                                 }`}>
                                                                     <div className={`mb-1 flex items-center gap-2 ${isOwnMessage ? 'justify-end' : 'justify-start'}`}>
                                                                         <p className="text-xs font-semibold">{message.author_name}</p>
-                                                                        <Badge variant="outline" className="h-5 px-1.5 text-[10px] uppercase tracking-wide">
-                                                                            {roleLabel}
-                                                                        </Badge>
+                                                                        {showRoleBadge ? (
+                                                                            <Badge variant="outline" className="h-5 px-1.5 text-[10px] uppercase tracking-wide">
+                                                                                {roleLabel}
+                                                                            </Badge>
+                                                                        ) : null}
                                                                     </div>
                                                                     <p className="whitespace-pre-wrap text-sm">{message.body}</p>
                                                                     {message.created_at && (
@@ -995,16 +1052,19 @@ export default function PracticeTasksFormPage({ interns, trainingPrograms, messa
 
                                         <div className={`${chatMessages.length > 0 ? 'border-t border-slate-200/80 dark:border-slate-700/80' : ''} bg-white p-4 dark:bg-slate-950`}>
                                             <div className="grid gap-2">
-                                                <FieldLabel htmlFor="task_message_body">Nuevo mensaje</FieldLabel>
                                                 <textarea
                                                     id="task_message_body"
+                                                    aria-label={isReadOnly ? 'Mensaje al tutor' : 'Mensaje al becario'}
                                                     value={messageBody}
                                                     onChange={(event) => setMessageBody(event.target.value)}
                                                     className="min-h-24 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-xs outline-none transition focus:border-slate-400 dark:border-slate-600 dark:bg-slate-950"
-                                                    placeholder="Escribe un mensaje para el seguimiento de esta tarea..."
+                                                    placeholder={
+                                                        isReadOnly
+                                                            ? 'Escribe un mensaje para tu tutor sobre esta tarea...'
+                                                            : 'Escribe un mensaje para el becario sobre esta tarea...'
+                                                    }
                                                 />
-                                                <div className="flex items-center justify-between gap-2">
-                                                    <p className="text-xs text-muted-foreground">Tu mensaje quedará registrado en esta tarea.</p>
+                                                <div className="flex items-center justify-end gap-2">
                                                     <Button type="button" onClick={handleSendMessage} disabled={isSendingMessage || messageBody.trim() === ''}>
                                                         {isSendingMessage ? 'Enviando...' : 'Enviar mensaje'}
                                                     </Button>
@@ -1058,14 +1118,18 @@ export default function PracticeTasksFormPage({ interns, trainingPrograms, messa
                             {activeTab === 'adjuntos' ? (
                             <section className="space-y-5 pt-4">
                                 <SectionIntro
-                                    title="Adjuntos"
-                                    description="Consulta aquí la documentación del tutor."
+                                    title={isReadOnly ? 'Adjuntos del tutor' : 'Adjuntos del tutor'}
+                                    description={
+                                        isReadOnly
+                                            ? 'Consulta aquí la documentación subida por el tutor para esta tarea.'
+                                            : 'Sube y gestiona la documentación que verá el becario en su pestaña de adjuntos.'
+                                    }
                                 />
 
                                 {!isEditing ? (
                                     <div className="grid gap-4">
                                         <div className={attachmentsCardClass}>
-                                            <p className="text-sm font-semibold">Tutor: especificaciones</p>
+                                            <p className="text-sm font-semibold">Documentación base (tutor)</p>
                                             <FileUploadField
                                                 id="tutor_spec_file"
                                                 name="tutor_spec_file"
@@ -1117,53 +1181,80 @@ export default function PracticeTasksFormPage({ interns, trainingPrograms, messa
                                         </dl>
                                     </div>
                                 ) : (
-                                    <div className="grid gap-4">
+                                    <div className="grid gap-4 xl:grid-cols-[minmax(0,340px)_minmax(0,1fr)] xl:items-start">
                                         <div className={attachmentsCardClass}>
-                                            <p className="text-sm font-semibold">Tutor: especificaciones</p>
-                                            <div className="grid gap-3">
-                                                <FileUploadField
-                                                    id="tutor_spec_file"
-                                                    name="tutor_spec_file"
-                                                    label="Seleccionar especificación"
-                                                    selectedFileName={tutorSpecFile?.name ?? null}
-                                                    onChange={setTutorSpecFile}
-                                                />
-                                                <Button type="button" onClick={() => handleUploadByCategory('tutor_spec', tutorSpecFile)} disabled={!tutorSpecFile || uploadingCategory === 'tutor_spec'}>
-                                                    {uploadingCategory === 'tutor_spec' ? 'Subiendo...' : 'Subir'}
-                                                </Button>
+                                            <div className="space-y-1">
+                                                <p className="text-sm font-semibold">Nueva documentación</p>
+                                                <p className="text-sm text-muted-foreground">
+                                                    Sube archivos que verá el becario en su pestaña de adjuntos.
+                                                </p>
                                             </div>
-                                            <div className="space-y-2">
-                                                {visibleTutorSpecifications.length > 0 ? (
-                                                    visibleTutorSpecifications.map((attachment) => (
-                                                        <div key={attachment.id} className="rounded-md border border-slate-200 bg-white p-2 text-sm dark:border-slate-700 dark:bg-slate-950">
+                                            <FileUploadField
+                                                id="tutor_spec_file"
+                                                name="tutor_spec_file"
+                                                label="Seleccionar especificación"
+                                                selectedFileName={tutorSpecFile?.name ?? null}
+                                                onChange={setTutorSpecFile}
+                                            />
+                                            <Button
+                                                type="button"
+                                                className="w-full"
+                                                onClick={() => handleUploadByCategory('tutor_spec', tutorSpecFile)}
+                                                disabled={!tutorSpecFile || uploadingCategory === 'tutor_spec'}
+                                            >
+                                                {uploadingCategory === 'tutor_spec' ? 'Subiendo...' : 'Subir documentación'}
+                                            </Button>
+                                            <p className="text-xs text-muted-foreground">
+                                                Puedes repetir este proceso para añadir varios archivos.
+                                            </p>
+                                        </div>
+
+                                        <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50/70 p-3 dark:border-slate-700 dark:bg-slate-900/50">
+                                            <div className="flex items-center justify-between gap-2">
+                                                <p className="text-sm font-semibold">Documentación publicada</p>
+                                                <Badge variant="secondary" className="w-fit">
+                                                    {visibleTutorSpecifications.length} {visibleTutorSpecifications.length === 1 ? 'archivo' : 'archivos'}
+                                                </Badge>
+                                            </div>
+
+                                            {visibleTutorSpecifications.length > 0 ? (
+                                                <div className="space-y-2">
+                                                    {visibleTutorSpecifications.map((attachment) => (
+                                                        <article key={attachment.id} className="rounded-md border border-slate-200 bg-white p-2.5 text-sm dark:border-slate-700 dark:bg-slate-950">
                                                             <div className="flex items-start justify-between gap-2">
                                                                 <div className="min-w-0">
                                                                     <a href={attachment.url} target="_blank" rel="noreferrer" className="font-medium text-primary underline">
                                                                         {attachment.original_name}
                                                                     </a>
-                                                                    <p className="text-xs text-muted-foreground">{attachment.uploader_name} · {attachment.created_at ?? '-'}</p>
+                                                                    <p className="text-xs text-muted-foreground">
+                                                                        {attachment.uploader_name} · {formatDateTime(attachment.created_at)}
+                                                                    </p>
                                                                 </div>
-                                                                <Button
-                                                                    type="button"
-                                                                    variant="outline"
-                                                                    size="icon"
-                                                                    className={`${UI_PRESETS.iconActionButtonDanger} disabled:cursor-not-allowed`}
-                                                                    disabled={deletingAttachmentId === attachment.id}
-                                                                    onClick={() => handleDeleteAttachment(attachment.id)}
-                                                                    aria-label="Eliminar adjunto"
-                                                                    title="Eliminar adjunto"
-                                                                >
-                                                                    {deletingAttachmentId === attachment.id ? '...' : <Trash2 />}
-                                                                </Button>
+                                                                <div className="flex items-center gap-1.5">
+                                                                    <Button type="button" variant="outline" size="sm" asChild>
+                                                                        <a href={attachment.url} target="_blank" rel="noreferrer">Ver</a>
+                                                                    </Button>
+                                                                    <Button
+                                                                        type="button"
+                                                                        variant="outline"
+                                                                        size="icon"
+                                                                        className={`${UI_PRESETS.iconActionButtonDanger} disabled:cursor-not-allowed`}
+                                                                        disabled={deletingAttachmentId === attachment.id}
+                                                                        onClick={() => handleDeleteAttachment(attachment.id)}
+                                                                        aria-label="Eliminar adjunto"
+                                                                        title="Eliminar adjunto"
+                                                                    >
+                                                                        {deletingAttachmentId === attachment.id ? '...' : <Trash2 />}
+                                                                    </Button>
+                                                                </div>
                                                             </div>
-                                                        </div>
-                                                    ))
-                                                ) : (
-                                                    <p className="text-sm text-muted-foreground">Sin especificaciones subidas.</p>
-                                                )}
-                                            </div>
+                                                        </article>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <p className="text-sm text-muted-foreground">Sin documentación subida.</p>
+                                            )}
                                         </div>
-
                                     </div>
                                 )}
                             </section>
@@ -1171,36 +1262,41 @@ export default function PracticeTasksFormPage({ interns, trainingPrograms, messa
 
                             {activeTab === 'entregas' ? (
                             <section className="space-y-5 pt-4">
-                                <div className="space-y-1">
-                                    <h3 className="text-lg font-semibold">Tu entrega</h3>
-                                </div>
+                                <SectionIntro
+                                    title={isReadOnly ? 'Tu entrega' : 'Entregas del becario'}
+                                    description={
+                                        isReadOnly
+                                            ? 'Sube tu archivo de entrega y consulta su historial.'
+                                            : 'Consulta los entregables subidos por el becario y su historial.'
+                                    }
+                                />
 
                                 {!isEditing ? (
-                                    <div className="grid gap-4">
-                                        <div className={attachmentsCardClass}>
-                                            <p className="text-sm font-semibold">Becario: entregables</p>
-                                            <FileUploadField
-                                                id="intern_deliverable_file"
-                                                name="intern_deliverable_file"
-                                                label="Seleccionar entregable"
-                                                selectedFileName={deliverableFile?.name ?? null}
-                                                onChange={(file) => {
-                                                    setDeliverableFile(file);
-                                                    setData('intern_deliverable_file', file);
-                                                }}
-                                            />
+                                    isReadOnly ? (
+                                        <div className="grid gap-4">
+                                            <div className={attachmentsCardClass}>
+                                                <p className="text-sm font-semibold">Becario: entregables</p>
+                                                <FileUploadField
+                                                    id="intern_deliverable_file"
+                                                    name="intern_deliverable_file"
+                                                    label="Seleccionar entregable"
+                                                    selectedFileName={deliverableFile?.name ?? null}
+                                                    onChange={(file) => {
+                                                        setDeliverableFile(file);
+                                                        setData('intern_deliverable_file', file);
+                                                    }}
+                                                />
+                                            </div>
+                                            <p className="text-sm text-muted-foreground">El entregable seleccionado se adjuntará al guardar la tarea.</p>
                                         </div>
-                                        <p className="text-sm text-muted-foreground">El entregable seleccionado se adjuntará al guardar la tarea.</p>
-                                    </div>
+                                    ) : (
+                                        <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-muted-foreground dark:border-slate-700 dark:bg-slate-900/60">
+                                            Las entregas se habilitan cuando la tarea ya está creada. Solo el becario puede subir entregables.
+                                        </div>
+                                    )
                                 ) : isReadOnly ? (
                                     <div className="space-y-5">
                                         <div className="space-y-4">
-                                            <div className="space-y-1">
-                                                <p className="text-sm text-muted-foreground">
-                                                    Sube tu archivo de entrega y consulta su historial.
-                                                </p>
-                                            </div>
-
                                             <div className="overflow-hidden rounded-xl border border-slate-200/80 dark:border-slate-700/80">
                                                 <dl className="divide-y divide-slate-200/80 dark:divide-slate-700/80">
                                                     <div className={summaryReadOnlyRowClass}>
@@ -1268,51 +1364,60 @@ export default function PracticeTasksFormPage({ interns, trainingPrograms, messa
                                         </div>
                                     </div>
                                 ) : (
-                                    <div className="grid gap-4">
+                                    <div className="grid gap-4 xl:grid-cols-[minmax(0,320px)_minmax(0,1fr)] xl:items-start">
                                         <div className={attachmentsCardClass}>
-                                            <p className="text-sm font-semibold">Becario: entregables</p>
-                                            <div className="grid gap-3">
-                                                <FileUploadField
-                                                    id="intern_deliverable_file"
-                                                    name="intern_deliverable_file"
-                                                    label="Seleccionar entregable"
-                                                    selectedFileName={deliverableFile?.name ?? null}
-                                                    onChange={setDeliverableFile}
-                                                />
-                                                <Button type="button" onClick={() => handleUploadByCategory('intern_deliverable', deliverableFile)} disabled={!deliverableFile || uploadingCategory === 'intern_deliverable'}>
-                                                    {uploadingCategory === 'intern_deliverable' ? 'Subiendo...' : 'Subir'}
-                                                </Button>
+                                            <p className="text-sm font-semibold">Resumen de entregas</p>
+                                            <dl className="space-y-2 text-sm">
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <dt className="text-muted-foreground">Estado</dt>
+                                                    <dd className="font-medium">
+                                                        {tutorViewInternDeliverables.length > 0 ? 'Con entregas registradas' : 'Sin entregas'}
+                                                    </dd>
+                                                </div>
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <dt className="text-muted-foreground">Total de archivos</dt>
+                                                    <dd className="font-medium">{tutorViewInternDeliverables.length}</dd>
+                                                </div>
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <dt className="text-muted-foreground">Última entrega</dt>
+                                                    <dd className="font-medium">
+                                                        {latestTutorViewInternDeliverableCreatedAt ? formatDateTime(latestTutorViewInternDeliverableCreatedAt) : '-'}
+                                                    </dd>
+                                                </div>
+                                            </dl>
+                                        </div>
+
+                                        <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50/70 p-3 dark:border-slate-700 dark:bg-slate-900/50">
+                                            <div className="flex items-center justify-between gap-2">
+                                                <p className="text-sm font-semibold">Entregas del becario</p>
+                                                <Badge variant="secondary" className="w-fit">
+                                                    {tutorViewInternDeliverables.length} {tutorViewInternDeliverables.length === 1 ? 'archivo' : 'archivos'}
+                                                </Badge>
                                             </div>
-                                            <div className="space-y-2">
-                                                {internDeliverables.length > 0 ? (
-                                                    internDeliverables.map((attachment) => (
-                                                        <div key={attachment.id} className="rounded-md border border-slate-200 bg-white p-2 text-sm dark:border-slate-700 dark:bg-slate-950">
+
+                                            {tutorViewInternDeliverables.length > 0 ? (
+                                                <div className="space-y-2">
+                                                    {tutorViewInternDeliverables.map((attachment) => (
+                                                        <article key={attachment.id} className="rounded-md border border-slate-200 bg-white p-2.5 text-sm dark:border-slate-700 dark:bg-slate-950">
                                                             <div className="flex items-start justify-between gap-2">
                                                                 <div className="min-w-0">
                                                                     <a href={attachment.url} target="_blank" rel="noreferrer" className="font-medium text-primary underline">
                                                                         {attachment.original_name}
                                                                     </a>
-                                                                    <p className="text-xs text-muted-foreground">{attachment.uploader_name} · {attachment.created_at ?? '-'}</p>
+                                                                    <p className="text-xs text-muted-foreground">
+                                                                        {attachment.uploader_name} · {formatDateTime(attachment.created_at)}
+                                                                    </p>
                                                                 </div>
-                                                                <Button
-                                                                    type="button"
-                                                                    variant="outline"
-                                                                    size="icon"
-                                                                    className={`${UI_PRESETS.iconActionButtonDanger} disabled:cursor-not-allowed`}
-                                                                    disabled={deletingAttachmentId === attachment.id}
-                                                                    onClick={() => handleDeleteAttachment(attachment.id)}
-                                                                    aria-label="Eliminar adjunto"
-                                                                    title="Eliminar adjunto"
-                                                                >
-                                                                    {deletingAttachmentId === attachment.id ? '...' : <Trash2 />}
+                                                                <Button type="button" variant="outline" size="sm" asChild>
+                                                                    <a href={attachment.url} target="_blank" rel="noreferrer">Ver</a>
                                                                 </Button>
                                                             </div>
-                                                        </div>
-                                                    ))
-                                                ) : (
-                                                    <p className="text-sm text-muted-foreground">Sin entregables subidos.</p>
-                                                )}
-                                            </div>
+                                                        </article>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <p className="text-sm text-muted-foreground">Sin entregables subidos.</p>
+                                            )}
                                         </div>
                                     </div>
                                 )}
@@ -1321,7 +1426,7 @@ export default function PracticeTasksFormPage({ interns, trainingPrograms, messa
                             </fieldset>
                             </section>
 
-                            <div className="flex flex-col gap-2 border-t border-sidebar-border/70 pt-4 md:flex-row md:items-center md:justify-end dark:border-sidebar-border">
+                            <div className="flex flex-col gap-2 pt-2 md:flex-row md:items-center md:justify-end">
                                 {isReadOnly ? (
                                     <Button type="button" variant="secondary" asChild>
                                         <Link href={practiceTasks.index().url}>Volver</Link>
