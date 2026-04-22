@@ -8,11 +8,10 @@ import PracticeTasksList from '@/components/practice-tasks/practice-tasks-list';
 import PracticeTasksViewToggle from '@/components/practice-tasks/practice-tasks-view-toggle';
 import ConfirmDeleteDialog from '@/components/shared/confirm-delete-dialog';
 import AppLayout from '@/layouts/app-layout';
-import { moveTaskInStatus, moveTaskToEndInStatus } from '@/lib/practice-tasks/practice-task-board';
 import { parseDueDate, dueDaysFromToday, dueIndicatorMeta } from '@/lib/practice-tasks/practice-task-dates';
 import { UI_PRESETS } from '@/lib/ui-presets';
 import type { BreadcrumbItem } from '@/types';
-import type { DueStateFilter, PracticeTasksProps, TaskCard, TaskStatus } from '@/types/domains/practice-tasks';
+import type { DueStateFilter, PracticeTasksProps, TaskCard } from '@/types/domains/practice-tasks';
 
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -39,14 +38,9 @@ export default function PracticeTasksPage({ viewMode, interns, trainingPrograms,
         || dateFrom !== ''
         || dateTo !== ''
         || dueStateFilter !== 'all';
-    const [draggedTask, setDraggedTask] = useState<TaskCard | null>(null);
-    const [dropColumn, setDropColumn] = useState<TaskStatus | null>(null);
     const [taskToDelete, setTaskToDelete] = useState<TaskCard | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
     const [boardTasks, setBoardTasks] = useState<TaskCard[]>(tasks);
-    const [hoveredTaskId, setHoveredTaskId] = useState<string | null>(null);
-    const [hoveredPosition, setHoveredPosition] = useState<'before' | 'after' | null>(null);
-    const [hoveredEndStatus, setHoveredEndStatus] = useState<TaskStatus | null>(null);
     const [tasksView, setTasksView] = useState<'kanban' | 'list'>(() => {
         if (typeof window === 'undefined') {
             return 'kanban';
@@ -55,9 +49,6 @@ export default function PracticeTasksPage({ viewMode, interns, trainingPrograms,
         const savedView = window.localStorage.getItem('practice-tasks:view');
         return savedView === 'list' ? 'list' : 'kanban';
     });
-    const dragStartStatusRef = useRef<TaskStatus | null>(null);
-    const dragStartOrderRef = useRef<string[]>([]);
-    const reorderedInCurrentDragRef = useRef(false);
 
     useEffect(() => {
         setBoardTasks(tasks);
@@ -105,6 +96,12 @@ export default function PracticeTasksPage({ viewMode, interns, trainingPrograms,
         });
     }, [search, selectedInternIds, trainingProgramFilter, dateFrom, dateTo, dueStateFilter, viewMode, boardTasks]);
     const hasInvalidDateRange = dateFrom !== '' && dateTo !== '' && dateFrom > dateTo;
+    const dueLegendItems: Array<{ dotClass: string; label: string }> = [
+        { dotClass: 'bg-black dark:bg-white', label: 'Vencida' },
+        { dotClass: 'bg-red-500', label: 'Vence hoy o en 7 días' },
+        { dotClass: 'bg-yellow-400', label: 'Vence en 8-14 días' },
+        { dotClass: 'bg-emerald-500', label: 'Vence en más de 14 días' },
+    ];
 
     useEffect(() => {
         const successMessage = page.props.flash?.success;
@@ -125,69 +122,6 @@ export default function PracticeTasksPage({ viewMode, interns, trainingPrograms,
             toast.error(errorMessage, { id: flashKey });
         }
     }, [page.props.flash?.success, page.props.flash?.error]);
-
-    const handleDropTask = (status: TaskStatus) => {
-        if (!draggedTask || draggedTask.status === status) {
-            setDropColumn(null);
-            setHoveredTaskId(null);
-            setHoveredPosition(null);
-            setHoveredEndStatus(null);
-            return;
-        }
-
-        setBoardTasks((current) => {
-            const movedTask = current.find((task) => task.id === draggedTask.id);
-
-            if (!movedTask) {
-                return current;
-            }
-
-            const updated = current.map((task) => (
-                task.id === draggedTask.id
-                    ? { ...task, status }
-                    : task
-            ));
-
-            // Keep moved tasks at the end of the target column until server sync.
-            const targetTasks = updated.filter((task) => task.status === status);
-            const targetIds = targetTasks.map((task) => task.id);
-            const movedIndex = targetIds.indexOf(draggedTask.id);
-
-            if (movedIndex < 0) {
-                return updated;
-            }
-
-            targetIds.splice(movedIndex, 1);
-            targetIds.push(draggedTask.id);
-
-            let targetCursor = 0;
-
-            return updated.map((task) => {
-                if (task.status !== status) {
-                    return task;
-                }
-
-                const nextId = targetIds[targetCursor];
-                targetCursor += 1;
-
-                return updated.find((candidate) => candidate.id === nextId) ?? task;
-            });
-        });
-
-        router.patch(practiceTasks.updateStatus(draggedTask.id).url, { status }, {
-            preserveScroll: true,
-            onError: () => {
-                toast.error('No se pudo actualizar el estado de la tarea.');
-            },
-            onFinish: () => {
-                setDraggedTask(null);
-                setDropColumn(null);
-                setHoveredTaskId(null);
-                setHoveredPosition(null);
-                setHoveredEndStatus(null);
-            },
-        });
-    };
 
     const confirmDeleteTask = () => {
         if (!isTutorView) {
@@ -262,31 +196,26 @@ export default function PracticeTasksPage({ viewMode, interns, trainingPrograms,
                             La fecha "Desde" no puede ser posterior a la fecha "Hasta".
                         </p>
                     ) : null}
+                    <div className="mb-3 rounded-xl border border-sidebar-border/70 bg-white/80 px-3 py-2 dark:bg-slate-900/35">
+                        <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 text-center text-xs text-muted-foreground">
+                            <span className="font-semibold text-foreground">Leyenda de vencimientos:</span>
+                            {dueLegendItems.map((item) => (
+                                <span key={item.label} className="inline-flex items-center gap-2">
+                                    <span className={`inline-block size-3 rounded-full ${item.dotClass}`} />
+                                    <span>{item.label}</span>
+                                </span>
+                            ))}
+                        </div>
+                    </div>
 
                     {tasksView === 'kanban' ? (
                         <PracticeTasksBoard
                             isTutorView={isTutorView}
                             filteredTasks={filteredTasks}
                             boardTasks={boardTasks}
-                            draggedTask={draggedTask}
-                            dropColumn={dropColumn}
-                            hoveredTaskId={hoveredTaskId}
-                            hoveredPosition={hoveredPosition}
-                            hoveredEndStatus={hoveredEndStatus}
-                            setDraggedTask={setDraggedTask}
-                            setDropColumn={setDropColumn}
-                            setHoveredTaskId={setHoveredTaskId}
-                            setHoveredPosition={setHoveredPosition}
-                            setHoveredEndStatus={setHoveredEndStatus}
                             setBoardTasks={setBoardTasks}
                             setTaskToDelete={setTaskToDelete}
-                            handleDropTask={handleDropTask}
-                            moveTaskInStatus={moveTaskInStatus}
-                            moveTaskToEndInStatus={moveTaskToEndInStatus}
                             dueIndicatorMeta={dueIndicatorMeta}
-                            dragStartStatusRef={dragStartStatusRef}
-                            dragStartOrderRef={dragStartOrderRef}
-                            reorderedInCurrentDragRef={reorderedInCurrentDragRef}
                         />
                     ) : (
                         <PracticeTasksList

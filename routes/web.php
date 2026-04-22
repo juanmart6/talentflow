@@ -173,6 +173,10 @@ Route::middleware(['auth'])->group(function () {
         ->middleware('permission:time-control.view')
         ->name('time-control.index');
 
+    Route::get('control-horario/day-details', [TimeControlController::class, 'dayDetails'])
+        ->middleware('permission:time-control.view')
+        ->name('time-control.day-details');
+
     Route::post('control-horario/clock-in', [TimeControlController::class, 'clockIn'])
         ->middleware('permission:time-control.update')
         ->name('time-control.clock-in');

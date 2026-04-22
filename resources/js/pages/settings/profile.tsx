@@ -1,7 +1,10 @@
 import { Form, Head, router, usePage } from '@inertiajs/react';
 import { Camera, Save, Trash2, Upload } from 'lucide-react';
 import type { ChangeEvent } from 'react';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import Cropper from 'react-easy-crop';
+import type { Area } from 'react-easy-crop';
+import 'react-easy-crop/react-easy-crop.css';
 import { toast } from 'sonner';
 import ProfileController from '@/actions/App/Http/Controllers/Settings/ProfileController';
 import DeleteUser from '@/components/delete-user';
@@ -9,6 +12,15 @@ import { SectionIntro } from '@/components/form-ui';
 import InputError from '@/components/input-error';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useInitials } from '@/hooks/use-initials';
@@ -23,6 +35,82 @@ const breadcrumbs: BreadcrumbItem[] = [
         href: ProfileController.edit().url,
     },
 ];
+
+const AVATAR_ALLOWED_MIME_TYPES = [
+    'image/png',
+    'image/jpeg',
+    'image/webp',
+] as const;
+const AVATAR_MAX_FILE_SIZE = 2 * 1024 * 1024;
+
+const isAvatarMimeType = (
+    value: string,
+): value is (typeof AVATAR_ALLOWED_MIME_TYPES)[number] =>
+    AVATAR_ALLOWED_MIME_TYPES.includes(
+        value as (typeof AVATAR_ALLOWED_MIME_TYPES)[number],
+    );
+
+const avatarExtensionByMime: Record<
+    (typeof AVATAR_ALLOWED_MIME_TYPES)[number],
+    string
+> = {
+    'image/png': 'png',
+    'image/jpeg': 'jpg',
+    'image/webp': 'webp',
+};
+
+const loadImage = (imageUrl: string): Promise<HTMLImageElement> =>
+    new Promise((resolve, reject) => {
+        const image = new Image();
+        image.addEventListener('load', () => resolve(image));
+        image.addEventListener('error', () =>
+            reject(new Error('No se pudo cargar la imagen seleccionada.')),
+        );
+        image.src = imageUrl;
+    });
+
+const getCroppedAvatarBlob = async (
+    imageUrl: string,
+    area: Area,
+    mimeType: (typeof AVATAR_ALLOWED_MIME_TYPES)[number],
+): Promise<Blob> => {
+    const image = await loadImage(imageUrl);
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(area.width));
+    canvas.height = Math.max(1, Math.round(area.height));
+
+    const context = canvas.getContext('2d');
+    if (!context) {
+        throw new Error('No se pudo preparar el recorte de la imagen.');
+    }
+
+    context.drawImage(
+        image,
+        area.x,
+        area.y,
+        area.width,
+        area.height,
+        0,
+        0,
+        canvas.width,
+        canvas.height,
+    );
+
+    const blob = await new Promise<Blob | null>((resolve) => {
+        if (mimeType === 'image/jpeg' || mimeType === 'image/webp') {
+            canvas.toBlob(resolve, mimeType, 0.92);
+            return;
+        }
+
+        canvas.toBlob(resolve, mimeType);
+    });
+
+    if (!blob) {
+        throw new Error('No se pudo generar la imagen recortada.');
+    }
+
+    return blob;
+};
 
 export default function Profile({
     mustVerifyEmail,
@@ -46,14 +134,147 @@ export default function Profile({
     const avatarInputRef = useRef<HTMLInputElement | null>(null);
     const profileHasChangesRef = useRef(false);
     const [avatarFile, setAvatarFile] = useState<File | null>(null);
+    const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null);
     const [isAvatarUploading, setIsAvatarUploading] = useState(false);
     const [isAvatarRemoving, setIsAvatarRemoving] = useState(false);
     const [avatarError, setAvatarError] = useState<string | null>(null);
+    const [isCropDialogOpen, setIsCropDialogOpen] = useState(false);
+    const [isPreparingCrop, setIsPreparingCrop] = useState(false);
+    const [cropSourceUrl, setCropSourceUrl] = useState<string | null>(null);
+    const [cropMimeType, setCropMimeType] = useState<
+        (typeof AVATAR_ALLOWED_MIME_TYPES)[number]
+    >('image/jpeg');
+    const [cropOriginalName, setCropOriginalName] = useState<string>('avatar');
+    const [crop, setCrop] = useState({ x: 0, y: 0 });
+    const [zoom, setZoom] = useState(1);
+    const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(
+        null,
+    );
+    const avatarDisplaySrc = avatarPreviewUrl ?? auth.user.avatar ?? null;
+
+    useEffect(
+        () => () => {
+            if (cropSourceUrl) {
+                URL.revokeObjectURL(cropSourceUrl);
+            }
+            if (avatarPreviewUrl) {
+                URL.revokeObjectURL(avatarPreviewUrl);
+            }
+        },
+        [cropSourceUrl, avatarPreviewUrl],
+    );
+
+    const clearAvatarSelection = () => {
+        setAvatarFile(null);
+        setAvatarPreviewUrl((current) => {
+            if (current) {
+                URL.revokeObjectURL(current);
+            }
+            return null;
+        });
+
+        if (avatarInputRef.current) {
+            avatarInputRef.current.value = '';
+        }
+    };
+
+    const closeCropDialog = () => {
+        setIsCropDialogOpen(false);
+        setIsPreparingCrop(false);
+        setCrop({ x: 0, y: 0 });
+        setZoom(1);
+        setCroppedAreaPixels(null);
+        setCropOriginalName('avatar');
+        setCropSourceUrl((current) => {
+            if (current) {
+                URL.revokeObjectURL(current);
+            }
+            return null;
+        });
+
+        if (avatarInputRef.current) {
+            avatarInputRef.current.value = '';
+        }
+    };
 
     const handleAvatarFileChange = (event: ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0] ?? null;
-        setAvatarFile(file);
+        if (!file) {
+            return;
+        }
+
+        if (!isAvatarMimeType(file.type)) {
+            setAvatarError('Formato no válido. Usa PNG, JPG o WEBP.');
+            event.target.value = '';
+            return;
+        }
+
+        if (file.size > AVATAR_MAX_FILE_SIZE) {
+            setAvatarError('El archivo supera el límite de 2 MB.');
+            event.target.value = '';
+            return;
+        }
+
         setAvatarError(null);
+        setIsPreparingCrop(false);
+        setCrop({ x: 0, y: 0 });
+        setZoom(1);
+        setCroppedAreaPixels(null);
+        setCropMimeType(file.type);
+        setCropOriginalName(file.name);
+        setCropSourceUrl((current) => {
+            if (current) {
+                URL.revokeObjectURL(current);
+            }
+            return URL.createObjectURL(file);
+        });
+        setIsCropDialogOpen(true);
+    };
+
+    const handleApplyCrop = async () => {
+        if (!cropSourceUrl || !croppedAreaPixels) {
+            setAvatarError('Ajusta el recorte antes de continuar.');
+            return;
+        }
+
+        setIsPreparingCrop(true);
+        setAvatarError(null);
+
+        try {
+            const blob = await getCroppedAvatarBlob(
+                cropSourceUrl,
+                croppedAreaPixels,
+                cropMimeType,
+            );
+
+            const extension = avatarExtensionByMime[cropMimeType];
+            const sanitizedName = cropOriginalName
+                .replace(/\.[^.]+$/, '')
+                .replace(/[^\w-]+/g, '-')
+                .slice(0, 40);
+            const fileName = `${sanitizedName || 'avatar-recortado'}.${extension}`;
+            const croppedFile = new File([blob], fileName, {
+                type: cropMimeType,
+                lastModified: Date.now(),
+            });
+
+            setAvatarPreviewUrl((current) => {
+                if (current) {
+                    URL.revokeObjectURL(current);
+                }
+                return URL.createObjectURL(croppedFile);
+            });
+            setAvatarFile(croppedFile);
+            closeCropDialog();
+        } catch (error) {
+            setAvatarError(
+                error instanceof Error
+                    ? error.message
+                    : 'No se pudo preparar el recorte.',
+            );
+        } finally {
+            setIsPreparingCrop(false);
+        }
     };
 
     const handleAvatarUpload = () => {
@@ -80,10 +301,7 @@ export default function Profile({
                     toast.error(message);
                 },
                 onSuccess: () => {
-                    setAvatarFile(null);
-                    if (avatarInputRef.current) {
-                        avatarInputRef.current.value = '';
-                    }
+                    clearAvatarSelection();
                     toast.success('Foto de perfil actualizada correctamente.');
                 },
                 onFinish: () => setIsAvatarUploading(false),
@@ -92,6 +310,12 @@ export default function Profile({
     };
 
     const handleAvatarDelete = () => {
+        if (avatarFile || avatarPreviewUrl) {
+            clearAvatarSelection();
+            setAvatarError(null);
+            return;
+        }
+
         setIsAvatarRemoving(true);
         setAvatarError(null);
 
@@ -104,10 +328,7 @@ export default function Profile({
                 toast.error('No se pudo eliminar la foto de perfil.');
             },
             onFinish: () => {
-                setAvatarFile(null);
-                if (avatarInputRef.current) {
-                    avatarInputRef.current.value = '';
-                }
+                clearAvatarSelection();
                 setIsAvatarRemoving(false);
             },
         });
@@ -137,15 +358,54 @@ export default function Profile({
                     </div>
 
                     <div className="mt-4 flex flex-col gap-4 md:flex-row md:items-center">
-                        <Avatar className="h-20 w-20 overflow-hidden rounded-full ring-2 ring-slate-200 dark:ring-slate-700">
-                            <AvatarImage
-                                src={auth.user.avatar ?? undefined}
-                                alt={auth.user.name}
-                            />
-                            <AvatarFallback className="rounded-full bg-neutral-200 text-sm font-semibold text-black dark:bg-neutral-700 dark:text-white">
-                                {getInitials(auth.user.name)}
-                            </AvatarFallback>
-                        </Avatar>
+                        {avatarDisplaySrc ? (
+                            <Dialog>
+                                <DialogTrigger asChild>
+                                    <button
+                                        type="button"
+                                        className="cursor-zoom-in rounded-full"
+                                        aria-label="Ver foto de perfil en grande"
+                                        title="Ver foto en grande"
+                                    >
+                                        <Avatar className="h-20 w-20 overflow-hidden rounded-full ring-2 ring-slate-200 dark:ring-slate-700">
+                                            <AvatarImage
+                                                src={avatarDisplaySrc}
+                                                alt={auth.user.name}
+                                            />
+                                            <AvatarFallback className="rounded-full bg-neutral-200 text-sm font-semibold text-black dark:bg-neutral-700 dark:text-white">
+                                                {getInitials(auth.user.name)}
+                                            </AvatarFallback>
+                                        </Avatar>
+                                    </button>
+                                </DialogTrigger>
+                                <DialogContent className="sm:max-w-xl">
+                                    <DialogHeader>
+                                        <DialogTitle>Foto de perfil</DialogTitle>
+                                        <DialogDescription>
+                                            Vista ampliada de la imagen seleccionada.
+                                        </DialogDescription>
+                                    </DialogHeader>
+
+                                    <div className="flex justify-center">
+                                        <img
+                                            src={avatarDisplaySrc}
+                                            alt="Foto de perfil ampliada"
+                                            className="max-h-[70vh] w-auto rounded-xl border border-sidebar-border/70 object-contain"
+                                        />
+                                    </div>
+                                </DialogContent>
+                            </Dialog>
+                        ) : (
+                            <Avatar className="h-20 w-20 overflow-hidden rounded-full ring-2 ring-slate-200 dark:ring-slate-700">
+                                <AvatarImage
+                                    src={undefined}
+                                    alt={auth.user.name}
+                                />
+                                <AvatarFallback className="rounded-full bg-neutral-200 text-sm font-semibold text-black dark:bg-neutral-700 dark:text-white">
+                                    {getInitials(auth.user.name)}
+                                </AvatarFallback>
+                            </Avatar>
+                        )}
 
                         <div className="flex-1 space-y-3">
                             <input
@@ -206,7 +466,8 @@ export default function Profile({
                                     className={UI_PRESETS.iconActionButtonDanger}
                                     onClick={handleAvatarDelete}
                                     disabled={
-                                        isAvatarRemoving || !auth.user.avatar
+                                        isAvatarRemoving
+                                        || (!auth.user.avatar && !avatarFile)
                                     }
                                     aria-label="Quitar foto"
                                     title="Quitar foto"
@@ -216,9 +477,14 @@ export default function Profile({
                             </div>
 
                             {avatarFile ? (
-                                <p className="text-sm text-muted-foreground">
-                                    Imagen seleccionada: {avatarFile.name}
-                                </p>
+                                <div className="space-y-2">
+                                    <p className="text-sm text-muted-foreground">
+                                        Imagen lista para guardar: {avatarFile.name}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                        Haz clic en la foto para verla en grande.
+                                    </p>
+                                </div>
                             ) : (
                                 <p className="text-sm text-muted-foreground">
                                     Formatos: PNG, JPG o WEBP (max. 2 MB).
@@ -232,6 +498,78 @@ export default function Profile({
                         </div>
                     </div>
                 </section>
+
+                <Dialog open={isCropDialogOpen} onOpenChange={(open) => !open && closeCropDialog()}>
+                    <DialogContent className="sm:max-w-2xl">
+                        <DialogHeader>
+                            <DialogTitle>Recortar foto de perfil</DialogTitle>
+                            <DialogDescription>
+                                Ajusta la imagen para usar un recorte cuadrado antes de guardarla.
+                            </DialogDescription>
+                        </DialogHeader>
+
+                        <div className="space-y-3">
+                            <div className="relative h-72 overflow-hidden rounded-lg border border-sidebar-border/70 bg-slate-950">
+                                {cropSourceUrl ? (
+                                    <Cropper
+                                        image={cropSourceUrl}
+                                        crop={crop}
+                                        zoom={zoom}
+                                        aspect={1}
+                                        cropShape="round"
+                                        showGrid={false}
+                                        onCropChange={setCrop}
+                                        onZoomChange={setZoom}
+                                        onCropComplete={(_, pixels) => setCroppedAreaPixels(pixels)}
+                                    />
+                                ) : null}
+                            </div>
+
+                            <div className="grid gap-2">
+                                <Label htmlFor="crop-zoom">Zoom</Label>
+                                <Input
+                                    id="crop-zoom"
+                                    type="range"
+                                    min={1}
+                                    max={3}
+                                    step={0.05}
+                                    value={zoom}
+                                    onChange={(event) =>
+                                        setZoom(Number(event.currentTarget.value))
+                                    }
+                                />
+                            </div>
+                        </div>
+
+                        <DialogFooter className="gap-2">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => {
+                                    setCrop({ x: 0, y: 0 });
+                                    setZoom(1);
+                                }}
+                            >
+                                Restablecer
+                            </Button>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={closeCropDialog}
+                            >
+                                Cancelar
+                            </Button>
+                            <Button
+                                type="button"
+                                className={UI_PRESETS.saveButton}
+                                disabled={isPreparingCrop}
+                                onClick={handleApplyCrop}
+                            >
+                                {isPreparingCrop ? 'Procesando...' : 'Aplicar recorte'}
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
 
                 <Form
                     {...ProfileController.update.form()}

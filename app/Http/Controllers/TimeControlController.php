@@ -9,6 +9,7 @@ use App\Models\TimeClockEntry;
 use App\Models\User;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -311,7 +312,8 @@ class TimeControlController extends Controller
             return back()->with('error', 'No hay una pausa activa para finalizar.');
         }
 
-        $newBreakMinutes = $activeEntry->break_minutes + max(0, $activeEntry->break_started_at->diffInMinutes(now()));
+        $newBreakMinutes = (int) $activeEntry->break_minutes
+            + $this->elapsedWholeMinutes($activeEntry->break_started_at, now());
 
         $activeEntry->update([
             'break_started_at' => null,
@@ -341,7 +343,7 @@ class TimeControlController extends Controller
         $breakMinutes = (int) $activeEntry->break_minutes;
 
         if ($activeEntry->break_started_at !== null) {
-            $breakMinutes += max(0, $activeEntry->break_started_at->diffInMinutes(now()));
+            $breakMinutes += $this->elapsedWholeMinutes($activeEntry->break_started_at, now());
         }
 
         $activeEntry->update([
@@ -389,9 +391,9 @@ class TimeControlController extends Controller
         $validated = $request->validate([
             'schedule_id' => ['nullable', 'integer', Rule::exists('intern_hour_schedules', 'id')],
             'intern_id' => ['required', 'integer', Rule::exists('interns', 'id')],
-            'season_name' => ['nullable', 'string', 'max:120'],
+            'season_name' => ['required', 'string', 'max:120'],
             'starts_on' => ['required', 'date'],
-            'ends_on' => ['nullable', 'date', 'after_or_equal:starts_on'],
+            'ends_on' => ['required', 'date', 'after_or_equal:starts_on'],
             'is_active' => ['nullable', 'boolean'],
             'monday_minutes' => ['required', 'integer', 'min:0', 'max:1440'],
             'tuesday_minutes' => ['required', 'integer', 'min:0', 'max:1440'],
@@ -410,14 +412,46 @@ class TimeControlController extends Controller
                 ->find($validated['schedule_id']);
         }
 
+        $startsOn = Carbon::parse((string) $validated['starts_on'])->toDateString();
+        $endsOn = Carbon::parse((string) $validated['ends_on'])->toDateString();
+
+        $hasOverlap = InternHourSchedule::query()
+            ->where('intern_id', (int) $validated['intern_id'])
+            ->when(
+                $schedule !== null,
+                fn ($query) => $query->whereKeyNot($schedule->getKey()),
+            )
+            ->where(function ($query) use ($startsOn, $endsOn): void {
+                $query
+                    ->where(function ($innerQuery) use ($startsOn, $endsOn): void {
+                        $innerQuery
+                            ->whereNotNull('ends_on')
+                            ->whereDate('starts_on', '<=', $endsOn)
+                            ->whereDate('ends_on', '>=', $startsOn);
+                    })
+                    ->orWhere(function ($innerQuery) use ($endsOn): void {
+                        // Compatibilidad con registros antiguos sin fecha de fin.
+                        $innerQuery
+                            ->whereNull('ends_on')
+                            ->whereDate('starts_on', '<=', $endsOn);
+                    });
+            })
+            ->exists();
+
+        if ($hasOverlap) {
+            return back()
+                ->withErrors([
+                    'date_range' => 'El rango de fechas se solapa con otro horario existente para este becario.',
+                ])
+                ->withInput();
+        }
+
         $payload = [
             'intern_id' => (int) $validated['intern_id'],
             'created_by_user_id' => $request->user()?->id,
-            'season_name' => trim((string) ($validated['season_name'] ?? '')) ?: null,
-            'starts_on' => Carbon::parse((string) $validated['starts_on'])->toDateString(),
-            'ends_on' => !empty($validated['ends_on'])
-                ? Carbon::parse((string) $validated['ends_on'])->toDateString()
-                : null,
+            'season_name' => trim((string) $validated['season_name']),
+            'starts_on' => $startsOn,
+            'ends_on' => $endsOn,
             'is_active' => (bool) ($validated['is_active'] ?? true),
             'monday_minutes' => (int) $validated['monday_minutes'],
             'tuesday_minutes' => (int) $validated['tuesday_minutes'],
@@ -550,6 +584,85 @@ class TimeControlController extends Controller
             'days' => $days,
             'summary' => $summary,
         ])->name($filename)->download();
+    }
+
+    public function dayDetails(Request $request): JsonResponse
+    {
+        $intern = $this->resolveActionIntern($request, true);
+        if ($intern === null) {
+            return response()->json([
+                'message' => 'Selecciona un becario valido para consultar el detalle diario.',
+            ], 422);
+        }
+
+        $validated = $request->validate([
+            'date' => ['required', 'date_format:Y-m-d'],
+        ]);
+
+        $targetDate = Carbon::createFromFormat('Y-m-d', (string) $validated['date'])->startOfDay();
+        $entries = TimeClockEntry::query()
+            ->where('intern_id', $intern->id)
+            ->whereDate('started_at', $targetDate->toDateString())
+            ->orderBy('started_at')
+            ->get();
+        $schedules = InternHourSchedule::query()
+            ->where('intern_id', $intern->id)
+            ->orderByDesc('starts_on')
+            ->get();
+
+        $plannedDayMeta = $this->plannedDayMetaForDate($targetDate, $schedules);
+        $plannedMinutes = (int) $plannedDayMeta['planned_minutes'];
+        $workedMinutes = (int) $entries->sum(fn ($entry) => $entry instanceof TimeClockEntry
+            ? $this->effectiveMinutesForEntry($entry)
+            : 0);
+        $breakMinutes = (int) $entries->sum(function ($entry): int {
+            if (!$entry instanceof TimeClockEntry) {
+                return 0;
+            }
+
+            $minutes = max(0, (int) $entry->break_minutes);
+            if ($entry->ended_at === null && $entry->break_started_at !== null) {
+                $minutes += $this->elapsedWholeMinutes($entry->break_started_at, now());
+            }
+
+            return $minutes;
+        });
+        $status = $this->resolveDayStatus($targetDate, $workedMinutes, $plannedMinutes);
+        $compliancePercent = $plannedMinutes > 0
+            ? round(($workedMinutes / $plannedMinutes) * 100, 1)
+            : 0;
+        $firstClockIn = $entries->first()?->started_at?->toIso8601String();
+        $lastClockOut = $entries
+            ->filter(fn ($entry) => $entry instanceof TimeClockEntry && $entry->ended_at !== null)
+            ->last()?->ended_at?->toIso8601String();
+        $activeBreakStartedAt = $entries
+            ->first(
+                fn ($entry) => $entry instanceof TimeClockEntry
+                    && $entry->ended_at === null
+                    && $entry->break_started_at !== null,
+            )?->break_started_at?->toIso8601String();
+
+        return response()->json([
+            'date' => $targetDate->toDateString(),
+            'label' => $targetDate->format('d/m'),
+            'weekday' => $this->weekdayLabel($targetDate),
+            'status' => $status,
+            'planned_minutes' => $plannedMinutes,
+            'planned_hours' => $this->minutesToHours($plannedMinutes),
+            'worked_minutes' => $workedMinutes,
+            'worked_hours' => $this->minutesToHours($workedMinutes),
+            'break_minutes' => $breakMinutes,
+            'break_hours' => $this->minutesToHours($breakMinutes),
+            'compliance_percent' => $compliancePercent,
+            'first_clock_in' => $firstClockIn,
+            'last_clock_out' => $lastClockOut,
+            'active_break_started_at' => $activeBreakStartedAt,
+            'off_kind' => $plannedDayMeta['off_kind'],
+            'entries' => $entries
+                ->map(fn (TimeClockEntry $entry): array => $this->mapEntry($entry))
+                ->values()
+                ->all(),
+        ]);
     }
 
     private function resolveSelectedIntern(Request $request, Collection $interns, bool $isInternUser, User $user): ?Intern
@@ -690,7 +803,8 @@ class TimeControlController extends Controller
         while ($cursor->lte($end)) {
             $dateKey = $cursor->toDateString();
             $workedMinutes = (int) ($workedByDate[$dateKey] ?? 0);
-            $plannedMinutes = $this->plannedMinutesForDate($cursor, $schedules);
+            $plannedDayMeta = $this->plannedDayMetaForDate($cursor, $schedules);
+            $plannedMinutes = (int) $plannedDayMeta['planned_minutes'];
             $status = $this->resolveDayStatus($cursor, $workedMinutes, $plannedMinutes);
 
             $rows[] = [
@@ -702,6 +816,7 @@ class TimeControlController extends Controller
                 'worked_hours' => $this->minutesToHours($workedMinutes),
                 'planned_hours' => $this->minutesToHours($plannedMinutes),
                 'status' => $status,
+                'off_kind' => $plannedDayMeta['off_kind'],
                 'is_today' => $cursor->equalTo($today),
                 'is_past' => $cursor->lt($today),
             ];
@@ -848,7 +963,10 @@ class TimeControlController extends Controller
         return round(($elapsedDays / $totalDays) * 100, 1);
     }
 
-    private function plannedMinutesForDate(CarbonInterface $date, Collection $schedules): int
+    /**
+     * @return array{planned_minutes: int, off_kind: 'rest'|'unscheduled'|null}
+     */
+    private function plannedDayMetaForDate(CarbonInterface $date, Collection $schedules): array
     {
         foreach ($schedules as $schedule) {
             if (!$schedule instanceof InternHourSchedule || !$schedule->is_active || !$schedule->starts_on) {
@@ -866,7 +984,7 @@ class TimeControlController extends Controller
                 continue;
             }
 
-            return match ($date->dayOfWeekIso) {
+            $plannedMinutes = match ($date->dayOfWeekIso) {
                 1 => (int) $schedule->monday_minutes,
                 2 => (int) $schedule->tuesday_minutes,
                 3 => (int) $schedule->wednesday_minutes,
@@ -876,9 +994,22 @@ class TimeControlController extends Controller
                 7 => (int) $schedule->sunday_minutes,
                 default => 0,
             };
+
+            return [
+                'planned_minutes' => $plannedMinutes,
+                'off_kind' => $plannedMinutes === 0 ? 'rest' : null,
+            ];
         }
 
-        return 0;
+        return [
+            'planned_minutes' => 0,
+            'off_kind' => 'unscheduled',
+        ];
+    }
+
+    private function plannedMinutesForDate(CarbonInterface $date, Collection $schedules): int
+    {
+        return (int) $this->plannedDayMetaForDate($date, $schedules)['planned_minutes'];
     }
 
     private function resolveDayStatus(CarbonInterface $date, int $workedMinutes, int $plannedMinutes): string
@@ -909,11 +1040,11 @@ class TimeControlController extends Controller
         }
 
         $endedAt = $entry->ended_at ?? now();
-        $grossMinutes = max(0, $entry->started_at->diffInMinutes($endedAt));
+        $grossMinutes = $this->elapsedWholeMinutes($entry->started_at, $endedAt);
         $breakMinutes = max(0, (int) $entry->break_minutes);
 
         if ($entry->ended_at === null && $entry->break_started_at !== null) {
-            $breakMinutes += max(0, $entry->break_started_at->diffInMinutes(now()));
+            $breakMinutes += $this->elapsedWholeMinutes($entry->break_started_at, now());
         }
 
         return max(0, $grossMinutes - $breakMinutes);
@@ -922,6 +1053,13 @@ class TimeControlController extends Controller
     private function minutesToHours(int $minutes): float
     {
         return round($minutes / 60, 2);
+    }
+
+    private function elapsedWholeMinutes(CarbonInterface $from, CarbonInterface $to): int
+    {
+        $seconds = max(0, $from->diffInSeconds($to));
+
+        return (int) floor($seconds / 60);
     }
 
     private function weekdayLabel(CarbonInterface $date): string
@@ -950,6 +1088,7 @@ class TimeControlController extends Controller
             'source' => $entry->source,
             'started_at' => $entry->started_at?->toIso8601String(),
             'ended_at' => $entry->ended_at?->toIso8601String(),
+            'break_started_at' => $entry->break_started_at?->toIso8601String(),
             'break_minutes' => (int) $entry->break_minutes,
             'manual_reason' => $entry->manual_reason,
             'is_on_break' => $entry->break_started_at !== null,

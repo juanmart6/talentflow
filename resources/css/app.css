@@ -143,3 +143,38 @@
         @apply bg-background text-foreground;
     }
 }
+
+/* Control Horario - status dots */
+@keyframes livepulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.2; }
+}
+
+@keyframes pausepulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.15; }
+}
+
+.dot-live,
+.dot-pause,
+.dot-stop {
+    display: inline-block;
+    width: 5px;
+    height: 5px;
+    border-radius: 9999px;
+    flex-shrink: 0;
+}
+
+.dot-live {
+    background: #34d399;
+    animation: livepulse 1.4s ease-in-out infinite;
+}
+
+.dot-pause {
+    background: #fbbf24;
+    animation: pausepulse 2.5s ease-in-out infinite;
+}
+
+.dot-stop {
+    background: #f87171;
+}
