@@ -10,7 +10,9 @@ import {
     Eye,
     FilterX,
     Pause,
+    Pencil,
     Play,
+    Plus,
     Save,
     ShieldAlert,
     Timer,
@@ -309,6 +311,14 @@ type ScheduleFormState = {
     notes: string;
 };
 
+type TimelineEntryFormState = {
+    entry_id: number | null;
+    started_at: string;
+    ended_at: string;
+    break_minutes: string;
+    manual_reason: string;
+};
+
 function parseTimeToMinutes(value: string): number | null {
     const [hoursStr, minutesStr] = value.split(':');
     const hours = Number(hoursStr);
@@ -397,6 +407,40 @@ function formatTime(value: string | null): string {
 
 function formatClockTime(value: string | null): string {
     return value ? formatTime(value) : '--:--';
+}
+
+function toDateTimeLocalInput(value: string | null): string {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
+function buildTimelineEntryCreateForm(date: string | null): TimelineEntryFormState {
+    return {
+        entry_id: null,
+        started_at: date ? `${date}T09:00` : '',
+        ended_at: date ? `${date}T14:00` : '',
+        break_minutes: '0',
+        manual_reason: '',
+    };
+}
+
+function buildTimelineEntryEditForm(entry: ClockEntry): TimelineEntryFormState {
+    return {
+        entry_id: entry.id,
+        started_at: toDateTimeLocalInput(entry.started_at),
+        ended_at: toDateTimeLocalInput(entry.ended_at),
+        break_minutes: String(entry.break_minutes ?? 0),
+        manual_reason: entry.manual_reason ?? '',
+    };
 }
 
 function formatMinutesDetailed(totalMinutes: number): string {
@@ -557,7 +601,7 @@ export default function TimeControlPage({
     const lastScheduleErrorRef = useRef<string | null>(null);
     const lastActionRef = useRef<string | null>(null);
     const [activeTab, setActiveTab] =
-        useState<(typeof tabs)[number]['id']>('clock');
+        useState<(typeof tabs)[number]['id']>('summary');
     const [actionLoading, setActionLoading] = useState<string | null>(null);
     const [reviewNotes, setReviewNotes] = useState<Record<number, string>>({});
     const [liveNow, setLiveNow] = useState<Date>(() => new Date());
@@ -599,6 +643,13 @@ export default function TimeControlPage({
     const [dayDetailsLoading, setDayDetailsLoading] = useState(false);
     const [dayDetails, setDayDetails] = useState<DayDetails | null>(null);
     const [dayDetailsDate, setDayDetailsDate] = useState<string | null>(null);
+    const [dayDetailsTab, setDayDetailsTab] = useState<'status' | 'timeline'>(
+        'status',
+    );
+    const [isTimelineEntryFormOpen, setIsTimelineEntryFormOpen] =
+        useState(false);
+    const [timelineEntryForm, setTimelineEntryForm] =
+        useState<TimelineEntryFormState>(() => buildTimelineEntryCreateForm(null));
     const dayDetailsRequestRef = useRef(0);
 
     useEffect(() => {
@@ -875,7 +926,10 @@ export default function TimeControlPage({
         window.location.href = `/control-horario/export/pdf?${params.toString()}`;
     };
 
-    const openDayDetails = async (date: string) => {
+    const openDayDetails = async (
+        date: string,
+        options?: { preserveTab?: boolean },
+    ) => {
         if (canManageTeam && !internId) {
             toast.error('Selecciona un becario para ver el detalle diario.');
             return;
@@ -885,6 +939,11 @@ export default function TimeControlPage({
         setDayDetailsLoading(true);
         setDayDetailsDate(date);
         setDayDetails(null);
+        if (!options?.preserveTab) {
+            setDayDetailsTab('status');
+        }
+        setIsTimelineEntryFormOpen(false);
+        setTimelineEntryForm(buildTimelineEntryCreateForm(null));
 
         const requestId = dayDetailsRequestRef.current + 1;
         dayDetailsRequestRef.current = requestId;
@@ -918,6 +977,163 @@ export default function TimeControlPage({
                 setDayDetailsLoading(false);
             }
         }
+    };
+
+    const closeDayDetailsDialog = () => {
+        setIsDayDetailsOpen(false);
+        setDayDetailsLoading(false);
+        setDayDetailsTab('status');
+        setIsTimelineEntryFormOpen(false);
+        setTimelineEntryForm(buildTimelineEntryCreateForm(null));
+    };
+
+    const openCreateTimelineEntryForm = () => {
+        if (!clockState.canManualEntry) {
+            toast.error('No tienes permisos para registrar fichajes manuales.');
+            return;
+        }
+
+        const targetDate = dayDetails?.date ?? dayDetailsDate;
+        setDayDetailsTab('timeline');
+        setTimelineEntryForm(buildTimelineEntryCreateForm(targetDate));
+        setIsTimelineEntryFormOpen(true);
+    };
+
+    const openEditTimelineEntryForm = (entry: ClockEntry) => {
+        if (!clockState.canManualEntry) {
+            toast.error('No tienes permisos para editar fichajes manuales.');
+            return;
+        }
+
+        if (entry.source !== 'tutor_manual') {
+            toast.error('Solo se pueden editar fichajes manuales.');
+            return;
+        }
+
+        setDayDetailsTab('timeline');
+        setTimelineEntryForm(buildTimelineEntryEditForm(entry));
+        setIsTimelineEntryFormOpen(true);
+    };
+
+    const closeTimelineEntryForm = () => {
+        setIsTimelineEntryFormOpen(false);
+        setTimelineEntryForm(buildTimelineEntryCreateForm(null));
+    };
+
+    const submitTimelineEntryForm = (event: FormEvent) => {
+        event.preventDefault();
+
+        if (!clockState.canManualEntry) {
+            toast.error('No tienes permisos para registrar fichajes manuales.');
+            return;
+        }
+
+        if (!internId) {
+            toast.error('Selecciona un becario para guardar fichajes manuales.');
+            return;
+        }
+
+        const manualReason = timelineEntryForm.manual_reason.trim();
+        if (!timelineEntryForm.started_at || !timelineEntryForm.ended_at) {
+            toast.error('Debes indicar una hora de inicio y de fin.');
+            return;
+        }
+
+        if (!manualReason) {
+            toast.error('Debes indicar un motivo.');
+            return;
+        }
+
+        const parsedBreakMinutes = Number(timelineEntryForm.break_minutes);
+        if (
+            !Number.isFinite(parsedBreakMinutes)
+            || parsedBreakMinutes < 0
+            || parsedBreakMinutes > 720
+        ) {
+            toast.error('Las pausas deben estar entre 0 y 720 minutos.');
+            return;
+        }
+
+        const payload = {
+            intern_id: internId,
+            started_at: timelineEntryForm.started_at,
+            ended_at: timelineEntryForm.ended_at,
+            break_minutes: Math.round(parsedBreakMinutes),
+            manual_reason: manualReason,
+        };
+
+        const selectedDate = dayDetails?.date ?? dayDetailsDate;
+        const entryId = timelineEntryForm.entry_id;
+
+        if (entryId !== null) {
+            setActionLoading(`day-entry-update-${entryId}`);
+            router.patch(`/control-horario/entries/${entryId}`, payload, {
+                preserveScroll: true,
+                preserveState: true,
+                onSuccess: () => {
+                    closeTimelineEntryForm();
+                    if (selectedDate) {
+                        void openDayDetails(selectedDate, { preserveTab: true });
+                    }
+                },
+                onFinish: () => setActionLoading(null),
+            });
+            return;
+        }
+
+        setActionLoading('day-entry-create');
+        router.post('/control-horario/manual-entry', payload, {
+            preserveScroll: true,
+            preserveState: true,
+            onSuccess: () => {
+                closeTimelineEntryForm();
+                if (selectedDate) {
+                    void openDayDetails(selectedDate, { preserveTab: true });
+                }
+            },
+            onFinish: () => setActionLoading(null),
+        });
+    };
+
+    const deleteTimelineEntry = (entry: ClockEntry) => {
+        if (!clockState.canManualEntry) {
+            toast.error('No tienes permisos para eliminar fichajes manuales.');
+            return;
+        }
+
+        if (entry.source !== 'tutor_manual') {
+            toast.error('Solo se pueden eliminar fichajes manuales.');
+            return;
+        }
+
+        if (!internId) {
+            toast.error('Selecciona un becario para eliminar fichajes manuales.');
+            return;
+        }
+
+        const confirmed = window.confirm(
+            'Se eliminara el fichaje manual seleccionado. Esta accion no se puede deshacer.',
+        );
+        if (!confirmed) return;
+
+        const selectedDate = dayDetails?.date ?? dayDetailsDate;
+        setActionLoading(`day-entry-delete-${entry.id}`);
+        router.delete(`/control-horario/entries/${entry.id}`, {
+            data: {
+                intern_id: internId,
+            },
+            preserveScroll: true,
+            preserveState: true,
+            onSuccess: () => {
+                if (timelineEntryForm.entry_id === entry.id) {
+                    closeTimelineEntryForm();
+                }
+                if (selectedDate) {
+                    void openDayDetails(selectedDate, { preserveTab: true });
+                }
+            },
+            onFinish: () => setActionLoading(null),
+        });
     };
 
     const activeEntry = clockState.activeEntry;
@@ -2335,26 +2551,38 @@ export default function TimeControlPage({
                                     <Dialog
                                         open={isDayDetailsOpen}
                                         onOpenChange={(open) => {
-                                            setIsDayDetailsOpen(open);
-                                            if (!open) {
-                                                setDayDetailsLoading(false);
+                                            if (open) {
+                                                setIsDayDetailsOpen(true);
+                                                return;
                                             }
+                                            closeDayDetailsDialog();
                                         }}
                                     >
                                         <DialogContent
                                             overlayClassName="bg-black/35 backdrop-blur-sm"
-                                            className="w-[96vw] max-w-[780px] !block overflow-hidden border-sidebar-border/70 p-0 !bg-white dark:!bg-slate-950"
+                                            hideCloseButton
+                                            className="!w-[94vw] !max-w-[760px] !block overflow-hidden border-sidebar-border/70 p-0 !bg-white dark:!bg-slate-950 [&_button]:cursor-pointer"
                                         >
                                             <div className="flex min-h-0 min-w-0 max-h-[85vh] flex-col">
                                                 <DialogHeader className="border-b border-sidebar-border/70 bg-[linear-gradient(140deg,#eaf2ff_0%,#f7fbff_36%,#e9f9f2_100%)] px-5 pb-3 pt-4 dark:border-sidebar-border dark:bg-[linear-gradient(140deg,#0f1d34_0%,#11233f_48%,#0f2c2b_100%)] sm:px-6">
-                                                    <DialogTitle className="flex flex-wrap items-center gap-2 text-base font-semibold text-foreground">
-                                                        <span>Detalle diario</span>
-                                                        {dayDetailsDateLabel !== '-' ? (
-                                                            <span className="inline-flex items-center rounded-md border border-sidebar-border/70 bg-white/75 px-2 py-0.5 text-xs font-semibold text-foreground dark:bg-slate-900/30">
-                                                                {dayDetailsDateLabel}
-                                                            </span>
-                                                        ) : null}
-                                                    </DialogTitle>
+                                                    <div className="flex items-center justify-between gap-3">
+                                                        <DialogTitle className="text-base font-semibold text-foreground">
+                                                            {dayDetailsDateLabel !== '-'
+                                                                ? `Detalle diario ${dayDetailsDateLabel}`
+                                                                : 'Detalle diario'}
+                                                        </DialogTitle>
+                                                        <Button
+                                                            type="button"
+                                                            size="icon"
+                                                            variant="ghost"
+                                                            className="shrink-0"
+                                                            aria-label="Volver"
+                                                            title="Volver"
+                                                            onClick={closeDayDetailsDialog}
+                                                        >
+                                                            <ArrowLeft className="size-4" />
+                                                        </Button>
+                                                    </div>
                                                 </DialogHeader>
 
                                                 <div className="min-w-0 space-y-5 overflow-x-hidden overflow-y-auto px-6 py-6 sm:px-7 sm:py-7">
@@ -2366,214 +2594,534 @@ export default function TimeControlPage({
 
                                                     {!dayDetailsLoading && dayDetails ? (
                                                         <div className="min-w-0 space-y-4">
-                                                            <section className="relative rounded-2xl border border-[#2563eb]/25 bg-[linear-gradient(150deg,#ffffff_0%,#f5f9ff_52%,#eefaf4_100%)] p-5 shadow-sm dark:border-[#2563eb]/35 dark:bg-[linear-gradient(150deg,#0b1426_0%,#0d1a31_58%,#0e2424_100%)]">
-                                                                <div className="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-center">
-                                                                    <div className="space-y-2">
-                                                                        <p className={FIELD_LABEL_CLASS}>
-                                                                            Estado
-                                                                        </p>
-                                                                        <span
-                                                                            className={cn(
-                                                                                'inline-flex items-center gap-2.5 rounded-lg border px-3 py-2 text-sm font-semibold shadow-sm',
-                                                                                dayDetailsStatusBadgeClass,
-                                                                            )}
-                                                                        >
-                                                                            {dayDetailsStatusLegendItem ? (
-                                                                                <span
-                                                                                    aria-hidden="true"
-                                                                                    className={cn(
-                                                                                        'inline-block size-2.5 rounded-full',
-                                                                                        dayDetailsStatusLegendItem.dotClassName,
-                                                                                    )}
-                                                                                />
-                                                                            ) : null}
-                                                                            {dayDetailsStatusLegendItem?.label ?? '-'}
-                                                                        </span>
-                                                                    </div>
-
-                                                                    <div className="min-w-[188px] rounded-xl border border-sidebar-border/70 bg-white/85 p-4 text-right shadow-sm dark:bg-slate-900/35">
-                                                                        <p className={FIELD_LABEL_CLASS}>
-                                                                            Cumplimiento
-                                                                        </p>
-                                                                        <p className="text-4xl font-extrabold leading-none text-foreground">
-                                                                            {dayDetails.compliance_percent.toFixed(
-                                                                                1,
-                                                                            )}
-                                                                            %
-                                                                        </p>
-                                                                        <p className="text-xs text-muted-foreground">
-                                                                            {dayDetails.worked_hours.toFixed(
-                                                                                1,
-                                                                            )}
-                                                                            h de{' '}
-                                                                            {dayDetails.planned_hours.toFixed(
-                                                                                1,
-                                                                            )}
-                                                                            h
-                                                                        </p>
-                                                                    </div>
-                                                                </div>
-
-                                                                <div className="mt-4">
-                                                                    <div className="mb-1 flex items-center justify-between text-xs text-muted-foreground">
-                                                                        <span>
-                                                                            Progreso del dia
-                                                                        </span>
-                                                                        <span>
-                                                                            {dayDetailsProgressPercent.toFixed(
-                                                                                1,
-                                                                            )}
-                                                                            %
-                                                                        </span>
-                                                                    </div>
-                                                                    <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-200/70 dark:bg-slate-700/70">
-                                                                        <div
-                                                                            className={cn(
-                                                                                'h-full transition-all duration-300',
-                                                                                dayDetailsProgressFillClass,
-                                                                            )}
-                                                                            style={{
-                                                                                width: `${dayDetailsProgressPercent}%`,
-                                                                            }}
-                                                                        />
-                                                                    </div>
-                                                                </div>
+                                                            <section className="space-y-1 py-1 text-center">
+                                                                <p className={cn(FIELD_LABEL_CLASS, 'text-center')}>
+                                                                    Cumplimiento
+                                                                </p>
+                                                                <p className="text-4xl font-extrabold leading-none text-foreground">
+                                                                    {dayDetails.compliance_percent.toFixed(
+                                                                        1,
+                                                                    )}
+                                                                    %
+                                                                </p>
+                                                                <p className="text-xs text-muted-foreground">
+                                                                    {dayDetails.worked_hours.toFixed(
+                                                                        1,
+                                                                    )}
+                                                                    h de{' '}
+                                                                    {dayDetails.planned_hours.toFixed(
+                                                                        1,
+                                                                    )}
+                                                                    h
+                                                                </p>
                                                             </section>
 
-                                                            <section className={cn(UI_PRESETS.sectionCard, 'space-y-3 p-5')}>
-                                                                <div className="flex flex-wrap items-center justify-between gap-2">
-                                                                    <h4 className={SECTION_TITLE_INLINE_CLASS}>
-                                                                        Timeline de fichajes
-                                                                    </h4>
-                                                                    <Badge variant="secondary">
-                                                                        {
-                                                                            dayDetails
-                                                                                .entries
-                                                                                .length
-                                                                        }{' '}
-                                                                        registros
-                                                                    </Badge>
+                                                            <section className={cn(UI_PRESETS.sectionCard, 'space-y-4 p-5')}>
+                                                                <div className="grid grid-cols-2 gap-2 rounded-xl border border-sidebar-border/70 bg-white/80 p-1 dark:bg-slate-900/30">
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() =>
+                                                                            setDayDetailsTab(
+                                                                                'status',
+                                                                            )
+                                                                        }
+                                                                        className={cn(
+                                                                            'rounded-lg px-3 py-2 text-sm font-semibold transition-colors',
+                                                                            dayDetailsTab
+                                                                                ===
+                                                                                'status'
+                                                                                ? 'bg-[#2563eb] text-white shadow-sm'
+                                                                                : 'text-muted-foreground hover:bg-slate-100 dark:hover:bg-slate-800/70',
+                                                                        )}
+                                                                    >
+                                                                        Estado
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() =>
+                                                                            setDayDetailsTab(
+                                                                                'timeline',
+                                                                            )
+                                                                        }
+                                                                        className={cn(
+                                                                            'rounded-lg px-3 py-2 text-sm font-semibold transition-colors',
+                                                                            dayDetailsTab
+                                                                                ===
+                                                                                'timeline'
+                                                                                ? 'bg-[#2563eb] text-white shadow-sm'
+                                                                                : 'text-muted-foreground hover:bg-slate-100 dark:hover:bg-slate-800/70',
+                                                                        )}
+                                                                    >
+                                                                        Timeline de fichajes (
+                                                                        {dayDetails
+                                                                            .entries
+                                                                            .length}
+                                                                        )
+                                                                    </button>
                                                                 </div>
-                                                                <div className={`${UI_PRESETS.tableContainer} min-w-0 max-h-[18rem] overflow-auto`}>
-                                                                    <Table className="text-sm">
-                                                                        <TableHeader className={cn(UI_PRESETS.tableHead, 'sticky top-0 z-10')}>
-                                                                            <TableRow>
-                                                                                <TableHead className={`${UI_PRESETS.tableCellCentered} ${FIELD_LABEL_CLASS}`}>
-                                                                                    #
-                                                                                </TableHead>
-                                                                                <TableHead className={`${UI_PRESETS.tableCellCentered} ${FIELD_LABEL_CLASS}`}>
-                                                                                    Inicio
-                                                                                </TableHead>
-                                                                                <TableHead className={`${UI_PRESETS.tableCellCentered} ${FIELD_LABEL_CLASS}`}>
-                                                                                    Fin
-                                                                                </TableHead>
-                                                                                <TableHead className={`${UI_PRESETS.tableCellCentered} ${FIELD_LABEL_CLASS}`}>
-                                                                                    Pausa
-                                                                                </TableHead>
-                                                                                <TableHead className={`${UI_PRESETS.tableCellCentered} ${FIELD_LABEL_CLASS}`}>
-                                                                                    Completadas
-                                                                                </TableHead>
-                                                                                <TableHead className={`${UI_PRESETS.tableCellCentered} ${FIELD_LABEL_CLASS}`}>
-                                                                                    Origen
-                                                                                </TableHead>
-                                                                            </TableRow>
-                                                                        </TableHeader>
-                                                                        <TableBody>
-                                                                            {dayDetails.entries.length > 0 ? (
-                                                                                dayDetails.entries.map((entry, index) => {
-                                                                                    const liveBreakMinutes =
-                                                                                        entry.is_on_break
-                                                                                        && entry.break_started_at
-                                                                                            ? Math.floor(
-                                                                                                Math.max(
-                                                                                                    0,
-                                                                                                    liveNow.getTime()
-                                                                                                    - new Date(
-                                                                                                        entry.break_started_at,
-                                                                                                    ).getTime(),
-                                                                                                )
-                                                                                                / 60_000,
-                                                                                            )
-                                                                                            : 0;
 
-                                                                                    return (
-                                                                                        <TableRow
-                                                                                            key={entry.id}
-                                                                                            className={cn(
-                                                                                                'border-t border-sidebar-border/50',
-                                                                                                stripedRowClass(index),
-                                                                                            )}
-                                                                                        >
-                                                                                            <TableCell className={UI_PRESETS.tableCellCentered}>
-                                                                                                {index + 1}
-                                                                                            </TableCell>
-                                                                                            <TableCell className={cn(UI_PRESETS.tableCellCentered, 'whitespace-nowrap')}>
-                                                                                                {formatClockTime(
-                                                                                                    entry.started_at,
+                                                                {dayDetailsTab === 'status' ? (
+                                                                    <div className="space-y-4">
+                                                                        <div className="flex flex-col items-center justify-center space-y-2 text-center">
+                                                                            <p
+                                                                                className={cn(
+                                                                                    FIELD_LABEL_CLASS,
+                                                                                    'w-full text-center',
+                                                                                )}
+                                                                            >
+                                                                                Estado
+                                                                            </p>
+                                                                            <span
+                                                                                className={cn(
+                                                                                    'inline-flex items-center gap-2.5 rounded-lg border px-3 py-2 text-sm font-semibold shadow-sm',
+                                                                                    dayDetailsStatusBadgeClass,
+                                                                                )}
+                                                                            >
+                                                                                {dayDetailsStatusLegendItem ? (
+                                                                                    <span
+                                                                                        aria-hidden="true"
+                                                                                        className={cn(
+                                                                                            'inline-block size-2.5 rounded-full',
+                                                                                            dayDetailsStatusLegendItem.dotClassName,
+                                                                                        )}
+                                                                                    />
+                                                                                ) : null}
+                                                                                {dayDetailsStatusLegendItem?.label ?? '-'}
+                                                                            </span>
+                                                                        </div>
+
+                                                                        <div>
+                                                                            <div className="mb-1 flex items-center justify-between text-xs text-muted-foreground">
+                                                                                <span>
+                                                                                    Progreso del dia
+                                                                                </span>
+                                                                                <span>
+                                                                                    {dayDetailsProgressPercent.toFixed(
+                                                                                        1,
+                                                                                    )}
+                                                                                    %
+                                                                                </span>
+                                                                            </div>
+                                                                            <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-200/70 dark:bg-slate-700/70">
+                                                                                <div
+                                                                                    className={cn(
+                                                                                        'h-full transition-all duration-300',
+                                                                                        dayDetailsProgressFillClass,
+                                                                                    )}
+                                                                                    style={{
+                                                                                        width: `${dayDetailsProgressPercent}%`,
+                                                                                    }}
+                                                                                />
+                                                                            </div>
+                                                                        </div>
+
+                                                                        <div className="grid gap-3 sm:grid-cols-3">
+                                                                            <div className="rounded-lg border border-sidebar-border/70 bg-white/80 p-3 text-center dark:bg-slate-900/30">
+                                                                                <p className={FIELD_LABEL_CLASS}>
+                                                                                    Trabajadas
+                                                                                </p>
+                                                                                <p className="mt-1 text-sm font-semibold text-foreground">
+                                                                                    {dayDetails.worked_hours.toFixed(
+                                                                                        1,
+                                                                                    )}
+                                                                                    h
+                                                                                </p>
+                                                                            </div>
+                                                                            <div className="rounded-lg border border-sidebar-border/70 bg-white/80 p-3 text-center dark:bg-slate-900/30">
+                                                                                <p className={FIELD_LABEL_CLASS}>
+                                                                                    Planificadas
+                                                                                </p>
+                                                                                <p className="mt-1 text-sm font-semibold text-foreground">
+                                                                                    {dayDetails.planned_hours.toFixed(
+                                                                                        1,
+                                                                                    )}
+                                                                                    h
+                                                                                </p>
+                                                                            </div>
+                                                                            <div className="rounded-lg border border-sidebar-border/70 bg-white/80 p-3 text-center dark:bg-slate-900/30">
+                                                                                <p className={FIELD_LABEL_CLASS}>
+                                                                                    Pausas
+                                                                                </p>
+                                                                                <p className="mt-1 text-sm font-semibold text-foreground">
+                                                                                    {dayDetails.break_hours.toFixed(
+                                                                                        1,
+                                                                                    )}
+                                                                                    h
+                                                                                </p>
+                                                                            </div>
+                                                                        </div>
+
+                                                                        <div className="grid gap-3 sm:grid-cols-2">
+                                                                            <div className="rounded-lg border border-sidebar-border/70 bg-white/80 p-3 text-center dark:bg-slate-900/30">
+                                                                                <p className={FIELD_LABEL_CLASS}>
+                                                                                    Primera entrada
+                                                                                </p>
+                                                                                <p className="mt-1 text-sm font-semibold text-foreground">
+                                                                                    {formatClockTime(
+                                                                                        dayDetails.first_clock_in,
+                                                                                    )}
+                                                                                </p>
+                                                                            </div>
+                                                                            <div className="rounded-lg border border-sidebar-border/70 bg-white/80 p-3 text-center dark:bg-slate-900/30">
+                                                                                <p className={FIELD_LABEL_CLASS}>
+                                                                                    Ultima salida
+                                                                                </p>
+                                                                                <p className="mt-1 text-sm font-semibold text-foreground">
+                                                                                    {formatClockTime(
+                                                                                        dayDetails.last_clock_out,
+                                                                                    )}
+                                                                                </p>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                ) : (
+                                                                    <section className="space-y-3">
+                                                                        <div className="flex flex-wrap items-center justify-between gap-2">
+                                                                            <h4 className={SECTION_TITLE_INLINE_CLASS}>
+                                                                                Timeline de fichajes
+                                                                            </h4>
+                                                                            <div className="flex items-center gap-2">
+                                                                                <Badge variant="secondary">
+                                                                                    {
+                                                                                        dayDetails
+                                                                                            .entries
+                                                                                            .length
+                                                                                    }{' '}
+                                                                                    registros
+                                                                                </Badge>
+                                                                                {clockState.canManualEntry ? (
+                                                                                    <Button
+                                                                                        type="button"
+                                                                                        size="sm"
+                                                                                        variant="outline"
+                                                                                        onClick={openCreateTimelineEntryForm}
+                                                                                        disabled={actionLoading !== null}
+                                                                                    >
+                                                                                        <Plus className="size-4" />
+                                                                                        Nuevo fichaje
+                                                                                    </Button>
+                                                                                ) : null}
+                                                                            </div>
+                                                                        </div>
+
+                                                                        {clockState.canManualEntry
+                                                                        && isTimelineEntryFormOpen ? (
+                                                                            <form
+                                                                                className="space-y-3 rounded-lg border border-sidebar-border/70 bg-white/80 p-3 dark:bg-slate-900/30"
+                                                                                onSubmit={submitTimelineEntryForm}
+                                                                            >
+                                                                                <p className={FIELD_LABEL_CLASS}>
+                                                                                    {timelineEntryForm.entry_id
+                                                                                    !== null
+                                                                                        ? 'Editar fichaje manual'
+                                                                                        : 'Nuevo fichaje manual'}
+                                                                                </p>
+                                                                                <div className="grid gap-2 sm:grid-cols-2">
+                                                                                    <div className="space-y-1">
+                                                                                        <p className={FIELD_LABEL_CLASS}>
+                                                                                            Inicio
+                                                                                        </p>
+                                                                                        <Input
+                                                                                            type="datetime-local"
+                                                                                            value={
+                                                                                                timelineEntryForm.started_at
+                                                                                            }
+                                                                                            onChange={(event) =>
+                                                                                                setTimelineEntryForm(
+                                                                                                    (current) => ({
+                                                                                                        ...current,
+                                                                                                        started_at:
+                                                                                                            event
+                                                                                                                .target
+                                                                                                                .value,
+                                                                                                    }),
+                                                                                                )
+                                                                                            }
+                                                                                            className={UI_PRESETS.filterInput}
+                                                                                            required
+                                                                                        />
+                                                                                    </div>
+                                                                                    <div className="space-y-1">
+                                                                                        <p className={FIELD_LABEL_CLASS}>
+                                                                                            Fin
+                                                                                        </p>
+                                                                                        <Input
+                                                                                            type="datetime-local"
+                                                                                            value={
+                                                                                                timelineEntryForm.ended_at
+                                                                                            }
+                                                                                            onChange={(event) =>
+                                                                                                setTimelineEntryForm(
+                                                                                                    (current) => ({
+                                                                                                        ...current,
+                                                                                                        ended_at:
+                                                                                                            event
+                                                                                                                .target
+                                                                                                                .value,
+                                                                                                    }),
+                                                                                                )
+                                                                                            }
+                                                                                            className={UI_PRESETS.filterInput}
+                                                                                            required
+                                                                                        />
+                                                                                    </div>
+                                                                                </div>
+                                                                                <div className="grid gap-2 sm:grid-cols-[160px_1fr]">
+                                                                                    <div className="space-y-1">
+                                                                                        <p className={FIELD_LABEL_CLASS}>
+                                                                                            Pausa (min)
+                                                                                        </p>
+                                                                                        <Input
+                                                                                            type="number"
+                                                                                            min={0}
+                                                                                            max={720}
+                                                                                            value={
+                                                                                                timelineEntryForm.break_minutes
+                                                                                            }
+                                                                                            onChange={(event) =>
+                                                                                                setTimelineEntryForm(
+                                                                                                    (current) => ({
+                                                                                                        ...current,
+                                                                                                        break_minutes:
+                                                                                                            event
+                                                                                                                .target
+                                                                                                                .value,
+                                                                                                    }),
+                                                                                                )
+                                                                                            }
+                                                                                            className={UI_PRESETS.filterInput}
+                                                                                        />
+                                                                                    </div>
+                                                                                    <div className="space-y-1">
+                                                                                        <p className={FIELD_LABEL_CLASS}>
+                                                                                            Motivo
+                                                                                        </p>
+                                                                                        <Input
+                                                                                            value={
+                                                                                                timelineEntryForm.manual_reason
+                                                                                            }
+                                                                                            onChange={(event) =>
+                                                                                                setTimelineEntryForm(
+                                                                                                    (current) => ({
+                                                                                                        ...current,
+                                                                                                        manual_reason:
+                                                                                                            event
+                                                                                                                .target
+                                                                                                                .value,
+                                                                                                    }),
+                                                                                                )
+                                                                                            }
+                                                                                            className={UI_PRESETS.filterInput}
+                                                                                            placeholder="Motivo del ajuste manual"
+                                                                                            maxLength={500}
+                                                                                            required
+                                                                                        />
+                                                                                    </div>
+                                                                                </div>
+                                                                                <div className="flex flex-wrap justify-end gap-2">
+                                                                                    <Button
+                                                                                        type="button"
+                                                                                        variant="ghost"
+                                                                                        size="sm"
+                                                                                        onClick={closeTimelineEntryForm}
+                                                                                        disabled={actionLoading !== null}
+                                                                                    >
+                                                                                        Cancelar
+                                                                                    </Button>
+                                                                                    <Button
+                                                                                        type="submit"
+                                                                                        size="sm"
+                                                                                        disabled={actionLoading !== null}
+                                                                                    >
+                                                                                        <Save className="size-4" />
+                                                                                        {timelineEntryForm.entry_id
+                                                                                        !== null
+                                                                                            ? 'Guardar cambios'
+                                                                                            : 'Crear fichaje'}
+                                                                                    </Button>
+                                                                                </div>
+                                                                            </form>
+                                                                        ) : null}
+
+                                                                        <div
+                                                                            className={`${UI_PRESETS.tableContainer} min-w-0 max-h-[18rem] overflow-y-auto overflow-x-hidden [&>[data-slot=table-container]]:overflow-x-hidden`}
+                                                                        >
+                                                                            <Table className="w-full table-fixed text-sm [&_td]:!whitespace-normal [&_th]:!whitespace-normal">
+                                                                                <TableHeader className={cn(UI_PRESETS.tableHead, 'sticky top-0 z-10')}>
+                                                                                    <TableRow>
+                                                                                        <TableHead className={cn('px-2 py-2 text-center text-[11px]', FIELD_LABEL_CLASS)}>
+                                                                                            #
+                                                                                        </TableHead>
+                                                                                        <TableHead className={cn('px-2 py-2 text-center text-[11px]', FIELD_LABEL_CLASS)}>
+                                                                                            Inicio
+                                                                                        </TableHead>
+                                                                                        <TableHead className={cn('px-2 py-2 text-center text-[11px]', FIELD_LABEL_CLASS)}>
+                                                                                            Fin
+                                                                                        </TableHead>
+                                                                                        <TableHead className={cn('px-2 py-2 text-center text-[11px]', FIELD_LABEL_CLASS)}>
+                                                                                            Pausa
+                                                                                        </TableHead>
+                                                                                        <TableHead className={cn('px-2 py-2 text-center text-[11px]', FIELD_LABEL_CLASS)}>
+                                                                                            Completadas
+                                                                                        </TableHead>
+                                                                                        <TableHead className={cn('px-2 py-2 text-center text-[11px]', FIELD_LABEL_CLASS)}>
+                                                                                            Origen
+                                                                                        </TableHead>
+                                                                                        {clockState.canManualEntry ? (
+                                                                                            <TableHead
+                                                                                                className={cn(
+                                                                                                    'px-2 py-2 text-center text-[11px]',
+                                                                                                    FIELD_LABEL_CLASS,
                                                                                                 )}
-                                                                                            </TableCell>
-                                                                                            <TableCell className={cn(UI_PRESETS.tableCellCentered, 'whitespace-nowrap')}>
-                                                                                                {formatClockTime(
-                                                                                                    entry.ended_at,
-                                                                                                )}
-                                                                                            </TableCell>
-                                                                                            <TableCell className={UI_PRESETS.tableCellCentered}>
-                                                                                                <div className="space-y-1 text-center">
-                                                                                                    <p className="font-medium text-foreground">
-                                                                                                        {formatMinutesDetailed(
-                                                                                                            entry.break_minutes
-                                                                                                            + liveBreakMinutes,
-                                                                                                        )}
-                                                                                                    </p>
-                                                                                                    {entry.is_on_break
-                                                                                                    && entry.break_started_at ? (
-                                                                                                        <p className="text-[11px] text-amber-700">
-                                                                                                            Activa
-                                                                                                        </p>
-                                                                                                    ) : null}
-                                                                                                </div>
-                                                                                            </TableCell>
-                                                                                            <TableCell className={UI_PRESETS.tableCellCentered}>
-                                                                                                <span className="font-medium text-foreground">
-                                                                                                    {entry.effective_hours.toFixed(
-                                                                                                        1,
+                                                                                            >
+                                                                                                Acciones
+                                                                                            </TableHead>
+                                                                                        ) : null}
+                                                                                    </TableRow>
+                                                                                </TableHeader>
+                                                                                <TableBody>
+                                                                                    {dayDetails.entries.length > 0 ? (
+                                                                                        dayDetails.entries.map((entry, index) => {
+                                                                                            const liveBreakMinutes =
+                                                                                                entry.is_on_break
+                                                                                                && entry.break_started_at
+                                                                                                    ? Math.floor(
+                                                                                                        Math.max(
+                                                                                                            0,
+                                                                                                            liveNow.getTime()
+                                                                                                            - new Date(
+                                                                                                                entry.break_started_at,
+                                                                                                            ).getTime(),
+                                                                                                        )
+                                                                                                        / 60_000,
+                                                                                                    )
+                                                                                                    : 0;
+
+                                                                                            return (
+                                                                                                <TableRow
+                                                                                                    key={entry.id}
+                                                                                                    className={cn(
+                                                                                                        'border-t border-sidebar-border/50',
+                                                                                                        stripedRowClass(index),
                                                                                                     )}
-                                                                                                    h
-                                                                                                </span>
-                                                                                            </TableCell>
-                                                                                            <TableCell className={UI_PRESETS.tableCellCentered}>
-                                                                                                <div className="flex flex-col items-center gap-1">
-                                                                                                    <Badge variant="secondary">
-                                                                                                        {formatEntrySource(
-                                                                                                            entry.source,
+                                                                                                >
+                                                                                                    <TableCell className="px-2 py-2 text-center">
+                                                                                                        {index + 1}
+                                                                                                    </TableCell>
+                                                                                                    <TableCell className="px-2 py-2 text-center">
+                                                                                                        {formatClockTime(
+                                                                                                            entry.started_at,
                                                                                                         )}
-                                                                                                    </Badge>
-                                                                                                    {entry.manual_reason ? (
-                                                                                                        <p
-                                                                                                            className="max-w-[170px] truncate text-[11px] leading-tight text-muted-foreground"
-                                                                                                            title={entry.manual_reason}
-                                                                                                        >
-                                                                                                            {entry.manual_reason}
-                                                                                                        </p>
+                                                                                                    </TableCell>
+                                                                                                    <TableCell className="px-2 py-2 text-center">
+                                                                                                        {formatClockTime(
+                                                                                                            entry.ended_at,
+                                                                                                        )}
+                                                                                                    </TableCell>
+                                                                                                    <TableCell className="px-2 py-2 text-center">
+                                                                                                        <div className="space-y-1 text-center">
+                                                                                                            <p className="font-medium text-foreground">
+                                                                                                                {formatMinutesDetailed(
+                                                                                                                    entry.break_minutes
+                                                                                                                    + liveBreakMinutes,
+                                                                                                                )}
+                                                                                                            </p>
+                                                                                                            {entry.is_on_break
+                                                                                                            && entry.break_started_at ? (
+                                                                                                                <p className="text-[11px] text-amber-700">
+                                                                                                                    Activa
+                                                                                                                </p>
+                                                                                                            ) : null}
+                                                                                                        </div>
+                                                                                                    </TableCell>
+                                                                                                    <TableCell className="px-2 py-2 text-center">
+                                                                                                        <span className="font-medium text-foreground">
+                                                                                                            {entry.effective_hours.toFixed(
+                                                                                                                1,
+                                                                                                            )}
+                                                                                                            h
+                                                                                                        </span>
+                                                                                                    </TableCell>
+                                                                                                    <TableCell className="px-2 py-2 text-center">
+                                                                                                        <div className="flex flex-col items-center gap-1">
+                                                                                                            <Badge variant="secondary">
+                                                                                                                {formatEntrySource(
+                                                                                                                    entry.source,
+                                                                                                                )}
+                                                                                                            </Badge>
+                                                                                                            {entry.manual_reason ? (
+                                                                                                                <p
+                                                                                                                    className="max-w-[140px] truncate text-[11px] leading-tight text-muted-foreground"
+                                                                                                                    title={entry.manual_reason}
+                                                                                                                >
+                                                                                                                    {entry.manual_reason}
+                                                                                                                </p>
+                                                                                                            ) : null}
+                                                                                                        </div>
+                                                                                                    </TableCell>
+                                                                                                    {clockState.canManualEntry ? (
+                                                                                                        <TableCell className="px-2 py-2 text-center">
+                                                                                                            {entry.source ===
+                                                                                                            'tutor_manual' ? (
+                                                                                                                <div className="flex items-center justify-center gap-1">
+                                                                                                                    <Button
+                                                                                                                        type="button"
+                                                                                                                        size="icon"
+                                                                                                                        variant="outline"
+                                                                                                                        className={UI_PRESETS.iconActionButton}
+                                                                                                                        aria-label="Editar fichaje"
+                                                                                                                        title="Editar fichaje"
+                                                                                                                        onClick={() =>
+                                                                                                                            openEditTimelineEntryForm(
+                                                                                                                                entry,
+                                                                                                                            )
+                                                                                                                        }
+                                                                                                                        disabled={actionLoading !== null}
+                                                                                                                    >
+                                                                                                                        <Pencil className="size-4" />
+                                                                                                                    </Button>
+                                                                                                                    <Button
+                                                                                                                        type="button"
+                                                                                                                        size="icon"
+                                                                                                                        variant="outline"
+                                                                                                                        className={UI_PRESETS.iconActionButtonDanger}
+                                                                                                                        aria-label="Eliminar fichaje"
+                                                                                                                        title="Eliminar fichaje"
+                                                                                                                        onClick={() =>
+                                                                                                                            deleteTimelineEntry(
+                                                                                                                                entry,
+                                                                                                                            )
+                                                                                                                        }
+                                                                                                                        disabled={actionLoading !== null}
+                                                                                                                    >
+                                                                                                                        <Trash2 className="size-4" />
+                                                                                                                    </Button>
+                                                                                                                </div>
+                                                                                                            ) : (
+                                                                                                                <span className="text-[11px] text-muted-foreground">
+                                                                                                                    Auto
+                                                                                                                </span>
+                                                                                                            )}
+                                                                                                        </TableCell>
                                                                                                     ) : null}
-                                                                                                </div>
+                                                                                                </TableRow>
+                                                                                            );
+                                                                                        })
+                                                                                    ) : (
+                                                                                        <TableRow className="border-t border-sidebar-border/50">
+                                                                                            <TableCell
+                                                                                                colSpan={clockState.canManualEntry ? 7 : 6}
+                                                                                                className="px-2 py-3 text-center text-sm text-muted-foreground"
+                                                                                            >
+                                                                                                No hay fichajes registrados en este dia.
                                                                                             </TableCell>
                                                                                         </TableRow>
-                                                                                    );
-                                                                                })
-                                                                            ) : (
-                                                                                <TableRow className="border-t border-sidebar-border/50">
-                                                                                    <TableCell
-                                                                                        colSpan={6}
-                                                                                        className={`${UI_PRESETS.tableCellCentered} text-sm text-muted-foreground`}
-                                                                                    >
-                                                                                        No hay fichajes registrados en este dia.
-                                                                                    </TableCell>
-                                                                                </TableRow>
-                                                                            )}
-                                                                        </TableBody>
-                                                                    </Table>
-                                                                </div>
+                                                                                    )}
+                                                                                </TableBody>
+                                                                            </Table>
+                                                                        </div>
+                                                                    </section>
+                                                                )}
                                                             </section>
                                                         </div>
                                                     ) : null}
@@ -2936,5 +3484,4 @@ export default function TimeControlPage({
         </AppLayout>
     );
 }
-
 

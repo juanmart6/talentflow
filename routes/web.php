@@ -197,6 +197,14 @@ Route::middleware(['auth'])->group(function () {
         ->middleware('permission:time-control.manual-entry')
         ->name('time-control.manual-entry');
 
+    Route::patch('control-horario/entries/{entry}', [TimeControlController::class, 'updateManualEntry'])
+        ->middleware('permission:time-control.manual-entry')
+        ->name('time-control.entries.update');
+
+    Route::delete('control-horario/entries/{entry}', [TimeControlController::class, 'destroyManualEntry'])
+        ->middleware('permission:time-control.manual-entry')
+        ->name('time-control.entries.destroy');
+
     Route::post('control-horario/schedules', [TimeControlController::class, 'upsertSchedule'])
         ->middleware('permission:time-control.manage-schedules')
         ->name('time-control.schedules.upsert');
