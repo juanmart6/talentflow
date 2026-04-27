@@ -1,35 +1,29 @@
 import { Link } from '@inertiajs/react';
 import type { PropsWithChildren } from 'react';
-import Heading from '@/components/heading';
+import PasswordController from '@/actions/App/Http/Controllers/Settings/PasswordController';
+import ProfileController from '@/actions/App/Http/Controllers/Settings/ProfileController';
+import { FormPageHeader } from '@/components/form-ui';
 import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
 import { useCurrentUrl } from '@/hooks/use-current-url';
+import { UI_PRESETS } from '@/lib/ui-presets';
 import { cn, toUrl } from '@/lib/utils';
-import { edit as editAppearance } from '@/routes/appearance';
-import { edit } from '@/routes/profile';
 import { show } from '@/routes/two-factor';
-import { edit as editPassword } from '@/routes/user-password';
 import type { NavItem } from '@/types';
 
-const sidebarNavItems: NavItem[] = [
+const settingsTabs: NavItem[] = [
     {
-        title: 'Profile',
-        href: edit(),
+        title: 'Perfil',
+        href: ProfileController.edit().url,
         icon: null,
     },
     {
-        title: 'Password',
-        href: editPassword(),
+        title: 'Contraseña',
+        href: PasswordController.edit().url,
         icon: null,
     },
     {
-        title: 'Two-factor auth',
+        title: 'Autenticación 2FA',
         href: show(),
-        icon: null,
-    },
-    {
-        title: 'Appearance',
-        href: editAppearance(),
         icon: null,
     },
 ];
@@ -37,53 +31,45 @@ const sidebarNavItems: NavItem[] = [
 export default function SettingsLayout({ children }: PropsWithChildren) {
     const { isCurrentOrParentUrl } = useCurrentUrl();
 
-    // When server-side rendering, we only render the layout on the client...
     if (typeof window === 'undefined') {
         return null;
     }
 
     return (
-        <div className="px-4 py-6">
-            <Heading
-                title="Settings"
-                description="Manage your profile and account settings"
-            />
+        <div className={UI_PRESETS.pageContent}>
+            <div className={cn(UI_PRESETS.pageSection, 'space-y-4')}>
+                <FormPageHeader
+                    title="Configuración"
+                    description="Gestiona tu perfil y los ajustes de tu cuenta."
+                />
 
-            <div className="flex flex-col lg:flex-row lg:space-x-12">
-                <aside className="w-full max-w-xl lg:w-48">
-                    <nav
-                        className="flex flex-col space-y-1 space-x-0"
-                        aria-label="Settings"
-                    >
-                        {sidebarNavItems.map((item, index) => (
-                            <Button
-                                key={`${toUrl(item.href)}-${index}`}
-                                size="sm"
-                                variant="ghost"
-                                asChild
-                                className={cn('w-full justify-start', {
-                                    'bg-muted': isCurrentOrParentUrl(item.href),
-                                })}
-                            >
-                                <Link href={item.href}>
-                                    {item.icon && (
-                                        <item.icon className="h-4 w-4" />
+                <section className={UI_PRESETS.sectionCard}>
+                    <div className={UI_PRESETS.tabsHeaderEmphasis}>
+                        <div className="flex flex-wrap items-end gap-1.5">
+                            {settingsTabs.map((item, index) => (
+                                <Button
+                                    key={`${toUrl(item.href)}-${index}`}
+                                    type="button"
+                                    size="sm"
+                                    variant="ghost"
+                                    asChild
+                                    className={cn(
+                                        UI_PRESETS.tabBase,
+                                        isCurrentOrParentUrl(item.href)
+                                            ? UI_PRESETS.tabActive
+                                            : UI_PRESETS.tabInactive,
                                     )}
-                                    {item.title}
-                                </Link>
-                            </Button>
-                        ))}
-                    </nav>
-                </aside>
+                                >
+                                    <Link href={item.href}>{item.title}</Link>
+                                </Button>
+                            ))}
+                        </div>
+                    </div>
 
-                <Separator className="my-6 lg:hidden" />
-
-                <div className="flex-1 md:max-w-2xl">
-                    <section className="max-w-xl space-y-12">
-                        {children}
-                    </section>
-                </div>
+                    <div className="space-y-6 pt-4">{children}</div>
+                </section>
             </div>
         </div>
     );
 }
+

@@ -1,21 +1,22 @@
 import { Transition } from '@headlessui/react';
 import { Form, Head } from '@inertiajs/react';
+import { Save } from 'lucide-react';
 import { useRef } from 'react';
 import PasswordController from '@/actions/App/Http/Controllers/Settings/PasswordController';
-import Heading from '@/components/heading';
+import { SectionIntro } from '@/components/form-ui';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
-import { edit } from '@/routes/user-password';
+import { UI_PRESETS } from '@/lib/ui-presets';
 import type { BreadcrumbItem } from '@/types';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
-        title: 'Password settings',
-        href: edit(),
+        title: 'Configuración de contraseña',
+        href: PasswordController.edit().url,
     },
 ];
 
@@ -25,57 +26,54 @@ export default function Password() {
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Password settings" />
+            <Head title="Configuración de contraseña" />
 
-            <h1 className="sr-only">Password settings</h1>
+            <h1 className="sr-only">Configuración de contraseña</h1>
 
             <SettingsLayout>
-                <div className="space-y-6">
-                    <Heading
-                        variant="small"
-                        title="Update password"
-                        description="Ensure your account is using a long, random password to stay secure"
-                    />
+                <SectionIntro
+                    title="Actualizar contraseña"
+                    description="Usa una contraseña robusta para reforzar la seguridad de tu cuenta."
+                />
 
-                    <Form
-                        {...PasswordController.update.form()}
-                        options={{
-                            preserveScroll: true,
-                        }}
-                        resetOnError={[
-                            'password',
-                            'password_confirmation',
-                            'current_password',
-                        ]}
-                        resetOnSuccess
-                        onError={(errors) => {
-                            if (errors.password) {
-                                passwordInput.current?.focus();
-                            }
+                <Form
+                    {...PasswordController.update.form()}
+                    options={{
+                        preserveScroll: true,
+                    }}
+                    resetOnError={[
+                        'password',
+                        'password_confirmation',
+                        'current_password',
+                    ]}
+                    resetOnSuccess
+                    onError={(errors) => {
+                        if (errors.password) {
+                            passwordInput.current?.focus();
+                        }
 
-                            if (errors.current_password) {
-                                currentPasswordInput.current?.focus();
-                            }
-                        }}
-                        className="space-y-6"
-                    >
-                        {({ errors, processing, recentlySuccessful }) => (
-                            <>
+                        if (errors.current_password) {
+                            currentPasswordInput.current?.focus();
+                        }
+                    }}
+                    className={`${UI_PRESETS.sectionCard} space-y-5`}
+                >
+                    {({ errors, processing, recentlySuccessful }) => (
+                        <>
+                            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] lg:items-end">
                                 <div className="grid gap-2">
                                     <Label htmlFor="current_password">
-                                        Current password
+                                        Contraseña actual
                                     </Label>
-
                                     <Input
                                         id="current_password"
                                         ref={currentPasswordInput}
                                         name="current_password"
                                         type="password"
-                                        className="mt-1 block w-full"
+                                        className={UI_PRESETS.simpleSearchInput}
                                         autoComplete="current-password"
-                                        placeholder="Current password"
+                                        placeholder="Contraseña actual"
                                     />
-
                                     <InputError
                                         message={errors.current_password}
                                     />
@@ -83,47 +81,47 @@ export default function Password() {
 
                                 <div className="grid gap-2">
                                     <Label htmlFor="password">
-                                        New password
+                                        Nueva contraseña
                                     </Label>
-
                                     <Input
                                         id="password"
                                         ref={passwordInput}
                                         name="password"
                                         type="password"
-                                        className="mt-1 block w-full"
+                                        className={UI_PRESETS.simpleSearchInput}
                                         autoComplete="new-password"
-                                        placeholder="New password"
+                                        placeholder="Nueva contraseña"
                                     />
-
                                     <InputError message={errors.password} />
                                 </div>
 
                                 <div className="grid gap-2">
                                     <Label htmlFor="password_confirmation">
-                                        Confirm password
+                                        Confirmar contraseña
                                     </Label>
-
                                     <Input
                                         id="password_confirmation"
                                         name="password_confirmation"
                                         type="password"
-                                        className="mt-1 block w-full"
+                                        className={UI_PRESETS.simpleSearchInput}
                                         autoComplete="new-password"
-                                        placeholder="Confirm password"
+                                        placeholder="Confirmar contraseña"
                                     />
-
                                     <InputError
                                         message={errors.password_confirmation}
                                     />
                                 </div>
 
-                                <div className="flex items-center gap-4">
+                                <div className="flex items-center justify-end gap-3 lg:self-end">
                                     <Button
                                         disabled={processing}
+                                        size="icon"
+                                        className={`${UI_PRESETS.saveButton} cursor-pointer`}
                                         data-test="update-password-button"
+                                        aria-label="Guardar contraseña"
+                                        title="Guardar contraseña"
                                     >
-                                        Save password
+                                        <Save className="size-4" />
                                     </Button>
 
                                     <Transition
@@ -134,15 +132,16 @@ export default function Password() {
                                         leaveTo="opacity-0"
                                     >
                                         <p className="text-sm text-neutral-600">
-                                            Saved
+                                            Guardada
                                         </p>
                                     </Transition>
                                 </div>
-                            </>
-                        )}
-                    </Form>
-                </div>
+                            </div>
+                        </>
+                    )}
+                </Form>
             </SettingsLayout>
         </AppLayout>
     );
 }
+

@@ -1,5 +1,6 @@
 import { Link, router } from '@inertiajs/react';
 import { LogOut, Settings } from 'lucide-react';
+import ProfileController from '@/actions/App/Http/Controllers/Settings/ProfileController';
 import {
     DropdownMenuGroup,
     DropdownMenuItem,
@@ -9,7 +10,6 @@ import {
 import { UserInfo } from '@/components/user-info';
 import { useMobileNavigation } from '@/hooks/use-mobile-navigation';
 import { logout } from '@/routes';
-import { edit } from '@/routes/profile';
 import type { User } from '@/types';
 
 type Props = {
@@ -33,29 +33,35 @@ export function UserMenuContent({ user }: Props) {
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-                <DropdownMenuItem asChild>
+                <DropdownMenuItem
+                    asChild
+                    className="rounded-md text-slate-700 data-[highlighted]:bg-[#2563eb]/8 data-[highlighted]:text-[#1d4ed8] dark:text-slate-200 dark:data-[highlighted]:bg-[#2563eb]/14 dark:data-[highlighted]:text-sky-100"
+                >
                     <Link
                         className="block w-full cursor-pointer"
-                        href={edit()}
+                        href={ProfileController.edit().url}
                         prefetch
                         onClick={cleanup}
                     >
                         <Settings className="mr-2" />
-                        Settings
+                        Configuración
                     </Link>
                 </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem asChild>
-                <Link
-                    className="block w-full cursor-pointer"
-                    href={logout()}
+            <DropdownMenuItem
+                asChild
+                className="rounded-md text-red-700 data-[highlighted]:bg-red-500/22 data-[highlighted]:text-red-900 dark:text-red-300 dark:data-[highlighted]:bg-red-500/35 dark:data-[highlighted]:text-red-50"
+                >
+                    <Link
+                        className="block w-full cursor-pointer"
+                        href={logout()}
                     as="button"
                     onClick={handleLogout}
                     data-test="logout-button"
-                >
-                    <LogOut className="mr-2" />
-                    Log out
+                    >
+                    <LogOut className="mr-2 text-current" />
+                    Cerrar sesión
                 </Link>
             </DropdownMenuItem>
         </>

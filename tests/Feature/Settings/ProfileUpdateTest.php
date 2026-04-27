@@ -14,6 +14,7 @@ test('profile page is displayed', function () {
 
 test('profile information can be updated', function () {
     $user = User::factory()->create();
+    $verifiedAtBefore = $user->email_verified_at;
 
     $response = $this
         ->actingAs($user)
@@ -30,7 +31,8 @@ test('profile information can be updated', function () {
 
     expect($user->name)->toBe('Test User');
     expect($user->email)->toBe('test@example.com');
-    expect($user->email_verified_at)->toBeNull();
+    expect($user->email_verified_at)->not->toBeNull();
+    expect($user->email_verified_at?->eq($verifiedAtBefore))->toBeTrue();
 });
 
 test('email verification status is unchanged when the email address is unchanged', function () {
@@ -64,7 +66,11 @@ test('user can delete their account', function () {
         ->assertRedirect(route('home'));
 
     $this->assertGuest();
-    expect($user->fresh())->toBeNull();
+    $user->refresh();
+
+    expect($user->is_active)->toBeFalse();
+    expect($user->deactivated_at)->not->toBeNull();
+    expect($user->deactivated_reason)->toBe('self-service');
 });
 
 test('correct password must be provided to delete account', function () {
@@ -81,5 +87,8 @@ test('correct password must be provided to delete account', function () {
         ->assertSessionHasErrors('password')
         ->assertRedirect(route('profile.edit'));
 
-    expect($user->fresh())->not->toBeNull();
+    $user->refresh();
+
+    expect($user->is_active)->toBeTrue();
+    expect($user->deactivated_at)->toBeNull();
 });

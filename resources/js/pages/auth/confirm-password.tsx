@@ -1,4 +1,6 @@
-import { Form, Head } from '@inertiajs/react';
+﻿import { Form, Head, Link } from '@inertiajs/react';
+import { ArrowLeft } from 'lucide-react';
+import ProfileController from '@/actions/App/Http/Controllers/Settings/ProfileController';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,21 +12,21 @@ import { store } from '@/routes/password/confirm';
 export default function ConfirmPassword() {
     return (
         <AuthLayout
-            title="Confirm your password"
-            description="This is a secure area of the application. Please confirm your password before continuing."
+            title="Confirma tu contraseña"
+            description="Esta es una zona segura de la aplicación. Confirma tu contraseña para continuar."
         >
-            <Head title="Confirm password" />
+            <Head title="Confirma tu contraseña" />
 
             <Form {...store.form()} resetOnSuccess={['password']}>
                 {({ processing, errors }) => (
                     <div className="space-y-6">
                         <div className="grid gap-2">
-                            <Label htmlFor="password">Password</Label>
+                            <Label htmlFor="password">Contraseña</Label>
                             <Input
                                 id="password"
                                 type="password"
                                 name="password"
-                                placeholder="Password"
+                                placeholder="Contraseña"
                                 autoComplete="current-password"
                                 autoFocus
                             />
@@ -32,14 +34,26 @@ export default function ConfirmPassword() {
                             <InputError message={errors.password} />
                         </div>
 
-                        <div className="flex items-center">
+                        <div className="flex items-center gap-2">
                             <Button
                                 className="w-full"
                                 disabled={processing}
                                 data-test="confirm-password-button"
                             >
                                 {processing && <Spinner />}
-                                Confirm password
+                                Confirmar contraseña
+                            </Button>
+
+                            <Button
+                                type="button"
+                                variant="outline"
+                                className="w-full"
+                                asChild
+                            >
+                                <Link href={ProfileController.edit().url}>
+                                    <ArrowLeft className="size-4" />
+                                    Volver
+                                </Link>
                             </Button>
                         </div>
                     </div>

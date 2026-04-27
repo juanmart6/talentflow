@@ -16,12 +16,15 @@
         "laravel/tinker": "^2.10.1",
         "laravel/wayfinder": "^0.1.9",
         "maatwebsite/excel": "*",
+        "spatie/browsershot": "*",
         "spatie/laravel-medialibrary": "*",
         "spatie/laravel-pdf": "*",
         "spatie/laravel-permission": "*"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",
+        "laravel-lang/lang": "*",
+        "laravel-lang/publisher": "*",
         "laravel/boost": "2.0",
         "laravel/pail": "^1.2.2",
         "laravel/pint": "^1.24",

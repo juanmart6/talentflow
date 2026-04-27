@@ -2,6 +2,7 @@ import { wayfinder } from '@laravel/vite-plugin-wayfinder';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import laravel from 'laravel-vite-plugin';
+import { fileURLToPath, URL } from 'node:url';
 import { defineConfig } from 'vite';
 
 export default defineConfig({
@@ -18,9 +19,15 @@ export default defineConfig({
         }),
         tailwindcss(),
         wayfinder({
+            routes: false,
             formVariants: true,
         }),
     ],
+    resolve: {
+        alias: {
+            '@': fileURLToPath(new URL('./resources/js', import.meta.url)),
+        },
+    },
     esbuild: {
         jsx: 'automatic',
     },
