@@ -25,7 +25,7 @@ return new class extends Migration
             $table->date('end_date');
             $table->string('reason', 500);
             $table->string('attachment_path')->nullable();
-            $table->string('status', 30)->default('pending'); // pending | approved | rejected
+            $table->string('status', 30)->default('pendiente'); // pendiente | aprobada | rechazada
             $table->dateTime('reviewed_at')->nullable();
             $table->string('review_note', 500)->nullable();
             $table->timestamps();

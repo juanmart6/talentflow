@@ -1,18 +1,21 @@
 import { Head, router, usePage } from '@inertiajs/react';
 import {
     ArrowLeft,
+    CalendarClock,
     CalendarDays,
+    CalendarX2,
+    CirclePlus,
+    ChartNoAxesCombined,
     CheckCircle2,
     ChevronLeft,
     ChevronRight,
     Clock3,
-    Download,
     Eye,
+    FileText,
     FilterX,
     Pause,
     Pencil,
     Play,
-    Plus,
     Save,
     ShieldAlert,
     Timer,
@@ -22,6 +25,7 @@ import type { FormEvent } from 'react';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import DatePicker from '@/components/shared/date-picker';
+import FileUploadField from '@/components/shared/file-upload-field';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -98,7 +102,7 @@ type Absence = {
     start_date: string | null;
     end_date: string | null;
     reason: string;
-    status: 'pending' | 'approved' | 'rejected';
+    status: 'pendiente' | 'aprobada' | 'rechazada';
     attachment_url: string | null;
     review_note: string | null;
     reviewed_at: string | null;
@@ -218,11 +222,11 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 const tabs = [
+    { id: 'summary', label: 'Resumen y alertas', icon: ChartNoAxesCombined },
     { id: 'clock', label: 'Fichaje', icon: Clock3 },
-    { id: 'schedules', label: 'Horarios', icon: Timer },
+    { id: 'schedules', label: 'Horarios', icon: CalendarClock },
     { id: 'calendar', label: 'Calendario', icon: CalendarDays },
-    { id: 'absence', label: 'Ausencias', icon: ShieldAlert },
-    { id: 'summary', label: 'Resumen y alertas', icon: CheckCircle2 },
+    { id: 'absence', label: 'Ausencias', icon: CalendarX2 },
 ] as const;
 
 const SECTION_TITLE_CLASS =
@@ -289,6 +293,15 @@ const SCHEDULE_DAY_DEFS = [
 ] as const;
 
 type ScheduleDayKey = (typeof SCHEDULE_DAY_DEFS)[number]['key'];
+const SCHEDULE_DAY_KEY_BY_UTC_WEEKDAY: readonly [
+    'sunday',
+    'monday',
+    'tuesday',
+    'wednesday',
+    'thursday',
+    'friday',
+    'saturday',
+] = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const;
 
 type ScheduleDayEditor = {
     start: string;
@@ -353,6 +366,50 @@ function getScheduleMinutes(day: ScheduleDayEditor): number {
 
 function formatScheduleHours(minutes: number): string {
     return `${(minutes / 60).toFixed(1)}h`;
+}
+
+function calculateSchedulePeriodMinutes(
+    days: Record<ScheduleDayKey, ScheduleDayEditor>,
+    startsOn: string,
+    endsOn: string,
+): number {
+    if (!startsOn || !endsOn || endsOn < startsOn) return 0;
+
+    const current = dateKeyToUtcDate(startsOn);
+    const end = dateKeyToUtcDate(endsOn);
+    let total = 0;
+
+    while (current <= end) {
+        const dayKey = SCHEDULE_DAY_KEY_BY_UTC_WEEKDAY[
+            current.getUTCDay()
+        ] as ScheduleDayKey;
+        total += getScheduleMinutes(days[dayKey]);
+        current.setUTCDate(current.getUTCDate() + 1);
+    }
+
+    return total;
+}
+
+function calculateSchedulePeriodMinutesFromDayMinutes(
+    days: Record<ScheduleDayKey, number>,
+    startsOn: string,
+    endsOn: string,
+): number {
+    if (!startsOn || !endsOn || endsOn < startsOn) return 0;
+
+    const current = dateKeyToUtcDate(startsOn);
+    const end = dateKeyToUtcDate(endsOn);
+    let total = 0;
+
+    while (current <= end) {
+        const dayKey = SCHEDULE_DAY_KEY_BY_UTC_WEEKDAY[
+            current.getUTCDay()
+        ] as ScheduleDayKey;
+        total += Math.max(0, days[dayKey] ?? 0);
+        current.setUTCDate(current.getUTCDate() + 1);
+    }
+
+    return total;
 }
 
 const TIME_OPTIONS = Array.from({ length: 48 }, (_, index) => {
@@ -423,6 +480,33 @@ function toDateTimeLocalInput(value: string | null): string {
     return `${year}-${month}-${day}T${hours}:${minutes}`;
 }
 
+function splitLocalDateTime(value: string): { date: string; time: string } {
+    if (!value) {
+        return { date: '', time: '' };
+    }
+
+    const [datePart = '', timePartRaw = ''] = value.split('T');
+    const timePart = timePartRaw.slice(0, 5);
+
+    return {
+        date: /^\d{4}-\d{2}-\d{2}$/.test(datePart) ? datePart : '',
+        time: /^\d{2}:\d{2}$/.test(timePart) ? timePart : '',
+    };
+}
+
+function joinLocalDateTime(date: string, time: string, fallbackTime: string): string {
+    if (!date) return '';
+    const normalizedTime = /^\d{2}:\d{2}$/.test(time) ? time : fallbackTime;
+    return `${date}T${normalizedTime}`;
+}
+
+function openNativeInputPicker(input: HTMLInputElement): void {
+    const pickerInput = input as HTMLInputElement & {
+        showPicker?: () => void;
+    };
+    pickerInput.showPicker?.();
+}
+
 function buildTimelineEntryCreateForm(date: string | null): TimelineEntryFormState {
     return {
         entry_id: null,
@@ -433,11 +517,23 @@ function buildTimelineEntryCreateForm(date: string | null): TimelineEntryFormSta
     };
 }
 
-function buildTimelineEntryEditForm(entry: ClockEntry): TimelineEntryFormState {
+function buildTimelineEntryEditForm(
+    entry: ClockEntry,
+    targetDate: string | null,
+): TimelineEntryFormState {
+    const startDateTime = toDateTimeLocalInput(entry.started_at);
+    const endDateTime = toDateTimeLocalInput(entry.ended_at);
+    const startParts = splitLocalDateTime(startDateTime);
+    const endParts = splitLocalDateTime(endDateTime);
+
     return {
         entry_id: entry.id,
-        started_at: toDateTimeLocalInput(entry.started_at),
-        ended_at: toDateTimeLocalInput(entry.ended_at),
+        started_at: targetDate
+            ? joinLocalDateTime(targetDate, startParts.time, '09:00')
+            : startDateTime,
+        ended_at: targetDate
+            ? joinLocalDateTime(targetDate, endParts.time, '14:00')
+            : endDateTime,
         break_minutes: String(entry.break_minutes ?? 0),
         manual_reason: entry.manual_reason ?? '',
     };
@@ -472,17 +568,63 @@ function utcDateToDateKey(value: Date): string {
     return `${year}-${month}-${day}`;
 }
 
-function localDateToDateKey(value: Date): string {
-    const year = value.getFullYear();
-    const month = String(value.getMonth() + 1).padStart(2, '0');
-    const day = String(value.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-}
-
 function shiftDateKey(value: string, days: number): string {
     const date = dateKeyToUtcDate(value);
     date.setUTCDate(date.getUTCDate() + days);
     return utcDateToDateKey(date);
+}
+
+function monthCursorToUtcDate(value: string): Date | null {
+    const [yearPart, monthPart] = value.split('-');
+    const year = Number(yearPart);
+    const month = Number(monthPart);
+
+    if (
+        !Number.isInteger(year)
+        || !Number.isInteger(month)
+        || month < 1
+        || month > 12
+    ) {
+        return null;
+    }
+
+    return new Date(Date.UTC(year, month - 1, 1));
+}
+
+function shiftMonthCursor(value: string, months: number): string {
+    const baseDate = monthCursorToUtcDate(value);
+    if (!baseDate) return value;
+
+    baseDate.setUTCMonth(baseDate.getUTCMonth() + months);
+    const year = baseDate.getUTCFullYear();
+    const month = String(baseDate.getUTCMonth() + 1).padStart(2, '0');
+    return `${year}-${month}`;
+}
+
+function formatMonthCursorLabel(value: string): string {
+    const date = monthCursorToUtcDate(value);
+    if (!date) return value;
+
+    const formatted = new Intl.DateTimeFormat('es-ES', {
+        month: 'long',
+        year: 'numeric',
+        timeZone: 'UTC',
+    }).format(date);
+
+    return formatted.toUpperCase();
+}
+
+function formatDateRangeLabel(startDateKey: string, endDateKey: string): string {
+    const formatter = new Intl.DateTimeFormat('es-ES', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        timeZone: 'UTC',
+    });
+
+    return `${formatter.format(dateKeyToUtcDate(startDateKey))} - ${formatter.format(
+        dateKeyToUtcDate(endDateKey),
+    )}`;
 }
 
 function formatWorkedElapsed(entry: ClockEntry | null, now: Date): string {
@@ -522,12 +664,14 @@ function resolveDayVisualStatus(
     const hasWorkedHours = workedHours > 0.01;
 
     if (!hasPlannedHours && !hasWorkedHours) {
-        return offKind === 'rest' ? 'rest' : 'disabled';
+        return offKind === 'rest' ? 'rest' : 'pending';
     }
     if (!hasPlannedHours && hasWorkedHours) return 'complete';
     if (!isPast && !hasWorkedHours) return 'pending';
     if (!hasWorkedHours) return 'missing';
-    if (workedHours >= 7.99 || workedHours >= plannedHours) return 'complete';
+
+    // Los 30 minutos de descanso ya estan incluidos en las horas efectivas
+    if (workedHours >= plannedHours) return 'complete';
     return 'partial';
 }
 
@@ -540,18 +684,6 @@ function dayVisualClasses(status: DayVisualStatus): string {
         missing: 'border-rose-200 bg-rose-50 text-rose-700',
         partial: 'border-amber-200 bg-amber-50 text-amber-700',
         complete: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-    }[status];
-}
-
-function dayVisualBadgeClasses(status: DayVisualStatus): string {
-    return {
-        disabled: 'border-slate-300 bg-slate-100 text-slate-700 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-200',
-        rest: 'border-slate-300 text-slate-700 bg-[repeating-linear-gradient(-45deg,#f8fafc_0_6px,#e2e8f0_6px_12px)] dark:border-slate-600 dark:text-slate-200 dark:bg-[repeating-linear-gradient(-45deg,#0f172a_0_6px,#1e293b_6px_12px)]',
-        pending:
-            'border-sidebar-border/70 bg-white text-slate-700 dark:border-sidebar-border dark:bg-slate-900/30 dark:text-slate-200',
-        missing: 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-700/50 dark:bg-rose-900/20 dark:text-rose-200',
-        partial: 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-700/50 dark:bg-amber-900/20 dark:text-amber-200',
-        complete: 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-700/50 dark:bg-emerald-900/20 dark:text-emerald-200',
     }[status];
 }
 
@@ -569,9 +701,15 @@ function dayVisualProgressClass(status: DayVisualStatus): string {
 function absenceBadgeVariant(
     status: Absence['status'],
 ): 'secondary' | 'default' | 'destructive' {
-    if (status === 'approved') return 'default';
-    if (status === 'rejected') return 'destructive';
+    if (status === 'aprobada') return 'default';
+    if (status === 'rechazada') return 'destructive';
     return 'secondary';
+}
+
+function absenceStatusLabel(status: Absence['status']): string {
+    if (status === 'aprobada') return 'Aprobada';
+    if (status === 'rechazada') return 'Rechazada';
+    return 'Pendiente';
 }
 
 export default function TimeControlPage({
@@ -903,7 +1041,7 @@ export default function TimeControlPage({
         );
     };
 
-    const runReview = (absenceId: number, status: 'approved' | 'rejected') => {
+    const runReview = (absenceId: number, status: 'aprobada' | 'rechazada') => {
         lastActionRef.current = 'absence-review';
         setActionLoading(`review-${absenceId}-${status}`);
         router.patch(
@@ -919,11 +1057,79 @@ export default function TimeControlPage({
         );
     };
 
-    const openPdf = () => {
+    const openPdf = (options?: {
+        startDate?: string | null;
+        endDate?: string | null;
+        range?: Props['filters']['range'];
+        rangeLabel?: string;
+    }) => {
+        if (canManageTeam && !internId) {
+            toast.error('Selecciona un becario para exportar el parte.');
+            return;
+        }
+
         const params = new URLSearchParams();
         if (internId) params.set('intern_id', internId);
-        params.set('range', range);
-        window.location.href = `/control-horario/export/pdf?${params.toString()}`;
+
+        if (options?.startDate && options?.endDate) {
+            params.set('start_date', options.startDate);
+            params.set('end_date', options.endDate);
+            if (options.rangeLabel?.trim()) {
+                params.set('range_label', options.rangeLabel.trim());
+            }
+        } else {
+            params.set('range', options?.range ?? range);
+        }
+
+        const exportUrl = `/control-horario/export/pdf?${params.toString()}`;
+        void (async () => {
+            try {
+                const response = await fetch(exportUrl, {
+                    method: 'GET',
+                    credentials: 'same-origin',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                });
+
+                if (!response.ok) {
+                    let errorMessage = 'No se pudo exportar el PDF.';
+                    if (response.status === 403) {
+                        errorMessage = 'No tienes permisos para exportar el PDF.';
+                    } else {
+                        const payload = await response
+                            .json()
+                            .catch(() => null) as { message?: string } | null;
+                        if (payload?.message) {
+                            errorMessage = payload.message;
+                        }
+                    }
+                    toast.error(errorMessage);
+                    return;
+                }
+
+                const blob = await response.blob();
+                const contentDisposition = response.headers.get('content-disposition') ?? '';
+                const encodedFilenameMatch = contentDisposition.match(
+                    /filename\*=UTF-8''([^;]+)/i,
+                );
+                const filenameMatch = contentDisposition.match(/filename="?([^";]+)"?/i);
+                const filename = encodedFilenameMatch?.[1]
+                    ? decodeURIComponent(encodedFilenameMatch[1])
+                    : (filenameMatch?.[1] ?? 'parte-horas.pdf');
+
+                const fileUrl = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = fileUrl;
+                link.download = filename;
+                document.body.append(link);
+                link.click();
+                link.remove();
+                window.setTimeout(() => URL.revokeObjectURL(fileUrl), 1500);
+            } catch {
+                toast.error('No se pudo exportar el PDF. Intentalo de nuevo.');
+            }
+        })();
     };
 
     const openDayDetails = async (
@@ -932,6 +1138,12 @@ export default function TimeControlPage({
     ) => {
         if (canManageTeam && !internId) {
             toast.error('Selecciona un becario para ver el detalle diario.');
+            return;
+        }
+
+        const targetCalendarDay = monthDaysByDate.get(date);
+        if (!targetCalendarDay || targetCalendarDay.off_kind === 'unscheduled') {
+            toast.error('Solo puedes abrir dias con horario planificado.');
             return;
         }
 
@@ -962,15 +1174,25 @@ export default function TimeControlPage({
             );
 
             if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
+                const errorPayload = await response
+                    .json()
+                    .catch(() => null) as { message?: string } | null;
+                throw new Error(
+                    errorPayload?.message
+                    ?? `No se pudo cargar el detalle del dia (HTTP ${response.status}).`,
+                );
             }
 
             const payload = (await response.json()) as DayDetails;
             if (dayDetailsRequestRef.current !== requestId) return;
             setDayDetails(payload);
-        } catch {
+        } catch (error) {
             if (dayDetailsRequestRef.current !== requestId) return;
-            toast.error('No se pudo cargar el detalle del dia.');
+            toast.error(
+                error instanceof Error && error.message
+                    ? error.message
+                    : 'No se pudo cargar el detalle del dia.',
+            );
             setDayDetails(null);
         } finally {
             if (dayDetailsRequestRef.current === requestId) {
@@ -1001,17 +1223,13 @@ export default function TimeControlPage({
 
     const openEditTimelineEntryForm = (entry: ClockEntry) => {
         if (!clockState.canManualEntry) {
-            toast.error('No tienes permisos para editar fichajes manuales.');
+            toast.error('No tienes permisos para editar fichajes.');
             return;
         }
 
-        if (entry.source !== 'tutor_manual') {
-            toast.error('Solo se pueden editar fichajes manuales.');
-            return;
-        }
-
+        const targetDate = dayDetails?.date ?? dayDetailsDate;
         setDayDetailsTab('timeline');
-        setTimelineEntryForm(buildTimelineEntryEditForm(entry));
+        setTimelineEntryForm(buildTimelineEntryEditForm(entry, targetDate));
         setIsTimelineEntryFormOpen(true);
     };
 
@@ -1044,6 +1262,33 @@ export default function TimeControlPage({
             return;
         }
 
+        const selectedDate = dayDetails?.date ?? dayDetailsDate;
+        if (!selectedDate) {
+            toast.error('No se pudo determinar la fecha seleccionada.');
+            return;
+        }
+
+        const normalizedStartedAt = joinLocalDateTime(
+            selectedDate,
+            splitLocalDateTime(timelineEntryForm.started_at).time,
+            '09:00',
+        );
+        const normalizedEndedAt = joinLocalDateTime(
+            selectedDate,
+            splitLocalDateTime(timelineEntryForm.ended_at).time,
+            '14:00',
+        );
+
+        if (!normalizedStartedAt || !normalizedEndedAt) {
+            toast.error('Debes indicar una hora de inicio y de fin.');
+            return;
+        }
+
+        if (normalizedEndedAt <= normalizedStartedAt) {
+            toast.error('La hora de fin debe ser posterior a la hora de inicio.');
+            return;
+        }
+
         const parsedBreakMinutes = Number(timelineEntryForm.break_minutes);
         if (
             !Number.isFinite(parsedBreakMinutes)
@@ -1056,13 +1301,13 @@ export default function TimeControlPage({
 
         const payload = {
             intern_id: internId,
-            started_at: timelineEntryForm.started_at,
-            ended_at: timelineEntryForm.ended_at,
+            started_at: normalizedStartedAt,
+            ended_at: normalizedEndedAt,
             break_minutes: Math.round(parsedBreakMinutes),
             manual_reason: manualReason,
+            target_date: selectedDate,
         };
 
-        const selectedDate = dayDetails?.date ?? dayDetailsDate;
         const entryId = timelineEntryForm.entry_id;
 
         if (entryId !== null) {
@@ -1185,6 +1430,54 @@ export default function TimeControlPage({
         : [];
     const weekDaysToRender =
         visibleWeekDays.length === 7 ? visibleWeekDays : calendar.weekDays;
+    const isScheduledCalendarDay = (day: DayRow) => day.off_kind !== 'unscheduled';
+    const isCurrentMonthDay = (day: DayRow) => day.date.startsWith(monthCursor);
+    const weekHasScheduledDays = weekDaysToRender.some(isScheduledCalendarDay);
+    const monthHasScheduledDays = calendar.monthDays.some(
+        (day) => isCurrentMonthDay(day) && isScheduledCalendarDay(day),
+    );
+    const weekRangeLabel =
+        weekDaysToRender.length >= 2
+            ? formatDateRangeLabel(
+                weekDaysToRender[0].date,
+                weekDaysToRender[weekDaysToRender.length - 1].date,
+            )
+            : null;
+    const timelineTargetDate = dayDetails?.date ?? dayDetailsDate ?? '';
+    const timelineStartParts = splitLocalDateTime(timelineEntryForm.started_at);
+    const timelineEndParts = splitLocalDateTime(timelineEntryForm.ended_at);
+    const timelineColumnWidths = clockState.canManualEntry
+        ? {
+              order: '8%',
+              start: '14%',
+              end: '14%',
+              pause: '16%',
+              completed: '16%',
+              source: '20%',
+              actions: '12%',
+          }
+        : {
+              order: '9%',
+              start: '16%',
+              end: '16%',
+              pause: '18%',
+              completed: '18%',
+              source: '23%',
+          };
+    const currentMonthLabel = formatMonthCursorLabel(monthCursor);
+    const weekPdfStartDate = weekDaysToRender[0]?.date ?? null;
+    const weekPdfEndDate = weekDaysToRender[weekDaysToRender.length - 1]?.date ?? null;
+    const monthCursorDate = monthCursorToUtcDate(monthCursor);
+    const monthPdfStartDate = monthCursorDate
+        ? utcDateToDateKey(monthCursorDate)
+        : null;
+    const monthPdfEndDate = monthCursorDate
+        ? (() => {
+              const monthEnd = new Date(monthCursorDate.getTime());
+              monthEnd.setUTCMonth(monthEnd.getUTCMonth() + 1, 0);
+              return utcDateToDateKey(monthEnd);
+          })()
+        : null;
     const navigateWeek = (direction: 'previous' | 'next') => {
         if (!selectedWeekStart) return;
 
@@ -1201,28 +1494,15 @@ export default function TimeControlPage({
             applyFilters({ month: nextWeekStart.slice(0, 7) });
         }
     };
-    const todayDateKey = localDateToDateKey(new Date());
-    const dayDetailsVisualStatus = dayDetails
-        ? resolveDayVisualStatus(
-            dayDetails.planned_hours,
-            dayDetails.worked_hours,
-            dayDetails.date < todayDateKey,
-            dayDetails.off_kind,
-        )
-        : null;
-    const dayDetailsStatusLegendItem = dayDetailsVisualStatus
-        ? DAY_VISUAL_LEGEND.find((item) => item.status === dayDetailsVisualStatus)
-        : null;
-    const dayDetailsStatusBadgeClass = dayDetailsVisualStatus
-        ? dayVisualBadgeClasses(dayDetailsVisualStatus)
-        : 'border-sidebar-border/70 bg-white text-foreground dark:bg-slate-900/30';
+    const navigateMonth = (direction: 'previous' | 'next') => {
+        const nextMonth = shiftMonthCursor(
+            monthCursor,
+            direction === 'next' ? 1 : -1,
+        );
+        setWeekStartOverride(null);
+        applyFilters({ month: nextMonth });
+    };
     const dayDetailsDateLabel = formatDate(dayDetails?.date ?? dayDetailsDate);
-    const dayDetailsProgressPercent = dayDetails
-        ? Math.max(0, Math.min(100, dayDetails.compliance_percent))
-        : 0;
-    const dayDetailsProgressFillClass = dayDetailsVisualStatus
-        ? dayVisualProgressClass(dayDetailsVisualStatus)
-        : 'bg-slate-300';
     const scheduleRowErrors = Object.fromEntries(
         SCHEDULE_DAY_DEFS.map((dayDef) => {
             const row = scheduleDays[dayDef.key];
@@ -1241,6 +1521,11 @@ export default function TimeControlPage({
     const weeklyMinutes = SCHEDULE_DAY_DEFS.reduce(
         (sum, dayDef) => sum + getScheduleMinutes(scheduleDays[dayDef.key]),
         0,
+    );
+    const periodMinutes = calculateSchedulePeriodMinutes(
+        scheduleDays,
+        scheduleForm.starts_on,
+        scheduleForm.ends_on,
     );
     const editScheduleRowErrors = Object.fromEntries(
         SCHEDULE_DAY_DEFS.map((dayDef) => {
@@ -1261,6 +1546,24 @@ export default function TimeControlPage({
         (sum, dayDef) => sum + getScheduleMinutes(editScheduleDays[dayDef.key]),
         0,
     );
+    const editPeriodMinutes = calculateSchedulePeriodMinutes(
+        editScheduleDays,
+        editScheduleForm.starts_on,
+        editScheduleForm.ends_on,
+    );
+    const activeSchedule = schedules.find((schedule) => schedule.is_active) ?? null;
+    const activeSchedulePlannedMinutes =
+        activeSchedule?.starts_on && activeSchedule?.ends_on
+            ? calculateSchedulePeriodMinutesFromDayMinutes(
+                activeSchedule.days,
+                activeSchedule.starts_on,
+                activeSchedule.ends_on,
+            )
+            : null;
+    const plannedHoursFromSchedule =
+        activeSchedulePlannedMinutes !== null
+            ? Math.round((activeSchedulePlannedMinutes / 60) * 100) / 100
+            : summary.range.planned_hours;
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -1285,7 +1588,7 @@ export default function TimeControlPage({
                                 : UI_PRESETS.sectionCard
                         }
                     >
-                        <div className="grid gap-3 md:grid-cols-3">
+                        <div className="grid gap-3 md:grid-cols-4">
                             {canManageTeam ? (
                                 <Select
                                     value={internId}
@@ -1294,7 +1597,7 @@ export default function TimeControlPage({
                                     }
                                 >
                                     <SelectTrigger
-                                        className={`${UI_PRESETS.selectTrigger} h-auto min-h-[92px] w-full rounded-lg border-sidebar-border/70 bg-white/70 p-3 text-left shadow-none dark:border-sidebar-border dark:bg-slate-900/20`}
+                                        className={`${UI_PRESETS.selectTrigger} h-auto min-h-[92px] w-full cursor-pointer rounded-lg border-sidebar-border/70 bg-white/70 p-3 text-left shadow-none dark:border-sidebar-border dark:bg-slate-900/20`}
                                     >
                                         <div className="flex w-full flex-col items-start gap-0.5 pr-5">
                                             <p className={FIELD_LABEL_CLASS}>
@@ -1313,7 +1616,7 @@ export default function TimeControlPage({
                                     <SelectContent>
                                         {interns.map((intern) => (
                                             <SelectItem
-                                                className={UI_PRESETS.selectItem}
+                                                className={`${UI_PRESETS.selectItem} cursor-pointer`}
                                                 key={intern.id}
                                                 value={String(intern.id)}
                                             >
@@ -1341,6 +1644,15 @@ export default function TimeControlPage({
                                 </p>
                                 <p className="font-semibold">
                                     {summary.progress.required_hours}h
+                                </p>
+                            </div>
+                            <div className="rounded-lg border border-sidebar-border/70 bg-white/70 p-3 dark:border-sidebar-border dark:bg-slate-900/20">
+                                <p className={FIELD_LABEL_CLASS}>
+                                    Fecha inicio y fin
+                                </p>
+                                <p className="font-semibold">
+                                    {formatDate(selectedIntern?.internship_start_date ?? null)} -{' '}
+                                    {formatDate(selectedIntern?.internship_end_date ?? null)}
                                 </p>
                             </div>
                             <div className="rounded-lg border border-sidebar-border/70 bg-white/70 p-3 dark:border-sidebar-border dark:bg-slate-900/20">
@@ -1958,19 +2270,27 @@ export default function TimeControlPage({
                                                 </table>
                                             </div>
 
-                                            <div className="grid grid-cols-1 gap-3 rounded-lg border border-sidebar-border/70 bg-white p-3 dark:bg-slate-900/20 sm:grid-cols-[1fr_auto_1fr] sm:items-center">
-                                                <p className="text-sm font-medium text-muted-foreground sm:justify-self-start">
-                                                    Total semanal:
-                                                </p>
-                                                <p className="justify-self-center text-3xl font-bold text-[#2563eb] sm:col-start-2">
-                                                    {formatScheduleHours(
-                                                        weeklyMinutes,
-                                                    )}
-                                                </p>
-                                                <div
-                                                    className="hidden sm:block"
-                                                    aria-hidden="true"
-                                                />
+                                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                                <div className="rounded-md border border-sidebar-border/60 bg-slate-50/70 px-3 py-3 text-center dark:bg-slate-900/30">
+                                                    <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                                                        Horas semanales
+                                                    </p>
+                                                    <p className="mt-1 text-3xl font-bold text-[#2563eb]">
+                                                        {formatScheduleHours(
+                                                            weeklyMinutes,
+                                                        )}
+                                                    </p>
+                                                </div>
+                                                <div className="rounded-md border border-sidebar-border/60 bg-slate-50/70 px-3 py-3 text-center dark:bg-slate-900/30">
+                                                    <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                                                        Total periodo
+                                                    </p>
+                                                    <p className="mt-1 text-3xl font-bold text-[#2563eb]">
+                                                        {formatScheduleHours(
+                                                            periodMinutes,
+                                                        )}
+                                                    </p>
+                                                </div>
                                             </div>
                                             <div className="flex justify-end gap-2">
                                                 <Button
@@ -2020,99 +2340,104 @@ export default function TimeControlPage({
                                         <DialogContent
                                             overlayClassName="bg-black/35 backdrop-blur-sm"
                                             hideCloseButton
-                                            className="w-[96vw] max-w-[980px] overflow-hidden p-0 !bg-white sm:max-w-[980px]"
+                                            className="!w-[94vw] !max-w-[980px] !block overflow-hidden border-sidebar-border/70 p-0 !bg-white dark:!bg-slate-950 [&_button]:cursor-pointer"
                                         >
-                                            <div className="max-h-[88vh] overflow-y-auto bg-white p-6">
-                                                <div className="mb-1 flex items-start justify-between gap-3">
-                                                    <DialogHeader className="space-y-1 pb-1">
-                                                        <DialogTitle>
-                                                            Ver horario existente
-                                                        </DialogTitle>
-                                                        <DialogDescription>
-                                                            Ve o Modifica los datos del horario y guarda los cambios.
-                                                        </DialogDescription>
-                                                    </DialogHeader>
-                                                    <Button
-                                                        type="button"
-                                                        size="icon"
-                                                        variant="ghost"
-                                                        className="shrink-0"
-                                                        aria-label="Volver"
-                                                        title="Volver"
-                                                        onClick={resetEditSchedule}
-                                                    >
-                                                        <ArrowLeft className="size-4" />
-                                                    </Button>
-                                                </div>
+                                            <div className="flex min-h-0 min-w-0 max-h-[88vh] flex-col">
+                                                <DialogHeader className="border-b border-sidebar-border/70 bg-[linear-gradient(140deg,#eaf2ff_0%,#f7fbff_36%,#e9f9f2_100%)] px-5 pb-3 pt-4 dark:border-sidebar-border dark:bg-[linear-gradient(140deg,#0f1d34_0%,#11233f_48%,#0f2c2b_100%)] sm:px-6">
+                                                    <div className="flex items-start justify-between gap-3">
+                                                        <div className="space-y-1">
+                                                            <DialogTitle className="text-base font-semibold text-foreground">
+                                                                Ver horario existente
+                                                            </DialogTitle>
+                                                            <DialogDescription className="text-sm text-muted-foreground">
+                                                                Ve o modifica los datos del horario y guarda los cambios.
+                                                            </DialogDescription>
+                                                        </div>
+                                                        <Button
+                                                            type="button"
+                                                            size="icon"
+                                                            variant="ghost"
+                                                            className="shrink-0"
+                                                            aria-label="Volver"
+                                                            title="Volver"
+                                                            onClick={resetEditSchedule}
+                                                        >
+                                                            <ArrowLeft className="size-4" />
+                                                        </Button>
+                                                    </div>
+                                                </DialogHeader>
 
+                                                <div className="min-w-0 overflow-x-hidden overflow-y-auto px-6 py-5 sm:px-7 sm:py-6">
                                                 <form
-                                                    className="min-w-0 space-y-5"
+                                                    className="min-w-0 space-y-6"
                                                     onSubmit={submitEditSchedule}
                                                 >
-                                                <div className="space-y-1">
-                                                    <label
-                                                        htmlFor="edit-schedule-season-name"
-                                                        className={FIELD_LABEL_CLASS}
-                                                    >
-                                                        Nombre del calendario
-                                                    </label>
-                                                    <Input
-                                                        id="edit-schedule-season-name"
-                                                        required
-                                                        value={editScheduleForm.season_name}
-                                                        onChange={(event) =>
-                                                            setEditScheduleForm((current) => ({
-                                                                ...current,
-                                                                season_name: event.target.value,
-                                                            }))
-                                                        }
-                                                        className={UI_PRESETS.filterInput}
-                                                        placeholder="Ej. Jornada anual 2026"
-                                                    />
-                                                </div>
-
-                                                <div className="grid gap-2 md:grid-cols-2">
-                                                    <div className="space-y-1">
+                                                <div className="space-y-3">
+                                                    <div className="space-y-2">
                                                         <label
-                                                            htmlFor="edit-schedule-starts-on"
+                                                            htmlFor="edit-schedule-season-name"
                                                             className={FIELD_LABEL_CLASS}
                                                         >
-                                                            Fecha inicio
+                                                            Nombre del calendario
                                                         </label>
-                                                        <DatePicker
-                                                            id="edit-schedule-starts-on"
-                                                            value={editScheduleForm.starts_on}
-                                                            onChange={(value) =>
+                                                        <Input
+                                                            id="edit-schedule-season-name"
+                                                            required
+                                                            value={editScheduleForm.season_name}
+                                                            onChange={(event) =>
                                                                 setEditScheduleForm((current) => ({
                                                                     ...current,
-                                                                    starts_on: value,
+                                                                    season_name: event.target.value,
                                                                 }))
                                                             }
-                                                            placeholder="Fecha inicio"
                                                             className={UI_PRESETS.filterInput}
-                                                            required
+                                                            placeholder="Ej. Jornada anual 2026"
                                                         />
                                                     </div>
-                                                    <div className="space-y-1">
-                                                        <label
-                                                            htmlFor="edit-schedule-ends-on"
-                                                            className={FIELD_LABEL_CLASS}
-                                                        >
-                                                            Fecha fin
-                                                        </label>
-                                                        <DatePicker
-                                                            id="edit-schedule-ends-on"
-                                                            value={editScheduleForm.ends_on}
-                                                            onChange={(value) =>
-                                                                setEditScheduleForm((current) => ({
-                                                                    ...current,
-                                                                    ends_on: value,
-                                                                }))
-                                                            }
-                                                            placeholder="Fecha fin"
-                                                            className={UI_PRESETS.filterInput}
-                                                            required
-                                                        />
+
+                                                    <div className="grid gap-4 md:grid-cols-2">
+                                                        <div className="space-y-2">
+                                                            <label
+                                                                htmlFor="edit-schedule-starts-on"
+                                                                className={FIELD_LABEL_CLASS}
+                                                            >
+                                                                Fecha inicio
+                                                            </label>
+                                                            <DatePicker
+                                                                id="edit-schedule-starts-on"
+                                                                value={editScheduleForm.starts_on}
+                                                                onChange={(value) =>
+                                                                    setEditScheduleForm((current) => ({
+                                                                        ...current,
+                                                                        starts_on: value,
+                                                                    }))
+                                                                }
+                                                                placeholder="Fecha inicio"
+                                                                className={UI_PRESETS.filterInput}
+                                                                required
+                                                            />
+                                                        </div>
+                                                        <div className="space-y-2">
+                                                            <label
+                                                                htmlFor="edit-schedule-ends-on"
+                                                                className={FIELD_LABEL_CLASS}
+                                                            >
+                                                                Fecha fin
+                                                            </label>
+                                                            <DatePicker
+                                                                id="edit-schedule-ends-on"
+                                                                value={editScheduleForm.ends_on}
+                                                                onChange={(value) =>
+                                                                    setEditScheduleForm((current) => ({
+                                                                        ...current,
+                                                                        ends_on: value,
+                                                                    }))
+                                                                }
+                                                                placeholder="Fecha fin"
+                                                                className={UI_PRESETS.filterInput}
+                                                                required
+                                                            />
+                                                        </div>
                                                     </div>
                                                 </div>
 
@@ -2336,21 +2661,29 @@ export default function TimeControlPage({
                                                     </table>
                                                 </div>
 
-                                                <div className="grid grid-cols-1 gap-3 rounded-lg border border-sidebar-border/70 bg-white p-3 dark:bg-slate-900/20 sm:grid-cols-[1fr_auto_1fr] sm:items-center">
-                                                    <p className="text-sm font-medium text-muted-foreground sm:justify-self-start">
-                                                        Total semanal:
-                                                    </p>
-                                                    <p className="justify-self-center text-3xl font-bold text-[#2563eb] sm:col-start-2">
-                                                        {formatScheduleHours(
-                                                            editWeeklyMinutes,
-                                                        )}
-                                                    </p>
-                                                    <div
-                                                        className="hidden sm:block"
-                                                        aria-hidden="true"
-                                                    />
+                                                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                                    <div className="rounded-md border border-sidebar-border/60 bg-slate-50/70 px-3 py-3 text-center dark:bg-slate-900/30">
+                                                        <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                                                            Horas semanales
+                                                        </p>
+                                                        <p className="mt-1 text-3xl font-bold text-[#2563eb]">
+                                                            {formatScheduleHours(
+                                                                editWeeklyMinutes,
+                                                            )}
+                                                        </p>
+                                                    </div>
+                                                    <div className="rounded-md border border-sidebar-border/60 bg-slate-50/70 px-3 py-3 text-center dark:bg-slate-900/30">
+                                                        <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                                                            Total periodo
+                                                        </p>
+                                                        <p className="mt-1 text-3xl font-bold text-[#2563eb]">
+                                                            {formatScheduleHours(
+                                                                editPeriodMinutes,
+                                                            )}
+                                                        </p>
+                                                    </div>
                                                 </div>
-                                                <div className="flex justify-end gap-2">
+                                                <div className="flex justify-end gap-2 pt-1">
                                                     <Button
                                                         type="submit"
                                                         disabled={actionLoading !== null}
@@ -2368,6 +2701,7 @@ export default function TimeControlPage({
                                                 </div>
                                                 </form>
                                             </div>
+                                            </div>
                                         </DialogContent>
                                     </Dialog>
 
@@ -2381,30 +2715,43 @@ export default function TimeControlPage({
                                             <span className="font-semibold text-foreground">
                                                 Leyenda de estados:
                                             </span>
-                                            {DAY_VISUAL_LEGEND.map((item) => (
-                                                <span
-                                                    key={item.status}
-                                                    className="inline-flex items-center gap-2"
-                                                >
+                                            {DAY_VISUAL_LEGEND
+                                                .filter(
+                                                    (item) =>
+                                                        item.status !== 'disabled'
+                                                        && item.status !== 'pending',
+                                                )
+                                                .map((item) => (
                                                     <span
-                                                        aria-hidden="true"
-                                                        className={cn(
-                                                            'inline-block size-3 rounded-full',
-                                                            item.dotClassName,
-                                                        )}
-                                                    />
-                                                    {item.label}
-                                                </span>
-                                            ))}
+                                                        key={item.status}
+                                                        className="inline-flex items-center gap-2"
+                                                    >
+                                                        <span
+                                                            aria-hidden="true"
+                                                            className={cn(
+                                                                'inline-block size-3 rounded-full',
+                                                                item.dotClassName,
+                                                            )}
+                                                        />
+                                                        {item.label}
+                                                    </span>
+                                                ))}
                                         </div>
                                     </div>
 
                                     <section className={UI_PRESETS.sectionCard}>
-                                        <div className="mb-3 flex items-center justify-between">
-                                            <h3 className={SECTION_TITLE_INLINE_CLASS}>
+                                        <div className="mb-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+                                            <h3 className={cn(SECTION_TITLE_INLINE_CLASS, 'justify-self-start')}>
                                                 Vista semanal
                                             </h3>
-                                            <div className="flex items-center gap-2">
+                                            <div className="justify-self-center text-center">
+                                                {weekRangeLabel ? (
+                                                    <p className="text-sm font-medium text-muted-foreground">
+                                                        {weekRangeLabel}
+                                                    </p>
+                                                ) : null}
+                                            </div>
+                                            <div className="flex items-center justify-self-end gap-2">
                                                 <Button
                                                     type="button"
                                                     variant="outline"
@@ -2431,11 +2778,40 @@ export default function TimeControlPage({
                                                 >
                                                     <ChevronRight className="size-4" />
                                                 </Button>
+                                                <Button
+                                                    type="button"
+                                                    size="icon"
+                                                    variant="outline"
+                                                    className={UI_PRESETS.iconActionButton}
+                                                    onClick={() =>
+                                                        openPdf({
+                                                            startDate: weekPdfStartDate,
+                                                            endDate: weekPdfEndDate,
+                                                            rangeLabel: 'Semana visible',
+                                                        })
+                                                    }
+                                                    disabled={!weekPdfStartDate || !weekPdfEndDate}
+                                                    aria-label="Exportar semana en PDF"
+                                                    title="Exportar semana en PDF"
+                                                >
+                                                    <FileText className="size-4 text-rose-600" />
+                                                </Button>
                                             </div>
                                         </div>
                                         <div className="grid gap-2 md:grid-cols-7">
                                             {weekDaysToRender.map((day) => {
-                                                const dayIndex = new Date(day.date).getDay();
+                                                const isDayScheduled = isScheduledCalendarDay(day);
+                                                if (!isDayScheduled) {
+                                                    return (
+                                                        <div
+                                                            key={day.date}
+                                                            aria-hidden="true"
+                                                            className="h-full min-h-[172px] rounded-lg border border-transparent bg-transparent p-3"
+                                                        />
+                                                    );
+                                                }
+
+                                                const dayIndex = dateKeyToUtcDate(day.date).getUTCDay();
                                                 const dayName = WEEKDAY_FULL_NAMES[(dayIndex + 6) % 7];
                                                 const visualStatus = resolveDayVisualStatus(
                                                     day.planned_hours,
@@ -2443,8 +2819,16 @@ export default function TimeControlPage({
                                                     day.is_past,
                                                     day.off_kind,
                                                 );
-                                                const progress = day.planned_hours > 0
-                                                    ? (day.worked_hours / day.planned_hours) * 100
+                                                const hasPlannedHours = day.planned_hours > 0.01;
+                                                const workedForPlannedProgress = hasPlannedHours
+                                                    ? Math.min(day.worked_hours, day.planned_hours)
+                                                    : day.worked_hours;
+                                                const extraHours = Math.max(
+                                                    0,
+                                                    day.worked_hours - day.planned_hours,
+                                                );
+                                                const progress = hasPlannedHours
+                                                    ? (workedForPlannedProgress / day.planned_hours) * 100
                                                     : 0;
 
                                                 return (
@@ -2468,28 +2852,95 @@ export default function TimeControlPage({
                                                         <p className="text-3xl font-extrabold mb-2.5 text-foreground">
                                                             {day.label}
                                                         </p>
-                                                        <div className="mb-2.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-200/60 dark:bg-slate-700/60">
-                                                            <div
-                                                                className={cn(
-                                                                    'h-full transition-all duration-300',
-                                                                    dayVisualProgressClass(visualStatus),
-                                                                )}
-                                                                style={{ width: `${Math.min(progress, 100)}%` }}
-                                                            />
-                                                        </div>
+                                                        {visualStatus !== 'rest' && hasPlannedHours ? (
+                                                            <div className="mb-2.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-200/60 dark:bg-slate-700/60">
+                                                                <div
+                                                                    className={cn(
+                                                                        'h-full transition-all duration-300',
+                                                                        dayVisualProgressClass(
+                                                                            visualStatus,
+                                                                        ),
+                                                                    )}
+                                                                    style={{
+                                                                        width: `${Math.min(progress, 100)}%`,
+                                                                    }}
+                                                                />
+                                                            </div>
+                                                        ) : null}
                                                         <p className="text-xs font-medium text-muted-foreground">
-                                                            {day.worked_hours.toFixed(1)}h / {day.planned_hours.toFixed(1)}h
+                                                            {workedForPlannedProgress.toFixed(1)}h / {day.planned_hours.toFixed(1)}h
                                                         </p>
+                                                        {extraHours > 0.01 ? (
+                                                            <p className="mt-0.5 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">
+                                                                +{extraHours.toFixed(1)}h extra
+                                                            </p>
+                                                        ) : null}
                                                     </button>
                                                 );
                                             })}
                                         </div>
+                                        {!weekHasScheduledDays ? (
+                                            <p className="mt-3 rounded-lg border border-sidebar-border/70 bg-white/70 p-3 text-sm text-muted-foreground dark:bg-slate-900/20">
+                                                No hay horario planificado para esta semana.
+                                            </p>
+                                        ) : null}
                                     </section>
 
                                     <section className={UI_PRESETS.sectionCard}>
-                                        <h3 className={SECTION_TITLE_CLASS}>
-                                            Vista mensual
-                                        </h3>
+                                        <div className="mb-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+                                            <h3 className={cn(SECTION_TITLE_INLINE_CLASS, 'justify-self-start')}>
+                                                Vista mensual
+                                            </h3>
+                                            <div className="justify-self-center text-center">
+                                                <p className="text-sm font-medium text-muted-foreground">
+                                                    {currentMonthLabel}
+                                                </p>
+                                            </div>
+                                            <div className="flex items-center justify-self-end gap-2">
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="icon"
+                                                    onClick={() =>
+                                                        navigateMonth('previous')
+                                                    }
+                                                    aria-label="Mes anterior"
+                                                    className={UI_PRESETS.iconActionButton}
+                                                >
+                                                    <ChevronLeft className="size-4" />
+                                                </Button>
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="icon"
+                                                    onClick={() =>
+                                                        navigateMonth('next')
+                                                    }
+                                                    aria-label="Mes siguiente"
+                                                    className={UI_PRESETS.iconActionButton}
+                                                >
+                                                    <ChevronRight className="size-4" />
+                                                </Button>
+                                                <Button
+                                                    type="button"
+                                                    size="icon"
+                                                    variant="outline"
+                                                    className={UI_PRESETS.iconActionButton}
+                                                    onClick={() =>
+                                                        openPdf({
+                                                            startDate: monthPdfStartDate,
+                                                            endDate: monthPdfEndDate,
+                                                            rangeLabel: 'Mes visible',
+                                                        })
+                                                    }
+                                                    disabled={!monthPdfStartDate || !monthPdfEndDate}
+                                                    aria-label="Exportar mes en PDF"
+                                                    title="Exportar mes en PDF"
+                                                >
+                                                    <FileText className="size-4 text-rose-600" />
+                                                </Button>
+                                            </div>
+                                        </div>
                                         <div className="mb-2 hidden gap-2 md:grid md:grid-cols-7">
                                             {WEEKDAY_FULL_NAMES.map((weekdayName) => (
                                                 <p
@@ -2500,8 +2951,21 @@ export default function TimeControlPage({
                                                 </p>
                                             ))}
                                         </div>
-                                        <div className="grid gap-2 md:grid-cols-7">
+                                        <div className="grid gap-2 md:grid-cols-7 md:auto-rows-[60px]">
                                             {calendar.monthDays.map((day) => {
+                                                const isDayInCurrentMonth = isCurrentMonthDay(day);
+                                                const isDayScheduled = isScheduledCalendarDay(day);
+
+                                                if (!isDayInCurrentMonth || !isDayScheduled) {
+                                                    return (
+                                                        <div
+                                                            key={day.date}
+                                                            aria-hidden="true"
+                                                            className="h-full rounded-md border border-transparent bg-transparent p-1.5"
+                                                        />
+                                                    );
+                                                }
+
                                                 const visualStatus = resolveDayVisualStatus(
                                                     day.planned_hours,
                                                     day.worked_hours,
@@ -2517,22 +2981,18 @@ export default function TimeControlPage({
                                                             openDayDetails(day.date)
                                                         }
                                                         className={cn(
-                                                            'rounded-md border p-2 text-left text-xs',
+                                                            'h-full w-full rounded-md border p-1.5 text-left text-xs',
+                                                            'flex flex-col justify-between',
                                                             'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563eb]/45',
                                                             dayVisualClasses(
                                                                 visualStatus,
                                                             ),
-                                                            day.date.startsWith(
-                                                                monthCursor,
-                                                            )
-                                                                ? ''
-                                                                : 'opacity-45',
                                                         )}
                                                     >
-                                                        <p className="font-semibold">
+                                                        <p className="font-semibold leading-none">
                                                             {day.label}
                                                         </p>
-                                                        <p>
+                                                        <p className="leading-none">
                                                             {day.worked_hours.toFixed(
                                                                 1,
                                                             )}
@@ -2546,6 +3006,11 @@ export default function TimeControlPage({
                                                 );
                                             })}
                                         </div>
+                                        {!monthHasScheduledDays ? (
+                                            <p className="mt-3 rounded-lg border border-sidebar-border/70 bg-white/70 p-3 text-sm text-muted-foreground dark:bg-slate-900/20">
+                                                No hay horario planificado para este mes.
+                                            </p>
+                                        ) : null}
                                     </section>
 
                                     <Dialog
@@ -2594,186 +3059,82 @@ export default function TimeControlPage({
 
                                                     {!dayDetailsLoading && dayDetails ? (
                                                         <div className="min-w-0 space-y-4">
-                                                            <section className="space-y-1 py-1 text-center">
-                                                                <p className={cn(FIELD_LABEL_CLASS, 'text-center')}>
-                                                                    Cumplimiento
-                                                                </p>
-                                                                <p className="text-4xl font-extrabold leading-none text-foreground">
-                                                                    {dayDetails.compliance_percent.toFixed(
-                                                                        1,
-                                                                    )}
-                                                                    %
-                                                                </p>
-                                                                <p className="text-xs text-muted-foreground">
-                                                                    {dayDetails.worked_hours.toFixed(
-                                                                        1,
-                                                                    )}
-                                                                    h de{' '}
-                                                                    {dayDetails.planned_hours.toFixed(
-                                                                        1,
-                                                                    )}
-                                                                    h
-                                                                </p>
-                                                            </section>
-
-                                                            <section className={cn(UI_PRESETS.sectionCard, 'space-y-4 p-5')}>
-                                                                <div className="grid grid-cols-2 gap-2 rounded-xl border border-sidebar-border/70 bg-white/80 p-1 dark:bg-slate-900/30">
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() =>
-                                                                            setDayDetailsTab(
-                                                                                'status',
-                                                                            )
-                                                                        }
-                                                                        className={cn(
-                                                                            'rounded-lg px-3 py-2 text-sm font-semibold transition-colors',
-                                                                            dayDetailsTab
-                                                                                ===
-                                                                                'status'
-                                                                                ? 'bg-[#2563eb] text-white shadow-sm'
-                                                                                : 'text-muted-foreground hover:bg-slate-100 dark:hover:bg-slate-800/70',
-                                                                        )}
-                                                                    >
-                                                                        Estado
-                                                                    </button>
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() =>
-                                                                            setDayDetailsTab(
-                                                                                'timeline',
-                                                                            )
-                                                                        }
-                                                                        className={cn(
-                                                                            'rounded-lg px-3 py-2 text-sm font-semibold transition-colors',
-                                                                            dayDetailsTab
-                                                                                ===
-                                                                                'timeline'
-                                                                                ? 'bg-[#2563eb] text-white shadow-sm'
-                                                                                : 'text-muted-foreground hover:bg-slate-100 dark:hover:bg-slate-800/70',
-                                                                        )}
-                                                                    >
-                                                                        Timeline de fichajes (
-                                                                        {dayDetails
-                                                                            .entries
-                                                                            .length}
-                                                                        )
-                                                                    </button>
+                                                            <section className={cn(UI_PRESETS.sectionCard, 'space-y-4 p-4')}>
+                                                                <div className={UI_PRESETS.tabsHeaderEmphasis}>
+                                                                    <div className="flex flex-wrap items-end gap-1.5">
+                                                                        <Button
+                                                                            type="button"
+                                                                            variant="ghost"
+                                                                            size="sm"
+                                                                            onClick={() =>
+                                                                                setDayDetailsTab(
+                                                                                    'status',
+                                                                                )
+                                                                            }
+                                                                            className={`${UI_PRESETS.tabBase} ${dayDetailsTab === 'status' ? UI_PRESETS.tabActive : UI_PRESETS.tabInactive}`}
+                                                                        >
+                                                                            <span className="flex items-center gap-1.5">
+                                                                                <CheckCircle2 className="size-4 shrink-0" />
+                                                                                <span>Estado</span>
+                                                                            </span>
+                                                                        </Button>
+                                                                        <Button
+                                                                            type="button"
+                                                                            variant="ghost"
+                                                                            size="sm"
+                                                                            onClick={() =>
+                                                                                setDayDetailsTab(
+                                                                                    'timeline',
+                                                                                )
+                                                                            }
+                                                                            className={`${UI_PRESETS.tabBase} ${dayDetailsTab === 'timeline' ? UI_PRESETS.tabActive : UI_PRESETS.tabInactive}`}
+                                                                        >
+                                                                            <span className="flex items-center gap-1.5">
+                                                                                <Clock3 className="size-4 shrink-0" />
+                                                                                <span>Timeline</span>
+                                                                            </span>
+                                                                        </Button>
+                                                                    </div>
                                                                 </div>
 
                                                                 {dayDetailsTab === 'status' ? (
-                                                                    <div className="space-y-4">
-                                                                        <div className="flex flex-col items-center justify-center space-y-2 text-center">
-                                                                            <p
-                                                                                className={cn(
-                                                                                    FIELD_LABEL_CLASS,
-                                                                                    'w-full text-center',
-                                                                                )}
-                                                                            >
-                                                                                Estado
-                                                                            </p>
-                                                                            <span
-                                                                                className={cn(
-                                                                                    'inline-flex items-center gap-2.5 rounded-lg border px-3 py-2 text-sm font-semibold shadow-sm',
-                                                                                    dayDetailsStatusBadgeClass,
-                                                                                )}
-                                                                            >
-                                                                                {dayDetailsStatusLegendItem ? (
-                                                                                    <span
-                                                                                        aria-hidden="true"
-                                                                                        className={cn(
-                                                                                            'inline-block size-2.5 rounded-full',
-                                                                                            dayDetailsStatusLegendItem.dotClassName,
-                                                                                        )}
-                                                                                    />
-                                                                                ) : null}
-                                                                                {dayDetailsStatusLegendItem?.label ?? '-'}
-                                                                            </span>
-                                                                        </div>
-
-                                                                        <div>
-                                                                            <div className="mb-1 flex items-center justify-between text-xs text-muted-foreground">
-                                                                                <span>
-                                                                                    Progreso del dia
-                                                                                </span>
-                                                                                <span>
-                                                                                    {dayDetailsProgressPercent.toFixed(
-                                                                                        1,
-                                                                                    )}
-                                                                                    %
-                                                                                </span>
-                                                                            </div>
-                                                                            <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-200/70 dark:bg-slate-700/70">
-                                                                                <div
-                                                                                    className={cn(
-                                                                                        'h-full transition-all duration-300',
-                                                                                        dayDetailsProgressFillClass,
-                                                                                    )}
-                                                                                    style={{
-                                                                                        width: `${dayDetailsProgressPercent}%`,
-                                                                                    }}
-                                                                                />
-                                                                            </div>
-                                                                        </div>
-
-                                                                        <div className="grid gap-3 sm:grid-cols-3">
-                                                                            <div className="rounded-lg border border-sidebar-border/70 bg-white/80 p-3 text-center dark:bg-slate-900/30">
+                                                                    <section className="space-y-3">
+                                                                        <div className="overflow-hidden rounded-lg border border-sidebar-border/70 bg-white/80 dark:bg-slate-900/30">
+                                                                            <div className="grid grid-cols-1 gap-1 border-b border-sidebar-border/70 px-4 py-3 sm:grid-cols-[220px_1fr] sm:items-center sm:gap-4">
                                                                                 <p className={FIELD_LABEL_CLASS}>
-                                                                                    Trabajadas
+                                                                                    Horas planificadas
                                                                                 </p>
-                                                                                <p className="mt-1 text-sm font-semibold text-foreground">
-                                                                                    {dayDetails.worked_hours.toFixed(
-                                                                                        1,
-                                                                                    )}
-                                                                                    h
-                                                                                </p>
-                                                                            </div>
-                                                                            <div className="rounded-lg border border-sidebar-border/70 bg-white/80 p-3 text-center dark:bg-slate-900/30">
-                                                                                <p className={FIELD_LABEL_CLASS}>
-                                                                                    Planificadas
-                                                                                </p>
-                                                                                <p className="mt-1 text-sm font-semibold text-foreground">
+                                                                                <p className="text-base font-semibold text-foreground">
                                                                                     {dayDetails.planned_hours.toFixed(
                                                                                         1,
-                                                                                    )}
+                                                                                    )}{' '}
                                                                                     h
                                                                                 </p>
                                                                             </div>
-                                                                            <div className="rounded-lg border border-sidebar-border/70 bg-white/80 p-3 text-center dark:bg-slate-900/30">
+                                                                            <div className="grid grid-cols-1 gap-1 border-b border-sidebar-border/70 px-4 py-3 sm:grid-cols-[220px_1fr] sm:items-center sm:gap-4">
                                                                                 <p className={FIELD_LABEL_CLASS}>
-                                                                                    Pausas
+                                                                                    Horas trabajadas
                                                                                 </p>
-                                                                                <p className="mt-1 text-sm font-semibold text-foreground">
+                                                                                <p className="text-base font-semibold text-foreground">
+                                                                                    {dayDetails.worked_hours.toFixed(
+                                                                                        1,
+                                                                                    )}{' '}
+                                                                                    h
+                                                                                </p>
+                                                                            </div>
+                                                                            <div className="grid grid-cols-1 gap-1 px-4 py-3 sm:grid-cols-[220px_1fr] sm:items-center sm:gap-4">
+                                                                                <p className={FIELD_LABEL_CLASS}>
+                                                                                    Descansos
+                                                                                </p>
+                                                                                <p className="text-base font-semibold text-foreground">
                                                                                     {dayDetails.break_hours.toFixed(
                                                                                         1,
-                                                                                    )}
+                                                                                    )}{' '}
                                                                                     h
                                                                                 </p>
                                                                             </div>
                                                                         </div>
-
-                                                                        <div className="grid gap-3 sm:grid-cols-2">
-                                                                            <div className="rounded-lg border border-sidebar-border/70 bg-white/80 p-3 text-center dark:bg-slate-900/30">
-                                                                                <p className={FIELD_LABEL_CLASS}>
-                                                                                    Primera entrada
-                                                                                </p>
-                                                                                <p className="mt-1 text-sm font-semibold text-foreground">
-                                                                                    {formatClockTime(
-                                                                                        dayDetails.first_clock_in,
-                                                                                    )}
-                                                                                </p>
-                                                                            </div>
-                                                                            <div className="rounded-lg border border-sidebar-border/70 bg-white/80 p-3 text-center dark:bg-slate-900/30">
-                                                                                <p className={FIELD_LABEL_CLASS}>
-                                                                                    Ultima salida
-                                                                                </p>
-                                                                                <p className="mt-1 text-sm font-semibold text-foreground">
-                                                                                    {formatClockTime(
-                                                                                        dayDetails.last_clock_out,
-                                                                                    )}
-                                                                                </p>
-                                                                            </div>
-                                                                        </div>
-                                                                    </div>
+                                                                    </section>
                                                                 ) : (
                                                                     <section className="space-y-3">
                                                                         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -2781,166 +3142,267 @@ export default function TimeControlPage({
                                                                                 Timeline de fichajes
                                                                             </h4>
                                                                             <div className="flex items-center gap-2">
-                                                                                <Badge variant="secondary">
-                                                                                    {
-                                                                                        dayDetails
-                                                                                            .entries
-                                                                                            .length
-                                                                                    }{' '}
-                                                                                    registros
-                                                                                </Badge>
                                                                                 {clockState.canManualEntry ? (
                                                                                     <Button
                                                                                         type="button"
-                                                                                        size="sm"
                                                                                         variant="outline"
+                                                                                        size="icon"
+                                                                                        className={UI_PRESETS.iconActionButtonPrimary}
                                                                                         onClick={openCreateTimelineEntryForm}
                                                                                         disabled={actionLoading !== null}
+                                                                                        aria-label="Nuevo fichaje"
+                                                                                        title="Nuevo fichaje"
                                                                                     >
-                                                                                        <Plus className="size-4" />
-                                                                                        Nuevo fichaje
+                                                                                        <CirclePlus />
                                                                                     </Button>
                                                                                 ) : null}
                                                                             </div>
                                                                         </div>
 
-                                                                        {clockState.canManualEntry
-                                                                        && isTimelineEntryFormOpen ? (
-                                                                            <form
-                                                                                className="space-y-3 rounded-lg border border-sidebar-border/70 bg-white/80 p-3 dark:bg-slate-900/30"
-                                                                                onSubmit={submitTimelineEntryForm}
+                                                                        {clockState.canManualEntry ? (
+                                                                            <Dialog
+                                                                                open={isTimelineEntryFormOpen}
+                                                                                onOpenChange={(open) => {
+                                                                                    if (open) {
+                                                                                        setIsTimelineEntryFormOpen(
+                                                                                            true,
+                                                                                        );
+                                                                                        return;
+                                                                                    }
+                                                                                    closeTimelineEntryForm();
+                                                                                }}
                                                                             >
-                                                                                <p className={FIELD_LABEL_CLASS}>
-                                                                                    {timelineEntryForm.entry_id
-                                                                                    !== null
-                                                                                        ? 'Editar fichaje manual'
-                                                                                        : 'Nuevo fichaje manual'}
-                                                                                </p>
-                                                                                <div className="grid gap-2 sm:grid-cols-2">
-                                                                                    <div className="space-y-1">
-                                                                                        <p className={FIELD_LABEL_CLASS}>
-                                                                                            Inicio
-                                                                                        </p>
-                                                                                        <Input
-                                                                                            type="datetime-local"
-                                                                                            value={
-                                                                                                timelineEntryForm.started_at
-                                                                                            }
-                                                                                            onChange={(event) =>
-                                                                                                setTimelineEntryForm(
-                                                                                                    (current) => ({
-                                                                                                        ...current,
-                                                                                                        started_at:
-                                                                                                            event
-                                                                                                                .target
-                                                                                                                .value,
-                                                                                                    }),
-                                                                                                )
-                                                                                            }
-                                                                                            className={UI_PRESETS.filterInput}
-                                                                                            required
-                                                                                        />
+                                                                                <DialogContent
+                                                                                    overlayClassName="bg-black/35 backdrop-blur-sm"
+                                                                                    hideCloseButton
+                                                                                    className="!w-[94vw] !max-w-[640px] !block overflow-hidden border-sidebar-border/70 p-0 !bg-white dark:!bg-slate-950 [&_button]:cursor-pointer"
+                                                                                >
+                                                                                    <div className="flex min-h-0 min-w-0 max-h-[80vh] flex-col">
+                                                                                        <DialogHeader className="border-b border-sidebar-border/70 bg-[linear-gradient(140deg,#eaf2ff_0%,#f7fbff_36%,#e9f9f2_100%)] px-5 pb-3 pt-4 dark:border-sidebar-border dark:bg-[linear-gradient(140deg,#0f1d34_0%,#11233f_48%,#0f2c2b_100%)] sm:px-6">
+                                                                                            <div className="flex items-center justify-between gap-3">
+                                                                                                <div className="min-w-0">
+                                                                                                    <DialogTitle className="text-base font-semibold text-foreground">
+                                                                                                        {timelineEntryForm.entry_id
+                                                                                                        !==
+                                                                                                        null
+                                                                                                            ? 'Editar fichaje manual'
+                                                                                                            : 'Nuevo fichaje manual'}
+                                                                                                    </DialogTitle>
+                                                                                                    <DialogDescription className="text-sm text-muted-foreground">
+                                                                                                        Completa el fichaje y guarda los cambios.
+                                                                                                    </DialogDescription>
+                                                                                                </div>
+                                                                                                <Button
+                                                                                                    type="button"
+                                                                                                    size="icon"
+                                                                                                    variant="ghost"
+                                                                                                    className="shrink-0"
+                                                                                                    aria-label="Volver"
+                                                                                                    title="Volver"
+                                                                                                    onClick={closeTimelineEntryForm}
+                                                                                                >
+                                                                                                    <ArrowLeft className="size-4" />
+                                                                                                </Button>
+                                                                                            </div>
+                                                                                        </DialogHeader>
+
+                                                                                        <form
+                                                                                            className="min-w-0 space-y-3 overflow-y-auto px-6 py-6 sm:px-7 sm:py-7"
+                                                                                            onSubmit={submitTimelineEntryForm}
+                                                                                        >
+                                                                                            <div className="grid gap-2 sm:grid-cols-2">
+                                                                                                <div className="space-y-1">
+                                                                                                    <p className={FIELD_LABEL_CLASS}>
+                                                                                                        Inicio
+                                                                                                    </p>
+                                                                                                    <div className="grid gap-2 sm:grid-cols-[1fr_132px]">
+                                                                                                        <DatePicker
+                                                                                                            id="timeline-start-date"
+                                                                                                            value={
+                                                                                                                timelineTargetDate
+                                                                                                                || timelineStartParts.date
+                                                                                                            }
+                                                                                                            placeholder="Fecha"
+                                                                                                            className={`${UI_PRESETS.filterInput} cursor-pointer`}
+                                                                                                            disabled
+                                                                                                        />
+                                                                                                        <Input
+                                                                                                            type="time"
+                                                                                                            step={60}
+                                                                                                            value={
+                                                                                                                timelineStartParts.time
+                                                                                                            }
+                                                                                                            onChange={(event) =>
+                                                                                                                setTimelineEntryForm(
+                                                                                                                    (
+                                                                                                                        current,
+                                                                                                                    ) => ({
+                                                                                                                        ...current,
+                                                                                                                        started_at:
+                                                                                                                            joinLocalDateTime(
+                                                                                                                                splitLocalDateTime(
+                                                                                                                                    current.started_at,
+                                                                                                                                )
+                                                                                                                                    .date
+                                                                                                                                || timelineTargetDate,
+                                                                                                                                event
+                                                                                                                                    .target
+                                                                                                                                    .value,
+                                                                                                                                '09:00',
+                                                                                                                            ),
+                                                                                                                    }),
+                                                                                                                )
+                                                                                                            }
+                                                                                                            onClick={(event) =>
+                                                                                                                openNativeInputPicker(
+                                                                                                                    event.currentTarget,
+                                                                                                                )
+                                                                                                            }
+                                                                                                            onFocus={(event) =>
+                                                                                                                openNativeInputPicker(
+                                                                                                                    event.currentTarget,
+                                                                                                                )
+                                                                                                            }
+                                                                                                            className={`${UI_PRESETS.filterInput} cursor-pointer`}
+                                                                                                            required
+                                                                                                        />
+                                                                                                    </div>
+                                                                                                </div>
+                                                                                                <div className="space-y-1">
+                                                                                                    <p className={FIELD_LABEL_CLASS}>
+                                                                                                        Fin
+                                                                                                    </p>
+                                                                                                    <div className="grid gap-2 sm:grid-cols-[1fr_132px]">
+                                                                                                        <DatePicker
+                                                                                                            id="timeline-end-date"
+                                                                                                            value={
+                                                                                                                timelineTargetDate
+                                                                                                                || timelineEndParts.date
+                                                                                                            }
+                                                                                                            placeholder="Fecha"
+                                                                                                            className={`${UI_PRESETS.filterInput} cursor-pointer`}
+                                                                                                            disabled
+                                                                                                        />
+                                                                                                        <Input
+                                                                                                            type="time"
+                                                                                                            step={60}
+                                                                                                            value={
+                                                                                                                timelineEndParts.time
+                                                                                                            }
+                                                                                                            onChange={(event) =>
+                                                                                                                setTimelineEntryForm(
+                                                                                                                    (
+                                                                                                                        current,
+                                                                                                                    ) => ({
+                                                                                                                        ...current,
+                                                                                                                        ended_at:
+                                                                                                                            joinLocalDateTime(
+                                                                                                                                splitLocalDateTime(
+                                                                                                                                    current.ended_at,
+                                                                                                                                )
+                                                                                                                                    .date
+                                                                                                                                || timelineTargetDate,
+                                                                                                                                event
+                                                                                                                                    .target
+                                                                                                                                    .value,
+                                                                                                                                '14:00',
+                                                                                                                            ),
+                                                                                                                    }),
+                                                                                                                )
+                                                                                                            }
+                                                                                                            onClick={(event) =>
+                                                                                                                openNativeInputPicker(
+                                                                                                                    event.currentTarget,
+                                                                                                                )
+                                                                                                            }
+                                                                                                            onFocus={(event) =>
+                                                                                                                openNativeInputPicker(
+                                                                                                                    event.currentTarget,
+                                                                                                                )
+                                                                                                            }
+                                                                                                            className={`${UI_PRESETS.filterInput} cursor-pointer`}
+                                                                                                            required
+                                                                                                        />
+                                                                                                    </div>
+                                                                                                </div>
+                                                                                            </div>
+                                                                                            <div className="grid gap-2 sm:grid-cols-[160px_1fr]">
+                                                                                                <div className="space-y-1">
+                                                                                                    <p className={FIELD_LABEL_CLASS}>
+                                                                                                        Pausa (min)
+                                                                                                    </p>
+                                                                                                    <Input
+                                                                                                        type="number"
+                                                                                                        min={0}
+                                                                                                        max={720}
+                                                                                                        value={
+                                                                                                            timelineEntryForm.break_minutes
+                                                                                                        }
+                                                                                                        onChange={(event) =>
+                                                                                                            setTimelineEntryForm(
+                                                                                                                (current) => ({
+                                                                                                                    ...current,
+                                                                                                                    break_minutes:
+                                                                                                                        event
+                                                                                                                            .target
+                                                                                                                            .value,
+                                                                                                                }),
+                                                                                                            )
+                                                                                                        }
+                                                                                                        className={UI_PRESETS.filterInput}
+                                                                                                    />
+                                                                                                </div>
+                                                                                                <div className="space-y-1">
+                                                                                                    <p className={FIELD_LABEL_CLASS}>
+                                                                                                        Motivo
+                                                                                                    </p>
+                                                                                                    <Input
+                                                                                                        value={
+                                                                                                            timelineEntryForm.manual_reason
+                                                                                                        }
+                                                                                                        onChange={(event) =>
+                                                                                                            setTimelineEntryForm(
+                                                                                                                (current) => ({
+                                                                                                                    ...current,
+                                                                                                                    manual_reason:
+                                                                                                                        event
+                                                                                                                            .target
+                                                                                                                            .value,
+                                                                                                                }),
+                                                                                                            )
+                                                                                                        }
+                                                                                                        className={UI_PRESETS.filterInput}
+                                                                                                        maxLength={500}
+                                                                                                        required
+                                                                                                    />
+                                                                                                </div>
+                                                                                            </div>
+                                                                                            <div className="flex flex-wrap justify-end gap-2 pt-1">
+                                                                                                <Button
+                                                                                                    type="button"
+                                                                                                    variant="ghost"
+                                                                                                    size="sm"
+                                                                                                    onClick={closeTimelineEntryForm}
+                                                                                                    disabled={actionLoading !== null}
+                                                                                                >
+                                                                                                    Cancelar
+                                                                                                </Button>
+                                                                                                <Button
+                                                                                                    type="submit"
+                                                                                                    size="sm"
+                                                                                                    disabled={actionLoading !== null}
+                                                                                                >
+                                                                                                    {timelineEntryForm.entry_id
+                                                                                                    !==
+                                                                                                    null
+                                                                                                        ? 'Guardar'
+                                                                                                        : 'Crear fichaje'}
+                                                                                                </Button>
+                                                                                            </div>
+                                                                                        </form>
                                                                                     </div>
-                                                                                    <div className="space-y-1">
-                                                                                        <p className={FIELD_LABEL_CLASS}>
-                                                                                            Fin
-                                                                                        </p>
-                                                                                        <Input
-                                                                                            type="datetime-local"
-                                                                                            value={
-                                                                                                timelineEntryForm.ended_at
-                                                                                            }
-                                                                                            onChange={(event) =>
-                                                                                                setTimelineEntryForm(
-                                                                                                    (current) => ({
-                                                                                                        ...current,
-                                                                                                        ended_at:
-                                                                                                            event
-                                                                                                                .target
-                                                                                                                .value,
-                                                                                                    }),
-                                                                                                )
-                                                                                            }
-                                                                                            className={UI_PRESETS.filterInput}
-                                                                                            required
-                                                                                        />
-                                                                                    </div>
-                                                                                </div>
-                                                                                <div className="grid gap-2 sm:grid-cols-[160px_1fr]">
-                                                                                    <div className="space-y-1">
-                                                                                        <p className={FIELD_LABEL_CLASS}>
-                                                                                            Pausa (min)
-                                                                                        </p>
-                                                                                        <Input
-                                                                                            type="number"
-                                                                                            min={0}
-                                                                                            max={720}
-                                                                                            value={
-                                                                                                timelineEntryForm.break_minutes
-                                                                                            }
-                                                                                            onChange={(event) =>
-                                                                                                setTimelineEntryForm(
-                                                                                                    (current) => ({
-                                                                                                        ...current,
-                                                                                                        break_minutes:
-                                                                                                            event
-                                                                                                                .target
-                                                                                                                .value,
-                                                                                                    }),
-                                                                                                )
-                                                                                            }
-                                                                                            className={UI_PRESETS.filterInput}
-                                                                                        />
-                                                                                    </div>
-                                                                                    <div className="space-y-1">
-                                                                                        <p className={FIELD_LABEL_CLASS}>
-                                                                                            Motivo
-                                                                                        </p>
-                                                                                        <Input
-                                                                                            value={
-                                                                                                timelineEntryForm.manual_reason
-                                                                                            }
-                                                                                            onChange={(event) =>
-                                                                                                setTimelineEntryForm(
-                                                                                                    (current) => ({
-                                                                                                        ...current,
-                                                                                                        manual_reason:
-                                                                                                            event
-                                                                                                                .target
-                                                                                                                .value,
-                                                                                                    }),
-                                                                                                )
-                                                                                            }
-                                                                                            className={UI_PRESETS.filterInput}
-                                                                                            placeholder="Motivo del ajuste manual"
-                                                                                            maxLength={500}
-                                                                                            required
-                                                                                        />
-                                                                                    </div>
-                                                                                </div>
-                                                                                <div className="flex flex-wrap justify-end gap-2">
-                                                                                    <Button
-                                                                                        type="button"
-                                                                                        variant="ghost"
-                                                                                        size="sm"
-                                                                                        onClick={closeTimelineEntryForm}
-                                                                                        disabled={actionLoading !== null}
-                                                                                    >
-                                                                                        Cancelar
-                                                                                    </Button>
-                                                                                    <Button
-                                                                                        type="submit"
-                                                                                        size="sm"
-                                                                                        disabled={actionLoading !== null}
-                                                                                    >
-                                                                                        <Save className="size-4" />
-                                                                                        {timelineEntryForm.entry_id
-                                                                                        !== null
-                                                                                            ? 'Guardar cambios'
-                                                                                            : 'Crear fichaje'}
-                                                                                    </Button>
-                                                                                </div>
-                                                                            </form>
+                                                                                </DialogContent>
+                                                                            </Dialog>
                                                                         ) : null}
 
                                                                         <div
@@ -2949,26 +3411,59 @@ export default function TimeControlPage({
                                                                             <Table className="w-full table-fixed text-sm [&_td]:!whitespace-normal [&_th]:!whitespace-normal">
                                                                                 <TableHeader className={cn(UI_PRESETS.tableHead, 'sticky top-0 z-10')}>
                                                                                     <TableRow>
-                                                                                        <TableHead className={cn('px-2 py-2 text-center text-[11px]', FIELD_LABEL_CLASS)}>
+                                                                                        <TableHead
+                                                                                            style={{
+                                                                                                width: timelineColumnWidths.order,
+                                                                                            }}
+                                                                                            className={cn('px-2 py-2 text-center text-[11px]', FIELD_LABEL_CLASS)}
+                                                                                        >
                                                                                             #
                                                                                         </TableHead>
-                                                                                        <TableHead className={cn('px-2 py-2 text-center text-[11px]', FIELD_LABEL_CLASS)}>
+                                                                                        <TableHead
+                                                                                            style={{
+                                                                                                width: timelineColumnWidths.start,
+                                                                                            }}
+                                                                                            className={cn('px-2 py-2 text-center text-[11px]', FIELD_LABEL_CLASS)}
+                                                                                        >
                                                                                             Inicio
                                                                                         </TableHead>
-                                                                                        <TableHead className={cn('px-2 py-2 text-center text-[11px]', FIELD_LABEL_CLASS)}>
+                                                                                        <TableHead
+                                                                                            style={{
+                                                                                                width: timelineColumnWidths.end,
+                                                                                            }}
+                                                                                            className={cn('px-2 py-2 text-center text-[11px]', FIELD_LABEL_CLASS)}
+                                                                                        >
                                                                                             Fin
                                                                                         </TableHead>
-                                                                                        <TableHead className={cn('px-2 py-2 text-center text-[11px]', FIELD_LABEL_CLASS)}>
+                                                                                        <TableHead
+                                                                                            style={{
+                                                                                                width: timelineColumnWidths.pause,
+                                                                                            }}
+                                                                                            className={cn('px-2 py-2 text-center text-[11px]', FIELD_LABEL_CLASS)}
+                                                                                        >
                                                                                             Pausa
                                                                                         </TableHead>
-                                                                                        <TableHead className={cn('px-2 py-2 text-center text-[11px]', FIELD_LABEL_CLASS)}>
+                                                                                        <TableHead
+                                                                                            style={{
+                                                                                                width: timelineColumnWidths.completed,
+                                                                                            }}
+                                                                                            className={cn('px-2 py-2 text-center text-[11px]', FIELD_LABEL_CLASS)}
+                                                                                        >
                                                                                             Completadas
                                                                                         </TableHead>
-                                                                                        <TableHead className={cn('px-2 py-2 text-center text-[11px]', FIELD_LABEL_CLASS)}>
+                                                                                        <TableHead
+                                                                                            style={{
+                                                                                                width: timelineColumnWidths.source,
+                                                                                            }}
+                                                                                            className={cn('px-2 py-2 text-center text-[11px]', FIELD_LABEL_CLASS)}
+                                                                                        >
                                                                                             Origen
                                                                                         </TableHead>
                                                                                         {clockState.canManualEntry ? (
                                                                                             <TableHead
+                                                                                                style={{
+                                                                                                    width: timelineColumnWidths.actions,
+                                                                                                }}
                                                                                                 className={cn(
                                                                                                     'px-2 py-2 text-center text-[11px]',
                                                                                                     FIELD_LABEL_CLASS,
@@ -3005,20 +3500,40 @@ export default function TimeControlPage({
                                                                                                         stripedRowClass(index),
                                                                                                     )}
                                                                                                 >
-                                                                                                    <TableCell className="px-2 py-2 text-center">
+                                                                                                    <TableCell
+                                                                                                        style={{
+                                                                                                            width: timelineColumnWidths.order,
+                                                                                                        }}
+                                                                                                        className="px-2 py-2 text-center"
+                                                                                                    >
                                                                                                         {index + 1}
                                                                                                     </TableCell>
-                                                                                                    <TableCell className="px-2 py-2 text-center">
+                                                                                                    <TableCell
+                                                                                                        style={{
+                                                                                                            width: timelineColumnWidths.start,
+                                                                                                        }}
+                                                                                                        className="px-2 py-2 text-center"
+                                                                                                    >
                                                                                                         {formatClockTime(
                                                                                                             entry.started_at,
                                                                                                         )}
                                                                                                     </TableCell>
-                                                                                                    <TableCell className="px-2 py-2 text-center">
+                                                                                                    <TableCell
+                                                                                                        style={{
+                                                                                                            width: timelineColumnWidths.end,
+                                                                                                        }}
+                                                                                                        className="px-2 py-2 text-center"
+                                                                                                    >
                                                                                                         {formatClockTime(
                                                                                                             entry.ended_at,
                                                                                                         )}
                                                                                                     </TableCell>
-                                                                                                    <TableCell className="px-2 py-2 text-center">
+                                                                                                    <TableCell
+                                                                                                        style={{
+                                                                                                            width: timelineColumnWidths.pause,
+                                                                                                        }}
+                                                                                                        className="px-2 py-2 text-center"
+                                                                                                    >
                                                                                                         <div className="space-y-1 text-center">
                                                                                                             <p className="font-medium text-foreground">
                                                                                                                 {formatMinutesDetailed(
@@ -3034,7 +3549,12 @@ export default function TimeControlPage({
                                                                                                             ) : null}
                                                                                                         </div>
                                                                                                     </TableCell>
-                                                                                                    <TableCell className="px-2 py-2 text-center">
+                                                                                                    <TableCell
+                                                                                                        style={{
+                                                                                                            width: timelineColumnWidths.completed,
+                                                                                                        }}
+                                                                                                        className="px-2 py-2 text-center"
+                                                                                                    >
                                                                                                         <span className="font-medium text-foreground">
                                                                                                             {entry.effective_hours.toFixed(
                                                                                                                 1,
@@ -3042,7 +3562,12 @@ export default function TimeControlPage({
                                                                                                             h
                                                                                                         </span>
                                                                                                     </TableCell>
-                                                                                                    <TableCell className="px-2 py-2 text-center">
+                                                                                                    <TableCell
+                                                                                                        style={{
+                                                                                                            width: timelineColumnWidths.source,
+                                                                                                        }}
+                                                                                                        className="px-2 py-2 text-center"
+                                                                                                    >
                                                                                                         <div className="flex flex-col items-center gap-1">
                                                                                                             <Badge variant="secondary">
                                                                                                                 {formatEntrySource(
@@ -3060,7 +3585,12 @@ export default function TimeControlPage({
                                                                                                         </div>
                                                                                                     </TableCell>
                                                                                                     {clockState.canManualEntry ? (
-                                                                                                        <TableCell className="px-2 py-2 text-center">
+                                                                                                        <TableCell
+                                                                                                            style={{
+                                                                                                                width: timelineColumnWidths.actions,
+                                                                                                            }}
+                                                                                                            className="px-2 py-2 text-center"
+                                                                                                        >
                                                                                                             {entry.source ===
                                                                                                             'tutor_manual' ? (
                                                                                                                 <div className="flex items-center justify-center gap-1">
@@ -3140,252 +3670,286 @@ export default function TimeControlPage({
                             ) : null}
 
                             {activeTab === 'absence' ? (
-                                <div className="grid gap-3 lg:grid-cols-2">
-                                    <section className={UI_PRESETS.sectionCard}>
-                                        <h3 className={SECTION_TITLE_CLASS}>
-                                            Solicitud de ausencia
-                                        </h3>
-                                        <form
-                                            className="space-y-2"
-                                            onSubmit={submitAbsence}
-                                        >
-                                            <div className="grid grid-cols-2 gap-2">
-                                                <Input
-                                                    type="date"
-                                                    value={
-                                                        absenceForm.start_date
-                                                    }
-                                                    onChange={(event) =>
-                                                        setAbsenceForm(
-                                                            (current) => ({
-                                                                ...current,
-                                                                start_date:
-                                                                    event.target
-                                                                        .value,
-                                                            }),
-                                                        )
-                                                    }
-                                                    className={
-                                                        UI_PRESETS.filterInput
-                                                    }
-                                                />
-                                                <Input
-                                                    type="date"
-                                                    value={absenceForm.end_date}
-                                                    onChange={(event) =>
-                                                        setAbsenceForm(
-                                                            (current) => ({
-                                                                ...current,
-                                                                end_date:
-                                                                    event.target
-                                                                        .value,
-                                                            }),
-                                                        )
-                                                    }
-                                                    className={
-                                                        UI_PRESETS.filterInput
-                                                    }
-                                                />
-                                            </div>
-                                            <Input
-                                                value={absenceForm.reason}
-                                                onChange={(event) =>
-                                                    setAbsenceForm(
-                                                        (current) => ({
-                                                            ...current,
-                                                            reason: event.target
-                                                                .value,
-                                                        }),
-                                                    )
-                                                }
-                                                className={
-                                                    UI_PRESETS.filterInput
-                                                }
-                                                placeholder="Motivo"
-                                            />
-                                            <Input
-                                                type="file"
-                                                onChange={(event) =>
-                                                    setAbsenceForm(
-                                                        (current) => ({
-                                                            ...current,
-                                                            attachment:
-                                                                event.target
-                                                                    .files?.[0] ??
-                                                                null,
-                                                        }),
-                                                    )
-                                                }
-                                                className={
-                                                    UI_PRESETS.filterInput
-                                                }
-                                            />
-                                            <Button
-                                                size="sm"
-                                                disabled={
-                                                    actionLoading !== null
-                                                }
-                                            >
-                                                Enviar solicitud
-                                            </Button>
-                                        </form>
-                                    </section>
-
-                                    <section className={UI_PRESETS.sectionCard}>
-                                        <h3 className={SECTION_TITLE_CLASS}>
-                                            Historial de ausencias
-                                        </h3>
-                                        <div className="space-y-2">
-                                            {absenceRequests.map((absence) => (
-                                                <div
-                                                    key={absence.id}
-                                                    className="rounded-lg border border-sidebar-border/70 bg-white/70 p-3 text-sm dark:bg-slate-900/20"
-                                                >
-                                                    <div className="mb-1 flex items-center justify-between gap-2">
-                                                        <p className="font-medium">
-                                                            {formatDate(
-                                                                absence.start_date,
-                                                            )}{' '}
-                                                            -{' '}
-                                                            {formatDate(
-                                                                absence.end_date,
-                                                            )}
-                                                        </p>
-                                                        <Badge
-                                                            variant={absenceBadgeVariant(
-                                                                absence.status,
-                                                            )}
-                                                        >
-                                                            {absence.status}
-                                                        </Badge>
-                                                    </div>
-                                                    <p className="text-muted-foreground">
-                                                        {absence.reason}
-                                                    </p>
-                                                    {absence.attachment_url ? (
-                                                        <a
-                                                            href={
-                                                                absence.attachment_url
-                                                            }
-                                                            target="_blank"
-                                                            rel="noreferrer"
-                                                            className="text-xs text-blue-600 hover:underline"
-                                                        >
-                                                            Ver justificante
-                                                        </a>
-                                                    ) : null}
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </section>
-
-                                    {canManageTeam &&
-                                    pendingAbsenceRequests.length > 0 ? (
-                                        <section
-                                            className={`${UI_PRESETS.sectionCard} lg:col-span-2`}
-                                        >
+                                <div className="grid gap-4 grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)] xl:grid-cols-[250px_minmax(0,1fr)] xl:items-start">
+                                    <section className={`relative overflow-hidden ${UI_PRESETS.sectionCard} bg-[linear-gradient(140deg,#eaf2ff_0%,#f7fbff_36%,#e9f9f2_100%)] xl:sticky xl:top-4 dark:bg-[linear-gradient(140deg,#0f1d34_0%,#11233f_48%,#0f2c2b_100%)]`}>
+                                        <div className="relative z-10">
                                             <h3 className={SECTION_TITLE_CLASS}>
-                                                Pendientes de revision
+                                                Ausencias existentes
                                             </h3>
                                             <div className="space-y-2">
-                                                {pendingAbsenceRequests.map(
-                                                    (absence) => (
+                                                {absenceRequests.length > 0 ? (
+                                                    absenceRequests.map((absence) => (
                                                         <div
                                                             key={absence.id}
-                                                            className="rounded-lg border border-sidebar-border/70 bg-white/70 p-3 dark:bg-slate-900/20"
+                                                            className="space-y-2 rounded-lg border border-sidebar-border/70 bg-white/80 p-3 backdrop-blur-[1px] dark:bg-slate-900/30"
                                                         >
-                                                            <p className="text-sm font-medium">
-                                                                {
-                                                                    absence
-                                                                        .intern
-                                                                        ?.name
-                                                                }{' '}
-                                                                -{' '}
-                                                                {formatDate(
-                                                                    absence.start_date,
-                                                                )}{' '}
-                                                                a{' '}
-                                                                {formatDate(
-                                                                    absence.end_date,
-                                                                )}
-                                                            </p>
+                                                            <div className="flex items-center justify-between gap-2">
+                                                                <p className="font-medium">
+                                                                    {formatDate(absence.start_date)} -{' '}
+                                                                    {formatDate(absence.end_date)}
+                                                                </p>
+                                                                <Badge
+                                                                    variant={absenceBadgeVariant(
+                                                                        absence.status,
+                                                                    )}
+                                                                >
+                                                                    {absenceStatusLabel(absence.status)}
+                                                                </Badge>
+                                                            </div>
                                                             <p className="text-sm text-muted-foreground">
                                                                 {absence.reason}
                                                             </p>
-                                                            <Input
-                                                                value={
-                                                                    reviewNotes[
-                                                                        absence
-                                                                            .id
-                                                                    ] ?? ''
-                                                                }
-                                                                onChange={(
-                                                                    event,
-                                                                ) =>
-                                                                    setReviewNotes(
-                                                                        (
-                                                                            current,
-                                                                        ) => ({
-                                                                            ...current,
-                                                                            [absence.id]:
-                                                                                event
-                                                                                    .target
-                                                                                    .value,
-                                                                        }),
-                                                                    )
-                                                                }
-                                                                className={`${UI_PRESETS.filterInput} mt-2`}
-                                                                placeholder="Nota de revision (opcional)"
-                                                            />
-                                                            <div className="mt-2 flex gap-2">
-                                                                <Button
-                                                                    size="sm"
-                                                                    onClick={() =>
-                                                                        runReview(
-                                                                            absence.id,
-                                                                            'approved',
-                                                                        )
-                                                                    }
-                                                                    disabled={
-                                                                        actionLoading !==
-                                                                        null
-                                                                    }
-                                                                >
-                                                                    Aprobar
-                                                                </Button>
-                                                                <Button
-                                                                    size="sm"
-                                                                    variant="destructive"
-                                                                    onClick={() =>
-                                                                        runReview(
-                                                                            absence.id,
-                                                                            'rejected',
-                                                                        )
-                                                                    }
-                                                                    disabled={
-                                                                        actionLoading !==
-                                                                        null
-                                                                    }
-                                                                >
-                                                                    Rechazar
-                                                                </Button>
-                                                            </div>
+                                                            {absence.attachment_url ? (
+                                                                <div className="mt-2 flex justify-center">
+                                                                    <Button
+                                                                        asChild
+                                                                        size="icon"
+                                                                        variant="outline"
+                                                                        className={UI_PRESETS.iconActionButtonPrimary}
+                                                                        aria-label="Ver justificante"
+                                                                        title="Ver justificante"
+                                                                    >
+                                                                        <a
+                                                                            href={absence.attachment_url}
+                                                                            target="_blank"
+                                                                            rel="noreferrer"
+                                                                        >
+                                                                            <Eye className="size-4" />
+                                                                        </a>
+                                                                    </Button>
+                                                                </div>
+                                                            ) : null}
                                                         </div>
-                                                    ),
+                                                    ))
+                                                ) : (
+                                                    <p className="rounded-lg border border-sidebar-border/70 bg-white/80 p-3 text-sm text-muted-foreground dark:bg-slate-900/30">
+                                                        No hay ausencias registradas.
+                                                    </p>
                                                 )}
                                             </div>
+                                        </div>
+                                    </section>
+
+                                    <div className="space-y-4">
+                                        <section className={`${UI_PRESETS.sectionCard} bg-white dark:bg-slate-900/20`}>
+                                            <h3 className={SECTION_TITLE_CLASS}>
+                                                Creacion de ausencia
+                                            </h3>
+                                            <p className="mb-1 text-xs text-muted-foreground">
+                                                Registra una ausencia e incluye justificante si corresponde.
+                                            </p>
+                                            <form
+                                                className="space-y-4"
+                                                onSubmit={submitAbsence}
+                                            >
+                                                <div className="grid gap-2 md:grid-cols-2">
+                                                    <div className="space-y-1">
+                                                        <label
+                                                            htmlFor="absence-start-date"
+                                                            className={FIELD_LABEL_CLASS}
+                                                        >
+                                                            Fecha inicio
+                                                        </label>
+                                                        <DatePicker
+                                                            id="absence-start-date"
+                                                            value={absenceForm.start_date}
+                                                            onChange={(value) =>
+                                                                setAbsenceForm((current) => ({
+                                                                    ...current,
+                                                                    start_date: value,
+                                                                }))
+                                                            }
+                                                            placeholder="Fecha inicio"
+                                                            className={UI_PRESETS.filterInput}
+                                                            required
+                                                        />
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        <label
+                                                            htmlFor="absence-end-date"
+                                                            className={FIELD_LABEL_CLASS}
+                                                        >
+                                                            Fecha fin
+                                                        </label>
+                                                        <DatePicker
+                                                            id="absence-end-date"
+                                                            value={absenceForm.end_date}
+                                                            onChange={(value) =>
+                                                                setAbsenceForm((current) => ({
+                                                                    ...current,
+                                                                    end_date: value,
+                                                                }))
+                                                            }
+                                                            placeholder="Fecha fin"
+                                                            className={UI_PRESETS.filterInput}
+                                                            required
+                                                        />
+                                                    </div>
+                                                </div>
+
+                                                <div className="space-y-1">
+                                                    <label
+                                                        htmlFor="absence-reason"
+                                                        className={FIELD_LABEL_CLASS}
+                                                    >
+                                                        Motivo
+                                                    </label>
+                                                    <Input
+                                                        id="absence-reason"
+                                                        value={absenceForm.reason}
+                                                        onChange={(event) =>
+                                                            setAbsenceForm((current) => ({
+                                                                ...current,
+                                                                reason: event.target.value,
+                                                            }))
+                                                        }
+                                                        className={UI_PRESETS.filterInput}
+                                                        placeholder="Ej. Cita medica"
+                                                        required
+                                                    />
+                                                </div>
+
+                                                <div className="space-y-1">
+                                                    <FileUploadField
+                                                        id="absence-attachment"
+                                                        label="Justificante (opcional)"
+                                                        selectedFileName={absenceForm.attachment?.name ?? null}
+                                                        onChange={(file) =>
+                                                            setAbsenceForm((current) => ({
+                                                                ...current,
+                                                                attachment: file,
+                                                            }))
+                                                        }
+                                                    />
+                                                </div>
+
+                                                <div className="flex justify-end">
+                                                    <Button
+                                                        size="sm"
+                                                        disabled={actionLoading !== null}
+                                                        className={UI_PRESETS.saveButton}
+                                                    >
+                                                        Enviar solicitud
+                                                    </Button>
+                                                </div>
+                                            </form>
                                         </section>
-                                    ) : null}
+
+                                        {canManageTeam &&
+                                        pendingAbsenceRequests.length > 0 ? (
+                                            <section className={UI_PRESETS.sectionCard}>
+                                                <h3 className={SECTION_TITLE_CLASS}>
+                                                    Pendientes de revision
+                                                </h3>
+                                                <div className="space-y-2">
+                                                    {pendingAbsenceRequests.map(
+                                                        (absence) => (
+                                                            <div
+                                                                key={absence.id}
+                                                                className="rounded-lg border border-sidebar-border/70 bg-white/70 p-3 dark:bg-slate-900/20"
+                                                            >
+                                                                <p className="text-sm font-medium">
+                                                                    {
+                                                                        absence
+                                                                            .intern
+                                                                            ?.name
+                                                                    }{' '}
+                                                                    -{' '}
+                                                                    {formatDate(
+                                                                        absence.start_date,
+                                                                    )}{' '}
+                                                                    a{' '}
+                                                                    {formatDate(
+                                                                        absence.end_date,
+                                                                    )}
+                                                                </p>
+                                                                <p className="text-sm text-muted-foreground">
+                                                                    {absence.reason}
+                                                                </p>
+                                                                {absence.attachment_url ? (
+                                                                    <a
+                                                                        href={absence.attachment_url}
+                                                                        target="_blank"
+                                                                        rel="noreferrer"
+                                                                        className="mt-1 inline-flex text-xs text-blue-600 hover:underline"
+                                                                    >
+                                                                        Ver justificante
+                                                                    </a>
+                                                                ) : null}
+                                                                <Input
+                                                                    value={
+                                                                        reviewNotes[
+                                                                            absence
+                                                                                .id
+                                                                        ] ?? ''
+                                                                    }
+                                                                    onChange={(
+                                                                        event,
+                                                                    ) =>
+                                                                        setReviewNotes(
+                                                                            (
+                                                                                current,
+                                                                            ) => ({
+                                                                                ...current,
+                                                                                [absence.id]:
+                                                                                    event
+                                                                                        .target
+                                                                                        .value,
+                                                                            }),
+                                                                        )
+                                                                    }
+                                                                    className={`${UI_PRESETS.filterInput} mt-2`}
+                                                                    placeholder="Nota de revision (opcional)"
+                                                                />
+                                                                <div className="mt-2 flex gap-2">
+                                                                    <Button
+                                                                        size="sm"
+                                                                        onClick={() =>
+                                                                            runReview(
+                                                                                absence.id,
+                                                                                'aprobada',
+                                                                            )
+                                                                        }
+                                                                        disabled={
+                                                                            actionLoading !==
+                                                                            null
+                                                                        }
+                                                                    >
+                                                                        Aprobar
+                                                                    </Button>
+                                                                    <Button
+                                                                        size="sm"
+                                                                        variant="destructive"
+                                                                        onClick={() =>
+                                                                            runReview(
+                                                                                absence.id,
+                                                                                'rechazada',
+                                                                            )
+                                                                        }
+                                                                        disabled={
+                                                                            actionLoading !==
+                                                                            null
+                                                                        }
+                                                                    >
+                                                                        Rechazar
+                                                                    </Button>
+                                                                </div>
+                                                            </div>
+                                                        ),
+                                                    )}
+                                                </div>
+                                            </section>
+                                        ) : null}
+                                    </div>
                                 </div>
                             ) : null}
 
                             {activeTab === 'summary' ? (
                                 <div className="space-y-4">
-                                    <section className="grid gap-3 md:grid-cols-4">
+                                    <section className="grid gap-3 md:grid-cols-3">
                                         <div className={UI_PRESETS.sectionCard}>
                                             <p className={FIELD_LABEL_CLASS}>
-                                                Horas efectivas (
-                                                {summary.range.label})
+                                                Horas realizadas
                                             </p>
                                             <p className={UI_PRESETS.summaryCardValue}>
                                                 {summary.range.worked_hours.toFixed(
@@ -3399,7 +3963,7 @@ export default function TimeControlPage({
                                                 Horas planificadas
                                             </p>
                                             <p className={UI_PRESETS.summaryCardValue}>
-                                                {summary.range.planned_hours.toFixed(
+                                                {plannedHoursFromSchedule.toFixed(
                                                     2,
                                                 )}
                                                 h
@@ -3408,17 +3972,6 @@ export default function TimeControlPage({
                                         <div className={UI_PRESETS.sectionCard}>
                                             <p className={FIELD_LABEL_CLASS}>
                                                 Cumplimiento
-                                            </p>
-                                            <p className={UI_PRESETS.summaryCardValue}>
-                                                {summary.range.compliance_percent.toFixed(
-                                                    1,
-                                                )}
-                                                %
-                                            </p>
-                                        </div>
-                                        <div className={UI_PRESETS.sectionCard}>
-                                            <p className={FIELD_LABEL_CLASS}>
-                                                Avance total
                                             </p>
                                             <p className={UI_PRESETS.summaryCardValue}>
                                                 {summary.progress.progress_percent.toFixed(
@@ -3440,10 +3993,6 @@ export default function TimeControlPage({
                                                 <ShieldAlert className="size-4" />
                                                 Alertas de cumplimiento
                                             </h3>
-                                            <Button size="sm" onClick={openPdf}>
-                                                <Download className="size-4" />
-                                                Exportar PDF
-                                            </Button>
                                         </div>
                                         <div className="space-y-2">
                                             {summary.alerts.map(
@@ -3484,4 +4033,3 @@ export default function TimeControlPage({
         </AppLayout>
     );
 }
-
