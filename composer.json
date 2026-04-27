@@ -16,6 +16,7 @@
         "laravel/tinker": "^2.10.1",
         "laravel/wayfinder": "^0.1.9",
         "maatwebsite/excel": "*",
+        "spatie/browsershot": "*",
         "spatie/laravel-medialibrary": "*",
         "spatie/laravel-pdf": "*",
         "spatie/laravel-permission": "*"

@@ -153,13 +153,14 @@ class TimeControlController extends Controller
         $weekWorkedByDate = $this->buildWorkedMinutesByDate($weekEntries);
         $rangeWorkedByDate = $this->buildWorkedMinutesByDate($rangeEntries);
 
-        $monthDays = $this->buildDayRows($monthGridStart->copy(), $monthGridEnd->copy(), $monthWorkedByDate, $schedules);
-        $weekDays = $this->buildDayRows($weekStart->copy(), $weekEnd->copy(), $weekWorkedByDate, $schedules);
+        $monthDays = $this->buildDayRows($monthGridStart->copy(), $monthGridEnd->copy(), $monthWorkedByDate, $schedules, $selectedIntern);
+        $weekDays = $this->buildDayRows($weekStart->copy(), $weekEnd->copy(), $weekWorkedByDate, $schedules, $selectedIntern);
         $rangeDays = $this->buildDayRows(
             $rangeWindow['start']->copy()->startOfDay(),
             $rangeWindow['end']->copy()->startOfDay(),
             $rangeWorkedByDate,
             $schedules,
+            $selectedIntern,
         );
         $recentWindowStart = now()->subDays(6)->startOfDay();
         $recentWindowEnd = now()->endOfDay();
@@ -175,10 +176,11 @@ class TimeControlController extends Controller
             $recentWindowEnd->copy(),
             $recentWorkedByDate,
             $schedules,
+            $selectedIntern,
         );
 
         $summary = $this->buildSummaryData($selectedIntern, $rangeWindow, $rangeDays, $allEntries);
-        $alerts = $this->buildAlerts($summary, $recentDays, $activeEntry, $schedules);
+        $alerts = $this->buildAlerts($summary, $rangeDays, $activeEntry, $schedules);
 
         $absenceRequests = InternAbsenceRequest::query()
             ->where('intern_id', $selectedIntern->id)
@@ -189,7 +191,7 @@ class TimeControlController extends Controller
 
         $pendingAbsenceRequests = $canManageTeam
             ? InternAbsenceRequest::query()
-                ->where('status', 'pending')
+                ->whereIn('status', ['pendiente', 'pending'])
                 ->with(['intern:id,first_name,last_name,email', 'requestedBy:id,name'])
                 ->orderBy('start_date')
                 ->limit(10)
@@ -267,6 +269,15 @@ class TimeControlController extends Controller
         $intern = $this->resolveActionIntern($request, true);
         if ($intern === null) {
             return back()->with('error', 'Selecciona un becario valido para fichar.');
+        }
+
+        $schedules = InternHourSchedule::query()
+            ->where('intern_id', $intern->id)
+            ->orderByDesc('starts_on')
+            ->get();
+        $today = now()->startOfDay();
+        if (!$this->hasScheduledCalendarForDate($today, $schedules, $intern)) {
+            return back()->with('error', 'No hay horario planificado para hoy en este becario.');
         }
 
         $existingActiveEntry = TimeClockEntry::query()
@@ -384,13 +395,54 @@ class TimeControlController extends Controller
         }
 
         $validated = $this->validateManualEntryPayload($request);
+        $internId = (int) $validated['intern_id'];
+        $intern = Intern::query()->find($internId);
+        if (!$intern instanceof Intern) {
+            return back()->with('error', 'No se encontro el becario seleccionado.');
+        }
+        $startedAt = Carbon::parse((string) $validated['started_at']);
+        $endedAt = Carbon::parse((string) $validated['ended_at']);
+        $targetDate = isset($validated['target_date'])
+            ? Carbon::createFromFormat('Y-m-d', (string) $validated['target_date'])->startOfDay()
+            : null;
+
+        if (!$startedAt->isSameDay($endedAt)) {
+            return back()->with('error', 'El fichaje manual debe empezar y terminar en el mismo dia.');
+        }
+
+        if ($targetDate !== null && (!$startedAt->isSameDay($targetDate) || !$endedAt->isSameDay($targetDate))) {
+            return back()->with('error', 'Solo puedes registrar fichajes en la fecha seleccionada del calendario.');
+        }
+
+        $schedules = InternHourSchedule::query()
+            ->where('intern_id', $internId)
+            ->orderByDesc('starts_on')
+            ->get();
+
+        $isStartedDayScheduled = $this->hasScheduledCalendarForDate(
+            $startedAt->copy()->startOfDay(),
+            $schedules,
+            $intern,
+        );
+        $isEndedDayScheduled = $this->hasScheduledCalendarForDate(
+            $endedAt->copy()->startOfDay(),
+            $schedules,
+            $intern,
+        );
+
+        if (!$isStartedDayScheduled || !$isEndedDayScheduled) {
+            return back()->with(
+                'error',
+                'Solo se pueden registrar fichajes manuales en dias con horario planificado.',
+            );
+        }
 
         TimeClockEntry::query()->create([
-            'intern_id' => (int) $validated['intern_id'],
+            'intern_id' => $internId,
             'entered_by_user_id' => $request->user()?->id,
             'source' => 'tutor_manual',
-            'started_at' => Carbon::parse((string) $validated['started_at']),
-            'ended_at' => Carbon::parse((string) $validated['ended_at']),
+            'started_at' => $startedAt,
+            'ended_at' => $endedAt,
             'break_minutes' => (int) ($validated['break_minutes'] ?? 0),
             'manual_reason' => trim((string) $validated['manual_reason']),
         ]);
@@ -405,14 +457,55 @@ class TimeControlController extends Controller
         }
 
         $validated = $this->validateManualEntryPayload($request);
+        $internId = (int) $validated['intern_id'];
+        $intern = Intern::query()->find($internId);
+        if (!$intern instanceof Intern) {
+            return back()->with('error', 'No se encontro el becario seleccionado.');
+        }
+        $startedAt = Carbon::parse((string) $validated['started_at']);
+        $endedAt = Carbon::parse((string) $validated['ended_at']);
+        $targetDate = isset($validated['target_date'])
+            ? Carbon::createFromFormat('Y-m-d', (string) $validated['target_date'])->startOfDay()
+            : null;
 
-        if ((int) $entry->intern_id !== (int) $validated['intern_id']) {
+        if (!$startedAt->isSameDay($endedAt)) {
+            return back()->with('error', 'El fichaje manual debe empezar y terminar en el mismo dia.');
+        }
+
+        if ($targetDate !== null && (!$startedAt->isSameDay($targetDate) || !$endedAt->isSameDay($targetDate))) {
+            return back()->with('error', 'Solo puedes guardar fichajes en la fecha seleccionada del calendario.');
+        }
+
+        $schedules = InternHourSchedule::query()
+            ->where('intern_id', $internId)
+            ->orderByDesc('starts_on')
+            ->get();
+
+        if ((int) $entry->intern_id !== $internId) {
             return back()->with('error', 'El fichaje no pertenece al becario seleccionado.');
         }
 
+        $isStartedDayScheduled = $this->hasScheduledCalendarForDate(
+            $startedAt->copy()->startOfDay(),
+            $schedules,
+            $intern,
+        );
+        $isEndedDayScheduled = $this->hasScheduledCalendarForDate(
+            $endedAt->copy()->startOfDay(),
+            $schedules,
+            $intern,
+        );
+
+        if (!$isStartedDayScheduled || !$isEndedDayScheduled) {
+            return back()->with(
+                'error',
+                'Solo se pueden guardar fichajes en dias con horario planificado.',
+            );
+        }
+
         $entry->update([
-            'started_at' => Carbon::parse((string) $validated['started_at']),
-            'ended_at' => Carbon::parse((string) $validated['ended_at']),
+            'started_at' => $startedAt,
+            'ended_at' => $endedAt,
             'break_minutes' => (int) ($validated['break_minutes'] ?? 0),
             'manual_reason' => trim((string) $validated['manual_reason']),
             'break_started_at' => null,
@@ -599,7 +692,7 @@ class TimeControlController extends Controller
             'end_date' => Carbon::parse((string) $validated['end_date'])->toDateString(),
             'reason' => trim((string) $validated['reason']),
             'attachment_path' => $attachmentPath,
-            'status' => 'pending',
+            'status' => 'pendiente',
         ]);
 
         return back()->with('success', 'Ausencia registrada correctamente.');
@@ -612,12 +705,18 @@ class TimeControlController extends Controller
         }
 
         $validated = $request->validate([
-            'status' => ['required', Rule::in(['approved', 'rejected'])],
+            'status' => ['required', Rule::in(['aprobada', 'rechazada', 'approved', 'rejected'])],
             'review_note' => ['nullable', 'string', 'max:500'],
         ]);
 
+        $normalizedStatus = match ((string) $validated['status']) {
+            'approved', 'aprobada' => 'aprobada',
+            'rejected', 'rechazada' => 'rechazada',
+            default => 'pendiente',
+        };
+
         $absence->update([
-            'status' => $validated['status'],
+            'status' => $normalizedStatus,
             'review_note' => trim((string) ($validated['review_note'] ?? '')) ?: null,
             'reviewed_by_user_id' => $request->user()?->id,
             'reviewed_at' => now(),
@@ -633,8 +732,25 @@ class TimeControlController extends Controller
             return back()->with('error', 'Selecciona un becario valido para exportar el parte.');
         }
 
-        $range = $this->normalizeRange($request->string('range')->toString());
-        $rangeWindow = $this->resolveRangeWindow($range);
+        $validated = $request->validate([
+            'start_date' => ['nullable', 'date_format:Y-m-d', 'required_with:end_date'],
+            'end_date' => ['nullable', 'date_format:Y-m-d', 'required_with:start_date', 'after_or_equal:start_date'],
+            'range_label' => ['nullable', 'string', 'max:80'],
+        ]);
+
+        $hasCustomRange = !empty($validated['start_date']) && !empty($validated['end_date']);
+        if ($hasCustomRange) {
+            $customRangeLabel = trim((string) ($validated['range_label'] ?? ''));
+            $rangeWindow = [
+                'start' => Carbon::createFromFormat('Y-m-d', (string) $validated['start_date'])->startOfDay(),
+                'end' => Carbon::createFromFormat('Y-m-d', (string) $validated['end_date'])->endOfDay(),
+                'label' => $customRangeLabel !== '' ? $customRangeLabel : 'Periodo seleccionado',
+            ];
+        } else {
+            $range = $this->normalizeRange($request->string('range')->toString());
+            $rangeWindow = $this->resolveRangeWindow($range);
+        }
+
         $schedules = InternHourSchedule::query()
             ->where('intern_id', $intern->id)
             ->orderByDesc('starts_on')
@@ -657,6 +773,7 @@ class TimeControlController extends Controller
             $rangeWindow['end']->copy()->startOfDay(),
             $workedByDate,
             $schedules,
+            $intern,
         );
         $summary = $this->buildSummaryData($intern, $rangeWindow, $days, $allEntries);
 
@@ -698,7 +815,13 @@ class TimeControlController extends Controller
             ->orderByDesc('starts_on')
             ->get();
 
-        $plannedDayMeta = $this->plannedDayMetaForDate($targetDate, $schedules);
+        $plannedDayMeta = $this->plannedDayMetaForDate($targetDate, $schedules, $intern);
+        if (($plannedDayMeta['off_kind'] ?? null) === 'unscheduled') {
+            return response()->json([
+                'message' => 'No hay horario planificado para el dia seleccionado.',
+            ], 422);
+        }
+
         $plannedMinutes = (int) $plannedDayMeta['planned_minutes'];
         $workedMinutes = (int) $entries->sum(fn ($entry) => $entry instanceof TimeClockEntry
             ? $this->effectiveMinutesForEntry($entry)
@@ -809,7 +932,14 @@ class TimeControlController extends Controller
     }
 
     /**
-     * @return array{intern_id: int, started_at: string, ended_at: string, break_minutes?: int, manual_reason: string}
+     * @return array{
+     *     intern_id: int,
+     *     started_at: string,
+     *     ended_at: string,
+     *     break_minutes?: int,
+     *     manual_reason: string,
+     *     target_date?: string
+     * }
      */
     private function validateManualEntryPayload(Request $request): array
     {
@@ -819,6 +949,7 @@ class TimeControlController extends Controller
             'ended_at' => ['required', 'date', 'after:started_at'],
             'break_minutes' => ['nullable', 'integer', 'min:0', 'max:720'],
             'manual_reason' => ['required', 'string', 'max:500'],
+            'target_date' => ['nullable', 'date_format:Y-m-d'],
         ]);
     }
 
@@ -924,7 +1055,13 @@ class TimeControlController extends Controller
     /**
      * @return array<int, array<string, mixed>>
      */
-    private function buildDayRows(CarbonInterface $start, CarbonInterface $end, array $workedByDate, Collection $schedules): array
+    private function buildDayRows(
+        CarbonInterface $start,
+        CarbonInterface $end,
+        array $workedByDate,
+        Collection $schedules,
+        ?Intern $intern = null,
+    ): array
     {
         $rows = [];
         $today = now()->startOfDay();
@@ -933,7 +1070,7 @@ class TimeControlController extends Controller
         while ($cursor->lte($end)) {
             $dateKey = $cursor->toDateString();
             $workedMinutes = (int) ($workedByDate[$dateKey] ?? 0);
-            $plannedDayMeta = $this->plannedDayMetaForDate($cursor, $schedules);
+            $plannedDayMeta = $this->plannedDayMetaForDate($cursor, $schedules, $intern);
             $plannedMinutes = (int) $plannedDayMeta['planned_minutes'];
             $status = $this->resolveDayStatus($cursor, $workedMinutes, $plannedMinutes);
 
@@ -1006,105 +1143,61 @@ class TimeControlController extends Controller
     private function buildAlerts(array $summary, array $recentDays, ?TimeClockEntry $activeEntry, Collection $schedules): array
     {
         $alerts = [];
-        $expectedPercent = data_get($summary, 'progress.expected_percent');
-        $realPercent = (float) data_get($summary, 'progress.progress_percent', 0);
         $requiredHours = (int) data_get($summary, 'progress.required_hours', 0);
-        $totalWorkedMinutes = (int) data_get($summary, 'progress.total_worked_minutes', 0);
         $rangeWorkedMinutes = (int) data_get($summary, 'range.worked_minutes', 0);
         $rangePlannedMinutes = (int) data_get($summary, 'range.planned_minutes', 0);
-        $effectiveBelowPlanned = $rangePlannedMinutes > 0 && $rangeWorkedMinutes < $rangePlannedMinutes;
-        $internshipHasStarted = is_numeric($expectedPercent) && (float) $expectedPercent > 0;
-        $minimumGapMinutes = 60;
-        $hasAnyActiveSchedule = $schedules->contains(
-            fn ($schedule) => $schedule instanceof InternHourSchedule
-                && $schedule->is_active
-                && $schedule->starts_on !== null
-        );
 
-        if ($requiredHours > 0 && $totalWorkedMinutes === 0 && $internshipHasStarted) {
-            $alerts[] = [
-                'level' => 'warning',
-                'title' => 'Sin horas efectivas',
-                'message' => 'No hay horas efectivas registradas pese a que el periodo de practicas ya esta en curso.',
-            ];
-        }
-
-        if ($requiredHours > 0 && $rangePlannedMinutes === 0 && !$hasAnyActiveSchedule) {
-            $alerts[] = [
-                'level' => 'info',
-                'title' => 'Sin planificacion activa',
-                'message' => 'No hay horarios activos configurados para este becario.',
-            ];
-        }
-
-        if ($effectiveBelowPlanned && ($rangePlannedMinutes - $rangeWorkedMinutes) >= $minimumGapMinutes) {
-            $workedHours = number_format($this->minutesToHours($rangeWorkedMinutes), 1);
-            $plannedHours = number_format($this->minutesToHours($rangePlannedMinutes), 1);
-            $alerts[] = [
-                'level' => 'warning',
-                'title' => 'Horas efectivas por debajo de planificadas',
-                'message' => "Horas efectivas {$workedHours}h frente a {$plannedHours}h planificadas en el rango actual.",
-            ];
-        }
-
+        // 1. Dias sin fichar: si ha pasado un dia planificado SIN fichaje
         $daysWithoutClocking = collect($recentDays)
             ->filter(function (array $day): bool {
                 $date = (string) ($day['date'] ?? '');
                 $plannedMinutes = (int) ($day['planned_minutes'] ?? 0);
                 $workedMinutes = (int) ($day['worked_minutes'] ?? 0);
+                $isPast = $day['is_past'] ?? false;
 
-                return $date !== ''
+                return $isPast
+                    && $date !== ''
                     && $plannedMinutes > 0
                     && $workedMinutes === 0;
             })
             ->count();
 
-        if ($daysWithoutClocking >= 1) {
+        if ($daysWithoutClocking > 0) {
             $alerts[] = [
                 'level' => 'warning',
-                'title' => 'Dias sin fichaje',
-                'message' => "Se han detectado {$daysWithoutClocking} dias recientes sin fichaje.",
+                'title' => 'Dias sin fichar',
+                'message' => "Se han detectado {$daysWithoutClocking} dia(s) planificado(s) sin registro de fichaje.",
             ];
         }
 
-        if ($activeEntry !== null && $activeEntry->started_at?->lt(now()->subHours(12))) {
-            $alerts[] = [
-                'level' => 'info',
-                'title' => 'Fichaje abierto',
-                'message' => 'Hay un fichaje abierto con una duracion superior a 12 horas.',
-            ];
-        }
+        // 2. Si va a destiempo con las planificadas vs requeridas
+        $expectedPercent = data_get($summary, 'progress.expected_percent');
+        $realPercent = (float) data_get($summary, 'progress.progress_percent', 0);
 
-        $isInternshipFinished = is_numeric($expectedPercent) && (float) $expectedPercent >= 100;
-        $isBehindRequiredGoal = is_numeric($expectedPercent)
-            && (
-                ($isInternshipFinished && $realPercent < 100)
-                || (!$isInternshipFinished && $realPercent + 5 < (float) $expectedPercent)
-            );
+        if ($requiredHours > 0 && is_numeric($expectedPercent) && (float) $expectedPercent > 0) {
+            $difference = $realPercent - (float) $expectedPercent;
 
-        if ($requiredHours > 0 && $isBehindRequiredGoal) {
-            $workedHours = number_format($this->minutesToHours($totalWorkedMinutes), 1);
-            $alerts[] = [
-                'level' => 'warning',
-                'title' => 'Desfase respecto al objetivo de horas requeridas',
-                'message' => "Horas efectivas acumuladas {$workedHours}h de {$requiredHours}h requeridas.",
-            ];
-        }
+            // Si esta mas de un 10% por debajo de lo esperado
+            if ($difference < -10) {
+                $workedHours = number_format($this->minutesToHours($rangeWorkedMinutes), 1);
+                $plannedHours = number_format($this->minutesToHours($rangePlannedMinutes), 1);
+                $diffPercent = number_format(abs($difference), 0);
 
-        if (empty($alerts)) {
-            if ($requiredHours <= 0) {
                 $alerts[] = [
-                    'level' => 'info',
-                    'title' => 'Sin datos suficientes para evaluar',
-                    'message' => 'El becario no tiene horas requeridas configuradas.',
-                ];
-            } else {
-                $alerts[] = [
-                    'level' => 'success',
-                    'title' => 'Sin incidencias',
-                    'message' => 'No se detectaron alertas relevantes en el periodo revisado.',
+                    'level' => 'warning',
+                    'title' => 'Desfase de cumplimiento',
+                    'message' => "El becario esta al {$diffPercent}% por debajo del ritmo esperado. Horas en rango: {$workedHours}h de {$plannedHours}h planificadas.",
                 ];
             }
+        }
+
+        // Mensaje cuando no hay alertas
+        if (empty($alerts)) {
+            $alerts[] = [
+                'level' => 'success',
+                'title' => 'Sin incidencias',
+                'message' => 'No se detectaron alertas de cumplimiento.',
+            ];
         }
 
         return $alerts;
@@ -1137,8 +1230,19 @@ class TimeControlController extends Controller
     /**
      * @return array{planned_minutes: int, off_kind: 'rest'|'unscheduled'|null}
      */
-    private function plannedDayMetaForDate(CarbonInterface $date, Collection $schedules): array
+    private function plannedDayMetaForDate(
+        CarbonInterface $date,
+        Collection $schedules,
+        ?Intern $intern = null,
+    ): array
     {
+        if (!$this->isDateWithinInternshipPeriod($date, $intern)) {
+            return [
+                'planned_minutes' => 0,
+                'off_kind' => 'unscheduled',
+            ];
+        }
+
         foreach ($schedules as $schedule) {
             if (!$schedule instanceof InternHourSchedule || !$schedule->is_active || !$schedule->starts_on) {
                 continue;
@@ -1178,9 +1282,49 @@ class TimeControlController extends Controller
         ];
     }
 
-    private function plannedMinutesForDate(CarbonInterface $date, Collection $schedules): int
+    private function plannedMinutesForDate(
+        CarbonInterface $date,
+        Collection $schedules,
+        ?Intern $intern = null,
+    ): int
     {
-        return (int) $this->plannedDayMetaForDate($date, $schedules)['planned_minutes'];
+        return (int) $this->plannedDayMetaForDate($date, $schedules, $intern)['planned_minutes'];
+    }
+
+    private function hasScheduledCalendarForDate(
+        CarbonInterface $date,
+        Collection $schedules,
+        ?Intern $intern = null,
+    ): bool
+    {
+        $plannedDayMeta = $this->plannedDayMetaForDate($date, $schedules, $intern);
+
+        return ($plannedDayMeta['off_kind'] ?? null) !== 'unscheduled';
+    }
+
+    private function isDateWithinInternshipPeriod(CarbonInterface $date, ?Intern $intern): bool
+    {
+        if (!$intern instanceof Intern) {
+            return true;
+        }
+
+        $targetDate = $date->copy()->startOfDay();
+
+        if ($intern->internship_start_date !== null) {
+            $startsOn = Carbon::parse($intern->internship_start_date)->startOfDay();
+            if ($targetDate->lt($startsOn)) {
+                return false;
+            }
+        }
+
+        if ($intern->internship_end_date !== null) {
+            $endsOn = Carbon::parse($intern->internship_end_date)->endOfDay();
+            if ($targetDate->gt($endsOn)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private function resolveDayStatus(CarbonInterface $date, int $workedMinutes, int $plannedMinutes): string
@@ -1193,6 +1337,7 @@ class TimeControlController extends Controller
             return $date->isFuture() ? 'scheduled' : 'missing';
         }
 
+        // Los 30 minutos de descanso ya estan incluidos en las horas efectivas
         if ($plannedMinutes > 0 && $workedMinutes < $plannedMinutes) {
             return 'partial';
         }
@@ -1218,9 +1363,14 @@ class TimeControlController extends Controller
             $breakMinutes += $this->elapsedWholeMinutes($entry->break_started_at, now());
         }
 
+        // Los minutos de descanso que excedan los 30 minutos se restan
         $discountableBreakMinutes = max(0, $breakMinutes - self::INCLUDED_BREAK_MINUTES);
 
-        return max(0, $grossMinutes - $discountableBreakMinutes);
+        // Las horas netas (sin descanso excesivo)
+        $netMinutes = max(0, $grossMinutes - $discountableBreakMinutes);
+
+        // Los 30 minutos de descanso se cuentan como horas trabajadas
+        return $netMinutes + self::INCLUDED_BREAK_MINUTES;
     }
 
     private function minutesToHours(int $minutes): float
@@ -1316,7 +1466,7 @@ class TimeControlController extends Controller
             'start_date' => $absence->start_date?->toDateString(),
             'end_date' => $absence->end_date?->toDateString(),
             'reason' => $absence->reason,
-            'status' => $absence->status,
+            'status' => $this->normalizeAbsenceStatus($absence->status),
             'attachment_url' => $absence->attachment_url,
             'review_note' => $absence->review_note,
             'reviewed_at' => $absence->reviewed_at?->toIso8601String(),
@@ -1324,5 +1474,14 @@ class TimeControlController extends Controller
             'reviewed_by_name' => $absence->reviewedBy?->name,
             'created_at' => $absence->created_at?->toIso8601String(),
         ];
+    }
+
+    private function normalizeAbsenceStatus(?string $status): string
+    {
+        return match ($status) {
+            'approved', 'aprobada' => 'aprobada',
+            'rejected', 'rechazada' => 'rechazada',
+            default => 'pendiente',
+        };
     }
 }
